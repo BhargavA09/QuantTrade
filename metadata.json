@@ -1,0 +1,7 @@
+{
+  "name": "QuantTrade Pro",
+  "description": "Advanced mobile trading platform with Monte Carlo simulations, Fuzzy Logic projections, Fourier signal filtering, and global trade tracking.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
