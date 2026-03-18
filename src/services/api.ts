@@ -4,7 +4,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 // Semaphore to limit parallel Gemini calls
 let activeRequests = 0;
-const MAX_PARALLEL_REQUESTS = 2;
+const MAX_PARALLEL_REQUESTS = 1; // Extremely conservative to avoid 429s
 const requestQueue: (() => void)[] = [];
 
 const acquireSemaphore = () => {
@@ -26,9 +26,9 @@ const releaseSemaphore = () => {
   }
 };
 
-// Helper for calling Gemini with exponential backoff for 429 errors
-const callGeminiWithRetry = async (params: any, maxRetries = 5) => {
-  let delay = 3000;
+// Helper for calling Gemini with exponential backoff for 429 and transient errors
+const callGeminiWithRetry = async (params: any, maxRetries = 10) => {
+  let delay = 5000; // Increased base delay
   for (let i = 0; i < maxRetries; i++) {
     try {
       await acquireSemaphore();
@@ -38,16 +38,29 @@ const callGeminiWithRetry = async (params: any, maxRetries = 5) => {
         releaseSemaphore();
       }
     } catch (error: any) {
-      const isRateLimit = error?.status === 429 || 
-                         error?.message?.includes('429') || 
-                         error?.message?.includes('RESOURCE_EXHAUSTED') ||
-                         error?.message?.includes('quota');
+      const errorMessage = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+      const errorCode = error?.status || error?.error?.code || error?.code;
+      const errorStatus = error?.status || error?.error?.status;
       
-      if (isRateLimit && i < maxRetries - 1) {
+      const isRetryable = errorCode === 429 || 
+                         errorCode === 500 ||
+                         errorCode === 6 || // Specific RPC error code mentioned by user
+                         errorStatus === 'UNKNOWN' ||
+                         errorMessage?.includes('429') || 
+                         errorMessage?.includes('500') ||
+                         errorMessage?.includes('error code: 6') ||
+                         errorMessage?.includes('RESOURCE_EXHAUSTED') ||
+                         errorMessage?.includes('quota') ||
+                         errorMessage?.includes('Rpc failed') ||
+                         errorMessage?.includes('xhr error') ||
+                         errorMessage?.includes('ProxyUnaryCall') ||
+                         errorMessage?.includes('UNKNOWN');
+      
+      if (isRetryable && i < maxRetries - 1) {
         // Add jitter to avoid thundering herd
-        const jitter = Math.random() * 1000;
+        const jitter = Math.random() * 2000;
         const totalDelay = delay + jitter;
-        console.warn(`Gemini Rate Limit hit. Retrying in ${Math.round(totalDelay)}ms (Attempt ${i + 1}/${maxRetries})`);
+        console.warn(`Gemini API error (retryable). Retrying in ${Math.round(totalDelay)}ms (Attempt ${i + 1}/${maxRetries}): ${errorMessage}`);
         await new Promise(resolve => setTimeout(resolve, totalDelay));
         delay *= 2;
         continue;
@@ -55,12 +68,12 @@ const callGeminiWithRetry = async (params: any, maxRetries = 5) => {
       throw error;
     }
   }
-  throw new Error("Max retries exceeded for Gemini API. Please wait a moment and try again.");
+  throw new Error("Max retries exceeded for Gemini API. The service is currently under high load or quota is exhausted. Please try again in a few minutes.");
 };
 
 // Simple in-memory cache for faster searching
 const dataCache: Record<string, { data: any; timestamp: number }> = {};
-const CACHE_TTL = 1000 * 60 * 15; // 15 minutes
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 
 export const generateMockHistory = (ticker: string, days: number = 100) => {
   let price = 100 + Math.random() * 400;
@@ -343,6 +356,70 @@ export const fetchPortfolioData = async () => {
   return request;
 };
 
+export const fetchPennyStocks = async () => {
+  try {
+    const prompt = `Using Google Finance and recent market data, identify 5-7 penny stocks (stocks under $5) on NASDAQ, NYSE, or TSX that are currently showing strong momentum or positive catalysts for the next 2 trading days.
+    
+    For each stock, provide:
+    - ticker: string (exact ticker symbol)
+    - name: string (company name)
+    - currentPrice: number (latest price from Google Finance)
+    - reason: string (specific technical or fundamental reason for momentum)
+    - riskLevel: "High" | "Extreme"
+    - projectedProfit: number (numeric percentage, e.g. 15 for 15%)
+    - confidence: number (0 to 1)
+    - volume: string (current volume)
+    
+    Return ONLY a JSON array of these objects. Ensure the tickers are accurate and currently active.`;
+    
+    const response = await callGeminiWithRetry({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json"
+      }
+    });
+    
+    const data = JSON.parse(response.text || "[]");
+    return data.map((item: any) => ({
+      ...item,
+      projectedProfit: typeof item.projectedProfit === 'string' ? parseFloat(item.projectedProfit) : item.projectedProfit
+    }));
+  } catch (error) {
+    console.error("Failed to fetch penny stocks:", error);
+    return [];
+  }
+};
+
+export const searchTicker = async (query: string, filters?: { exchange?: string; marketCap?: string; sector?: string }) => {
+  try {
+    let filterString = "";
+    if (filters) {
+      if (filters.exchange) filterString += ` Exchange: ${filters.exchange}.`;
+      if (filters.marketCap) filterString += ` Market Cap: ${filters.marketCap}.`;
+      if (filters.sector) filterString += ` Sector: ${filters.sector}.`;
+    }
+
+    const prompt = `Search for the stock ticker symbol for the company or criteria: "${query}". 
+    ${filterString}
+    Look specifically at NASDAQ, NYSE, TSX, and LSE.
+    Return ONLY the ticker symbol (e.g. "AAPL", "RY.TO", or "BP.L"). 
+    If multiple exist, return the most popular one that matches the criteria.`;
+    
+    const response = await callGeminiWithRetry({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { tools: [{ googleSearch: {} }] }
+    });
+    
+    return response.text?.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, '');
+  } catch (error) {
+    console.error("Search failed:", error);
+    return null;
+  }
+};
+
 export const fetchForecast = async (ticker: string = "SPY", numSimulations: number = 100, confidenceInterval: number = 0.8) => {
   // Check Cache First for Fast Searching
   const cached = dataCache[ticker];
@@ -358,22 +435,53 @@ export const fetchForecast = async (ticker: string = "SPY", numSimulations: numb
 
   const request = (async () => {
     try {
-      // 1. Fetch REAL historical data using Gemini Search from multiple portals
-      const pricePrompt = `Search multiple open-source finance portals (Yahoo Finance, Google Finance, Investing.com, London Stock Exchange) for the daily closing prices of ${ticker} for the last 90 days. 
-      This search should cover US markets, the British market (LSE), and TRX markets.
+      // 1. Fetch REAL historical data and fundamentals using Gemini Search
+      const pricePrompt = `Search multiple open-source finance portals (Yahoo Finance, Google Finance, Investing.com, London Stock Exchange, TMX Money, NASDAQ) for the daily closing prices of ${ticker} for the last 90 days. 
+      This search should cover US markets (NASDAQ, NYSE), the British market (LSE), and Canadian markets (TSX, TSXV).
       Return ONLY a JSON array of objects: [{ "date": "YYYY-MM-DD", "price": number, "volume": number }]. 
       Ensure the data is the most accurate available and sorted chronologically.`;
+
+      const fundamentalsPrompt = `Search for the latest fundamental data and recent news for ${ticker}.
+      Return ONLY a JSON object with the following structure:
+      {
+        "fundamentals": {
+          "marketCap": "string",
+          "peRatio": "string",
+          "dividendYield": "string",
+          "revenue": "string",
+          "netIncome": "string",
+          "eps": "string",
+          "beta": "string",
+          "fiftyTwoWeekHigh": "string",
+          "fiftyTwoWeekLow": "string"
+        },
+        "news": [
+          { "title": "string", "source": "string", "time": "string", "url": "string", "sentiment": "string" }
+        ]
+      }
+      Ensure the data is the most recent available.`;
       
-      const priceResponse = await callGeminiWithRetry({
-        model: "gemini-3-flash-preview",
-        contents: pricePrompt,
-        config: { 
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json"
-        }
-      });
+      const [priceResponse, fundamentalsResponse] = await Promise.all([
+        callGeminiWithRetry({
+          model: "gemini-3-flash-preview",
+          contents: pricePrompt,
+          config: { 
+            tools: [{ googleSearch: {} }],
+            responseMimeType: "application/json"
+          }
+        }),
+        callGeminiWithRetry({
+          model: "gemini-3-flash-preview",
+          contents: fundamentalsPrompt,
+          config: { 
+            tools: [{ googleSearch: {} }],
+            responseMimeType: "application/json"
+          }
+        })
+      ]);
 
       let history = JSON.parse(priceResponse.text || "[]");
+      let extraData = JSON.parse(fundamentalsResponse.text || "{}");
       
       if (!Array.isArray(history) || history.length < 5) {
         console.warn("Gemini failed to fetch accurate history, falling back to mock for:", ticker);
@@ -448,6 +556,8 @@ export const fetchForecast = async (ticker: string = "SPY", numSimulations: numb
         change,
         changePercent,
         history,
+        fundamentals: extraData.fundamentals,
+        news: extraData.news,
         filtered: filtered.map(p => parseFloat(p.toFixed(2))),
         neuralFeatures,
         ...mcResults,
@@ -644,24 +754,37 @@ export const fetchGlobalState = async () => {
       2. Major shipping lane status (Suez, Panama, Malacca, etc.)
       3. Current OPEC+ production levels vs targets
       4. Key resource shortages or surpluses (Lithium, Wheat, Semiconductors, etc.)
-      5. Top 5 global trade news headlines with impact analysis.
+      5. Top 5 global trade news headlines with impact analysis and sentiment.
       6. Import/Export volume trends for major economies (US, China, EU, India, Japan, Brazil).
+      7. Detailed ship information: Name, Type (Container, Tanker, Bulk Carrier, Gas Carrier), Capacity (TEU or DWT), Origin, Destination, Cargo (Commodity), Status (In Transit, Docked, Delayed, Under Repair), and Progress (0-100).
+      8. Detailed commodity data: Name, Status, Price Trend, Import Volume, Export Volume, Top Exporter, Top Importer, 30-day historical price data (date, price), and supply/demand metrics (supply, demand, inventory levels).
       
       Return ONLY JSON: 
       {
         "globalTrade": { 
           "status": string, 
-          "news": [{ "title": string, "impact": string, "severity": "low"|"medium"|"high" }], 
+          "news": [{ "title": string, "impact": string, "severity": "low"|"medium"|"high", "sentiment": "positive"|"neutral"|"negative" }], 
           "volumeIndex": number,
           "importExport": { "us": number, "china": number, "eu": number, "india": number, "japan": number, "brazil": number }
         },
         "logistics": { 
           "shipping": [{ "lane": string, "status": string, "delayDays": number, "congestionLevel": number }], 
-          "bottlenecks": string[] 
+          "bottlenecks": string[],
+          "ships": [{ "name": string, "type": "Container"|"Tanker"|"Bulk Carrier"|"Gas Carrier", "capacity": string, "origin": string, "destination": string, "cargo": string, "status": "In Transit"|"Docked"|"Delayed"|"Under Repair", "progress": number }]
         },
         "resources": { 
           "oil": { "production": string, "trend": "up"|"down", "price": number }, 
-          "commodities": [{ "name": string, "status": string, "priceTrend": string }] 
+          "commodities": [{ 
+            "name": string, 
+            "status": string, 
+            "priceTrend": string, 
+            "importVolume": string, 
+            "exportVolume": string, 
+            "topExporter": string, 
+            "topImporter": string,
+            "history": [{ "date": string, "price": number }],
+            "supplyDemand": { "supply": number, "demand": number, "inventory": number }
+          }] 
         }
       }`;
 
@@ -693,28 +816,48 @@ export const fetchGlobalState = async () => {
   return request;
 };
 
+// Cache for pattern analysis
+let patternCache: { data: any; timestamp: number } | null = null;
+
 export const analyzeTradePatterns = async (globalState: any) => {
-  try {
-    const prompt = `Based on the following global trade and logistics data:
-    ${JSON.stringify(globalState)}
-    
-    Learn and identify complex patterns that may impact specific stock sectors (Tech, Energy, Consumer, Industrials, Finance, Healthcare, Materials).
-    Return ONLY JSON:
-    {
-      "patterns": [{ "sector": string, "pattern": string, "impact": "positive"|"negative"|"neutral", "impactScore": number, "confidence": number }],
-      "summary": string
-    }
-    Note: impactScore should be between -100 and 100.`;
-
-    const response = await callGeminiWithRetry({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: { responseMimeType: "application/json" }
-    });
-
-    return JSON.parse(response.text || "{}");
-  } catch (e) {
-    console.error("Pattern analysis failed:", e);
-    return { patterns: [], summary: "Pattern analysis unavailable" };
+  if (patternCache && (Date.now() - patternCache.timestamp < CACHE_TTL)) {
+    return patternCache.data;
   }
+
+  if (pendingRequests.has('analyzePatterns')) {
+    return pendingRequests.get('analyzePatterns');
+  }
+
+  const request = (async () => {
+    try {
+      const prompt = `Based on the following global trade and logistics data:
+      ${JSON.stringify(globalState)}
+      
+      Learn and identify complex patterns that may impact specific stock sectors (Tech, Energy, Consumer, Industrials, Finance, Healthcare, Materials).
+      Return ONLY JSON:
+      {
+        "patterns": [{ "sector": string, "pattern": string, "impact": "positive"|"negative"|"neutral", "impactScore": number, "confidence": number }],
+        "summary": string
+      }
+      Note: impactScore should be between -100 and 100.`;
+
+      const response = await callGeminiWithRetry({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+      });
+
+      const data = JSON.parse(response.text || "{}");
+      patternCache = { data, timestamp: Date.now() };
+      return data;
+    } catch (e) {
+      console.error("Pattern analysis failed:", e);
+      return { patterns: [], summary: "Pattern analysis unavailable" };
+    } finally {
+      pendingRequests.delete('analyzePatterns');
+    }
+  })();
+
+  pendingRequests.set('analyzePatterns', request);
+  return request;
 };
