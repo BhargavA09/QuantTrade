@@ -798,6 +798,20 @@ export const fetchGlobalState = async () => {
       });
 
       const data = JSON.parse(response.text || "{}");
+      
+      // Simulate Learning Engine state
+      data.learningEngine = {
+        modelVersion: "v2.4.1-alpha",
+        learningRate: 0.0012,
+        lossTrend: Math.random() > 0.3 ? 'decreasing' : 'stable',
+        activeFeatures: ["Sentiment Analysis", "Logistics Congestion", "Monte Carlo Simulations", "Fourier Noise Reduction"],
+        optimizationGoal: "Sharpe Ratio Maximization",
+        recentEvents: [
+          { timestamp: new Date().toISOString(), event: "Model weights updated with new shipping data", impact: "positive" },
+          { timestamp: new Date(Date.now() - 3600000).toISOString(), event: "Anomaly detected in Suez Canal throughput", impact: "neutral" }
+        ]
+      };
+
       globalStateCache = { data, timestamp: Date.now() };
       return data;
     } catch (error: any) {
@@ -805,7 +819,15 @@ export const fetchGlobalState = async () => {
       return { 
         globalTrade: { status: "Stable", news: [], volumeIndex: 100, importExport: { us: 0, china: 0, eu: 0, india: 0, japan: 0, brazil: 0 } },
         logistics: { shipping: [], bottlenecks: [] },
-        resources: { oil: { production: "N/A", trend: "down", price: 0 }, commodities: [] }
+        resources: { oil: { production: "N/A", trend: "down", price: 0 }, commodities: [] },
+        learningEngine: {
+          modelVersion: "v2.4.1-alpha",
+          learningRate: 0.0012,
+          lossTrend: 'stable',
+          activeFeatures: [],
+          optimizationGoal: "N/A",
+          recentEvents: []
+        }
       };
     } finally {
       pendingRequests.delete('globalState');
@@ -814,6 +836,18 @@ export const fetchGlobalState = async () => {
 
   pendingRequests.set('globalState', request);
   return request;
+};
+
+/**
+ * Simulates retraining the model
+ */
+export const retrainModel = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // In a real app, this would call a backend to trigger a training job
+      resolve(true);
+    }, 2000);
+  });
 };
 
 // Cache for pattern analysis
@@ -860,4 +894,41 @@ export const analyzeTradePatterns = async (globalState: any) => {
 
   pendingRequests.set('analyzePatterns', request);
   return request;
+};
+
+export const fetchMarketOverview = async () => {
+  try {
+    const prompt = `Provide a list of 10 major companies from the NASDAQ and 10 major companies from the Toronto Stock Exchange (TSX).
+    For each company, include:
+    - ticker: string (e.g. "AAPL", "RY.TO")
+    - name: string (company name)
+    - exchange: "NASDAQ" | "TSX"
+    - sector: string
+    - marketCap: string
+    - recentPerformance: number (percentage change in last 30 days)
+    
+    Return ONLY JSON:
+    {
+      "nasdaq": [{ "ticker": string, "name": string, "sector": string, "marketCap": string, "recentPerformance": number }],
+      "tsx": [{ "ticker": string, "name": string, "sector": string, "marketCap": string, "recentPerformance": number }]
+    }`;
+
+    const response = await callGeminiWithRetry({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json"
+      }
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    return {
+      nasdaq: Array.isArray(parsed.nasdaq) ? parsed.nasdaq : [],
+      tsx: Array.isArray(parsed.tsx) ? parsed.tsx : []
+    };
+  } catch (error) {
+    console.error("Market overview fetch failed:", error);
+    return { nasdaq: [], tsx: [] };
+  }
 };

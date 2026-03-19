@@ -13,18 +13,24 @@ import {
   ArrowDownRight,
   Info,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Minus,
   Zap,
   AlertCircle,
   AlertTriangle,
   RefreshCw,
   XCircle,
+  X,
   Circle,
   LayoutGrid,
   Plus,
+  Brain,
   Newspaper,
   Package,
   History,
-  Settings
+  Settings,
+  Briefcase
 } from 'lucide-react';
 import { 
   BarChart,
@@ -49,13 +55,43 @@ import {
   ZAxis
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { fetchForecast, fetchGlobalState, fetchSentiment, fetchRiskAnalysis, runMonteCarlo, analyzeTradePatterns, fetchPortfolioData, searchTicker, fetchPennyStocks } from './services/api';
+import { cn } from './utils/cn';
+import { fetchForecast, fetchGlobalState, fetchSentiment, fetchRiskAnalysis, runMonteCarlo, analyzeTradePatterns, fetchPortfolioData, searchTicker, fetchPennyStocks, fetchMarketOverview } from './services/api';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+// --- Components ---
+import StatCard from './components/StatCard';
+import TradeFeed from './components/TradeFeed';
+import LoadingScreen from './components/LoadingScreen';
+import CustomTooltip from './components/CustomTooltip';
+import PredictiveBacktest from './components/PredictiveBacktest';
+import SentimentAnalysis from './components/SentimentAnalysis';
+import RiskAnalysis from './components/RiskAnalysis';
+import { PriceTargets } from './components/PriceTargets';
+import { DateRangeSelector } from './components/DateRangeSelector';
+import { MonteCarloControls } from './components/MonteCarloControls';
+import { FibonacciSettings } from './components/FibonacciSettings';
+import { DistributionChart } from './components/DistributionChart';
+import { ModelComparison } from './components/ModelComparison';
+import { OptionsChain } from './components/OptionsChain';
+import { RiskAssessment } from './components/RiskAssessment';
+import GlobalNewsFeed from './components/GlobalNewsFeed';
+import CommodityDetailChart from './components/CommodityDetailChart';
+import GlobalTradeComparisonChart from './components/GlobalTradeComparisonChart';
+import GlobalEconomyTradeChart from './components/GlobalEconomyTradeChart';
+import SectorImpactChart from './components/SectorImpactChart';
+import SectorHeatmap from './components/SectorHeatmap';
+import GlobalTradeChart from './components/GlobalTradeChart';
+import RiskReturnScatterPlot from './components/RiskReturnScatterPlot';
+import PerformanceAttributionChart from './components/PerformanceAttributionChart';
+import SectorAllocationChart from './components/SectorAllocationChart';
+import FuzzyLogicExplainer from './components/FuzzyLogicExplainer';
+import BacktestReport from './components/BacktestReport';
+import PortfolioManager from './components/PortfolioManager';
+import NavigationMenu from './components/NavigationMenu';
+import QuickActions from './components/QuickActions';
+import { ShippingMap } from './components/ShippingMap';
+import LearningStatus from './components/LearningStatus';
+import { ModelInsight } from './types';
 
 // --- Types ---
 interface RiskData {
@@ -143,6 +179,7 @@ interface GlobalState {
     patterns: { sector: string; pattern: string; impact: 'positive' | 'negative' | 'neutral'; impactScore: number; confidence: number }[];
     summary: string;
   };
+  learningEngine?: ModelInsight;
 }
 
 interface PortfolioData {
@@ -151,94 +188,91 @@ interface PortfolioData {
   riskReturn: { ticker: string; return: number; volatility: number; sharpe: number }[];
 }
 
-const SectorAllocationChart = ({ data }: { data: PortfolioData['allocation'] }) => {
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-  return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={5}
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
-          />
-          <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px' }} />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
+const getFuzzyVolatility = (data: StockData) => {
+  if (!data.sentiment) return { label: "Moderate", value: "2.5%", trend: "down" as const, reasons: ["Awaiting sentiment analysis"] };
+
+  const sentimentScore = Math.abs(data.sentiment.score); // 0 to 1
+  const summary = data.sentiment.summary.toLowerCase();
+  const reasons: string[] = [];
+  
+  // Fuzzy inputs
+  let volatilityScore = 0.5; // Base volatility (Moderate)
+
+  // Rule 1: High sentiment magnitude increases volatility
+  if (sentimentScore > 0.7) {
+    volatilityScore += 0.3;
+    reasons.push("High sentiment conviction detected");
+  } else if (sentimentScore > 0.4) {
+    volatilityScore += 0.1;
+    reasons.push("Moderate sentiment bias");
+  }
+
+  // Rule 2: Keywords in news summary
+  const highVolKeywords = ['uncertainty', 'volatile', 'crisis', 'lawsuit', 'earnings', 'breakthrough', 'crash', 'surge', 'fear', 'panic', 'conflict', 'war'];
+  const lowVolKeywords = ['stable', 'steady', 'consistent', 'neutral', 'sideways', 'calm', 'quiet', 'growth', 'solid'];
+
+  let foundHigh = false;
+  highVolKeywords.forEach(word => {
+    if (summary.includes(word)) {
+      volatilityScore += 0.15;
+      foundHigh = true;
+    }
+  });
+  if (foundHigh) reasons.push("Risk-elevating keywords in news");
+
+  let foundLow = false;
+  lowVolKeywords.forEach(word => {
+    if (summary.includes(word)) {
+      volatilityScore -= 0.1;
+      foundLow = true;
+    }
+  });
+  if (foundLow) reasons.push("Stability signals in recent reports");
+
+  // Rule 3: Price change magnitude
+  const absChange = Math.abs(data.changePercent);
+  if (absChange > 3) {
+    volatilityScore += 0.2;
+    reasons.push("Significant recent price momentum");
+  } else if (absChange > 1) {
+    volatilityScore += 0.1;
+    reasons.push("Active price discovery");
+  }
+
+  // Clamp score
+  volatilityScore = Math.max(0.1, Math.min(1.0, volatilityScore));
+
+  // Defuzzification to labels
+  let label = "Moderate";
+  let trend: 'up' | 'down' = 'down';
+  
+  if (volatilityScore > 0.8) {
+    label = "Extreme";
+    trend = "up";
+  } else if (volatilityScore > 0.6) {
+    label = "High";
+    trend = "up";
+  } else if (volatilityScore > 0.4) {
+    label = "Moderate";
+    trend = "down";
+  } else {
+    label = "Low";
+    trend = "down";
+  }
+
+  // Map score to a realistic percentage (e.g., 1% to 15%)
+  const percentage = (volatilityScore * 12 + 1).toFixed(1);
+
+  return { label, value: `${percentage}%`, trend, reasons };
 };
 
-const PerformanceAttributionChart = ({ data }: { data: PortfolioData['attribution'] }) => {
-  return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ left: 40, right: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 10, fill: '#71717a' }} unit="bps" />
-          <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#71717a' }} width={80} />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
-          />
-          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
 
-const RiskReturnScatterPlot = ({ data }: { data: PortfolioData['riskReturn'] }) => {
-  return (
-    <div className="h-[300px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-          <XAxis type="number" dataKey="volatility" name="Volatility" unit="%" tick={{ fontSize: 10, fill: '#71717a' }} label={{ value: 'Volatility', position: 'insideBottom', offset: -5, fontSize: 10, fill: '#71717a' }} />
-          <YAxis type="number" dataKey="return" name="Return" unit="%" tick={{ fontSize: 10, fill: '#71717a' }} label={{ value: 'Return', angle: -90, position: 'insideLeft', fontSize: 10, fill: '#71717a' }} />
-          <ZAxis type="number" dataKey="sharpe" range={[50, 400]} name="Sharpe Ratio" />
-          <Tooltip 
-            cursor={{ strokeDasharray: '3 3' }}
-            contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
-            content={({ active, payload }) => {
-              if (active && payload && payload.length) {
-                const item = payload[0].payload;
-                return (
-                  <div className="bg-zinc-900 border border-zinc-800 p-2 rounded shadow-xl">
-                    <p className="font-bold text-emerald-400">{item.ticker}</p>
-                    <p className="text-zinc-400">Return: {item.return}%</p>
-                    <p className="text-zinc-400">Vol: {item.volatility}%</p>
-                    <p className="text-zinc-400">Sharpe: {item.sharpe}</p>
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
-          <Scatter name="Assets" data={data} fill="#3b82f6">
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.sharpe > 1 ? '#10b981' : entry.sharpe > 0.5 ? '#3b82f6' : '#ef4444'} />
-            ))}
-          </Scatter>
-        </ScatterChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
+
+
+
+
+
+
 
 type DateRange = '1M' | '3M' | '6M' | 'ALL';
 
@@ -253,844 +287,54 @@ interface Trade {
 
 // --- Components ---
 
-const TradeFeed = ({ trades }: { trades: Trade[] }) => {
-  return (
-    <div className="glass-card p-4 h-[320px] flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-          <Activity size={14} className="text-emerald-400" />
-          Live Trade Feed
-        </h3>
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-bold text-emerald-500/80 uppercase">Live</span>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-        <AnimatePresence initial={false}>
-          {trades.length === 0 ? (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Waiting for trades...</p>
-            </div>
-          ) : (
-            trades.map((trade) => (
-              <motion.div
-                key={trade.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center justify-between py-2 border-b border-zinc-800/50 last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter",
-                    trade.side === 'buy' ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
-                  )}>
-                    {trade.side}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-zinc-200">${trade.price.toFixed(2)}</span>
-                    <span className="text-[9px] text-zinc-500 font-medium">
-                      {trade.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-mono font-bold text-zinc-400">{trade.quantity.toLocaleString()}</span>
-                  <p className="text-[8px] text-zinc-600 uppercase font-bold tracking-tighter">Shares</p>
-                </div>
-              </motion.div>
-            ))
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-};
 
-const StatCard = ({ label, value, subValue, trend }: { label: string, value: string, subValue?: string, trend?: 'up' | 'down' }) => (
-  <div className="glass-card p-4 flex-1 min-w-[140px]">
-    <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold mb-1">{label}</p>
-    <p className="text-xl font-bold tracking-tight">{value}</p>
-    {subValue && (
-      <div className={cn("flex items-center gap-1 text-xs mt-1", trend === 'up' ? "text-emerald-400" : "text-rose-400")}>
-        {trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-        <span>{subValue}</span>
-      </div>
-    )}
-  </div>
-);
 
-const DistributionChart = ({ simulations }: { simulations: number[][] }) => {
-  const finalPrices = simulations.map(s => s[s.length - 1]);
-  const min = Math.min(...finalPrices);
-  const max = Math.max(...finalPrices);
-  const bins = 20;
-  const step = (max - min) / bins;
-  
-  const histogram = Array.from({ length: bins }).map((_, i) => {
-    const rangeMin = min + i * step;
-    const rangeMax = rangeMin + step;
-    const count = finalPrices.filter(p => p >= rangeMin && p < rangeMax).length;
-    return {
-      range: `$${rangeMin.toFixed(0)}`,
-      count
-    };
-  });
 
-  return (
-    <div className="h-[200px] w-full mt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={histogram}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-          <XAxis dataKey="range" tick={{ fontSize: 8, fill: '#71717a' }} />
-          <YAxis hide />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
-            itemStyle={{ color: '#10b981' }}
-          />
-          <Bar dataKey="count" fill="#10b981" radius={[2, 2, 0, 0]}>
-            {histogram.map((entry, index) => (
-              <Cell key={`cell-${index}`} fillOpacity={0.4 + (entry.count / simulations.length) * 0.6} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
 
-const BacktestReport = ({ backtest }: { backtest: NonNullable<StockData['backtest']> }) => {
-  return (
-    <div className="glass-card p-4 border-blue-500/20">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-          <RefreshCw size={14} className="text-blue-400" />
-          Stability Backtest Report
-        </h3>
-        <span className="text-xs font-bold text-blue-400">{backtest.accuracy}% Accuracy</span>
-      </div>
-      <div className="h-[150px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={backtest.results}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-            <XAxis dataKey="date" hide />
-            <YAxis domain={['auto', 'auto']} hide />
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
-            />
-            <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="Actual" />
-            <Line type="monotone" dataKey="predicted" stroke="#10b981" strokeWidth={2} strokeDasharray="3 3" dot={false} name="Predicted" />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <p className="text-[9px] text-zinc-500 mt-2 italic">
-        Comparing last 10 days of historical data against model predictions for stability verification.
-      </p>
-    </div>
-  );
-};
 
-const GlobalTradeChart = ({ importExport }: { importExport: Record<string, number> }) => {
-  const data = Object.entries(importExport).map(([name, value]) => ({
-    name: name.toUpperCase(),
-    volume: value
-  }));
 
-  return (
-    <div className="h-[250px] w-full mt-6">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ left: 40, right: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 10, fill: '#71717a' }} />
-          <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#71717a' }} width={40} />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
-          />
-          <Bar dataKey="volume" radius={[0, 4, 4, 0]}>
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.volume >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.8} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
 
-const SectorHeatmap = ({ patterns }: { patterns: NonNullable<GlobalState['patterns']>['patterns'] }) => {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-      {patterns.map((p, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1 }}
-          className={cn(
-            "p-5 rounded-3xl border transition-all hover:scale-[1.02] group relative overflow-hidden",
-            p.impactScore > 40 ? "bg-emerald-500/10 border-emerald-500/20" :
-            p.impactScore > 0 ? "bg-emerald-500/5 border-emerald-500/10" :
-            p.impactScore < -40 ? "bg-rose-500/10 border-rose-500/20" :
-            p.impactScore < 0 ? "bg-rose-500/5 border-rose-500/10" :
-            "bg-zinc-900/50 border-zinc-800"
-          )}
-        >
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h4 className="text-xs font-black uppercase tracking-widest text-zinc-100">{p.sector}</h4>
-              <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">Pattern Identified</p>
-            </div>
-            <div className={cn(
-              "px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
-              p.impactScore > 0 ? "bg-emerald-500/20 text-emerald-400" : 
-              p.impactScore < 0 ? "bg-rose-500/20 text-rose-400" : "bg-zinc-800 text-zinc-500"
-            )}>
-              {p.impactScore > 0 ? 'Bullish' : p.impactScore < 0 ? 'Bearish' : 'Neutral'}
-            </div>
-          </div>
-          
-          <p className="text-xs text-zinc-300 leading-relaxed mb-6 min-h-[3rem]">
-            {p.pattern}
-          </p>
-          
-          <div className="flex items-end justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "text-3xl font-black font-mono leading-none",
-                  p.impactScore > 0 ? "text-emerald-400" : p.impactScore < 0 ? "text-rose-400" : "text-zinc-400"
-                )}>
-                  {p.impactScore > 0 ? '+' : ''}{p.impactScore}
-                </span>
-                <div className="h-4 w-[1px] bg-zinc-800" />
-                <div className="flex flex-col">
-                  <span className="text-[8px] font-bold text-zinc-500 uppercase leading-none">Confidence</span>
-                  <span className="text-[10px] font-mono font-bold text-zinc-200">{(p.confidence * 100).toFixed(0)}%</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex gap-1">
-              {Array.from({ length: 5 }).map((_, idx) => (
-                <div 
-                  key={idx} 
-                  className={cn(
-                    "w-1 h-3 rounded-full",
-                    idx < Math.ceil(Math.abs(p.impactScore) / 20) 
-                      ? (p.impactScore > 0 ? "bg-emerald-500" : "bg-rose-500") 
-                      : "bg-zinc-800"
-                  )} 
-                />
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  );
-};
+
+
+
 
 const ALL_FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 0.886, 1, 1.272, 1.618, 2, 2.618, 3.618, 4.236];
 
-const PredictiveBacktest = ({ backtest, currentPrice }: { backtest: any; currentPrice: number }) => {
-  if (!backtest || !backtest.results) return null;
 
-  const totalProfit = backtest.results.reduce((acc: number, curr: any, idx: number, arr: any[]) => {
-    if (idx === 0) return 0;
-    const prevActual = arr[idx - 1].actual;
-    const predictedTrend = curr.predicted > prevActual;
-    const actualTrend = curr.actual > prevActual;
-    
-    // If we followed the prediction, did we make money?
-    if (predictedTrend === actualTrend) {
-      return acc + Math.abs(curr.actual - prevActual);
-    } else {
-      return acc - Math.abs(curr.actual - prevActual);
-    }
-  }, 0);
 
-  const profitPercent = (totalProfit / backtest.results[0].actual) * 100;
 
-  return (
-    <div className="glass-card p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-          <History size={14} className="text-purple-400" />
-          Predictive Backtesting (10D)
-        </h3>
-        <div className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-[10px] font-bold text-purple-400 uppercase">
-          AI Simulation
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase mb-1">Model Accuracy</p>
-          <div className="flex items-end gap-2">
-            <p className="text-xl font-bold text-zinc-100">{backtest.accuracy}%</p>
-            <div className="mb-1 h-1 w-12 bg-zinc-800 rounded-full overflow-hidden">
-              <div 
-                className={cn("h-full transition-all", Number(backtest.accuracy) > 80 ? "bg-emerald-500" : "bg-amber-500")}
-                style={{ width: `${backtest.accuracy}%` }}
-              />
-            </div>
-          </div>
-        </div>
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase mb-1">Theoretical P/L</p>
-          <div className="flex items-center gap-1">
-            <p className={cn("text-xl font-bold", totalProfit >= 0 ? "text-emerald-400" : "text-rose-400")}>
-              {totalProfit >= 0 ? '+' : ''}{totalProfit.toFixed(2)}
-            </p>
-            <span className={cn("text-[10px] font-bold", totalProfit >= 0 ? "text-emerald-500/50" : "text-rose-500/50")}>
-              ({profitPercent.toFixed(2)}%)
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <div className="h-32 w-full mt-4">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={backtest.results}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-            <XAxis dataKey="date" hide />
-            <YAxis hide domain={['auto', 'auto']} />
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '10px' }}
-              itemStyle={{ fontWeight: 'bold' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="actual" 
-              stroke="#71717a" 
-              strokeWidth={1} 
-              dot={false} 
-              name="Actual"
-            />
-            <Line 
-              type="monotone" 
-              dataKey="predicted" 
-              stroke="#a855f7" 
-              strokeWidth={2} 
-              dot={false} 
-              name="AI Predicted"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <p className="text-[9px] text-zinc-600 text-center italic">
-        * Theoretical P/L assumes execution on every predicted trend shift.
-      </p>
-    </div>
-  );
-};
 
-const LoadingScreen = () => {
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState('Initializing Neural Core...');
+
+
+
+
+
+
+
+
+
+
+const SentimentGauge: React.FC<{ value: number }> = ({ value }) => {
+  const rotation = (value / 100) * 180 - 90;
+  const color = value > 70 ? '#10b981' : value > 40 ? '#f59e0b' : '#f43f5e';
   
-  const statuses = [
-    'Initializing Neural Core...',
-    'Fetching Global Trade Pulse...',
-    'Running Monte Carlo Simulations...',
-    'Analyzing Fourier Harmonics...',
-    'Calibrating Risk Models...',
-    'Synchronizing Logistics Data...',
-    'Finalizing Intelligence Report...'
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 1;
-      });
-    }, 30);
-
-    const statusInterval = setInterval(() => {
-      setStatus(prev => {
-        const currentIndex = statuses.indexOf(prev);
-        const nextIndex = (currentIndex + 1) % statuses.length;
-        return statuses[nextIndex];
-      });
-    }, 800);
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(statusInterval);
-    };
-  }, []);
-
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] bg-zinc-950 flex flex-col items-center justify-center p-8 overflow-hidden"
-    >
-      {/* Background Grid */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none" 
-        style={{ 
-          backgroundImage: 'linear-gradient(#27272a 1px, transparent 1px), linear-gradient(90deg, #27272a 1px, transparent 1px)',
-          backgroundSize: '40px 40px'
-        }} 
-      />
-      
-      {/* Scanning Line */}
+    <div className="relative w-32 h-16 overflow-hidden">
+      <div className="absolute inset-0 border-[12px] border-zinc-800 rounded-t-full" />
       <motion.div 
-        animate={{ top: ['0%', '100%'] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-        className="absolute left-0 right-0 h-[2px] bg-emerald-500/20 blur-sm z-10"
-      />
-
-      <div className="relative z-20 flex flex-col items-center max-w-md w-full">
-        <div className="mb-12 relative">
-          <motion.div 
-            animate={{ rotate: 360 }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="w-32 h-32 rounded-full border-2 border-dashed border-emerald-500/20"
-          />
-          <motion.div 
-            animate={{ rotate: -360 }}
-            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-            className="absolute inset-2 rounded-full border-2 border-dashed border-blue-500/20"
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Activity size={40} className="text-emerald-500 animate-pulse" />
-          </div>
-        </div>
-
-        <div className="w-full space-y-6">
-          <div className="flex justify-between items-end">
-            <div className="space-y-1">
-              <h1 className="text-xl font-black text-zinc-100 tracking-tighter uppercase italic">Aegis Intelligence</h1>
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em]">{status}</p>
-            </div>
-            <span className="text-2xl font-black text-emerald-400 font-mono">{progress}%</span>
-          </div>
-
-          <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
-            <motion.div 
-              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.1 }}
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-1 bg-zinc-900 rounded-full overflow-hidden">
-                <motion.div 
-                  animate={{ opacity: [0.2, 1, 0.2] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
-                  className="h-full bg-emerald-500/40"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-12 flex items-center gap-4 opacity-50">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Neural Link Active</span>
-          </div>
-          <div className="w-px h-3 bg-zinc-800" />
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Global Sync OK</span>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-const GlobalNewsFeed = ({ news }: { news: any[] }) => {
-  if (!news || news.length === 0) return null;
-
-  return (
-    <div className="glass-card p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-          <Newspaper size={14} className="text-emerald-500" />
-          Real-time Global Trade Intelligence
-        </h3>
-        <div className="flex items-center gap-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-bold text-emerald-500 uppercase">Live Feed</span>
-        </div>
-      </div>
-      <div className="space-y-4">
-        {news.map((item, idx) => (
-          <motion.div 
-            key={idx}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-emerald-500/30 transition-all group cursor-pointer"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
-                  item.severity === 'high' ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
-                  item.severity === 'medium' ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                  "bg-zinc-800 text-zinc-400 border border-zinc-700"
-                )}>
-                  {item.severity} Impact
-                </span>
-                <span className={cn(
-                  "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
-                  item.sentiment === 'positive' ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                  item.sentiment === 'negative' ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
-                  "bg-zinc-800 text-zinc-400 border border-zinc-700"
-                )}>
-                  {item.sentiment || 'neutral'}
-                </span>
-              </div>
-              <ArrowUpRight size={12} className="text-zinc-600 group-hover:text-emerald-400 transition-colors" />
-            </div>
-            <h4 className="text-sm font-bold text-zinc-200 mb-2 leading-tight group-hover:text-white transition-colors">
-              {item.title}
-            </h4>
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
-              {item.impact}
-            </p>
-          </motion.div>
-        ))}
-      </div>
+        initial={{ rotate: -90 }}
+        animate={{ rotate: rotation }}
+        transition={{ type: 'spring', stiffness: 50 }}
+        className="absolute bottom-0 left-1/2 w-1 h-14 origin-bottom -translate-x-1/2 bg-zinc-100 rounded-full shadow-lg"
+        style={{ backgroundColor: color }}
+      >
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full shadow-lg" style={{ backgroundColor: color }} />
+      </motion.div>
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 border-2 border-zinc-800 rounded-full z-10" />
     </div>
   );
-};
-
-const CommodityDetailChart = ({ commodity }: { commodity: any }) => {
-  if (!commodity.history || !commodity.supplyDemand) return null;
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Price History */}
-        <div className="glass-card p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-              <TrendingUp size={12} className="text-emerald-400" />
-              30D Price History
-            </h4>
-            <span className="text-xs font-bold text-zinc-300">${commodity.history[commodity.history.length - 1]?.price}</span>
-          </div>
-          <div className="h-40 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={commodity.history}>
-                <defs>
-                  <linearGradient id={`colorPrice-${commodity.name}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  hide 
-                />
-                <YAxis 
-                  hide 
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '10px' }}
-                  itemStyle={{ fontWeight: 'bold' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="price" 
-                  stroke="#10b981" 
-                  fillOpacity={1} 
-                  fill={`url(#colorPrice-${commodity.name})`} 
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Supply vs Demand */}
-        <div className="glass-card p-4">
-          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 mb-4">
-            <Activity size={12} className="text-blue-400" />
-            Supply vs Demand Dynamics
-          </h4>
-          <div className="h-40 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[commodity.supplyDemand]}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                <XAxis hide />
-                <YAxis hide />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '10px' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
-                <Bar dataKey="supply" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Supply" />
-                <Bar dataKey="demand" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Demand" />
-                <Bar dataKey="inventory" fill="#71717a" radius={[4, 4, 0, 0]} name="Inventory" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Flow Details */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase">Import Vol</p>
-          <p className="text-xs font-bold text-zinc-300">{commodity.importVolume || 'N/A'}</p>
-        </div>
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase">Export Vol</p>
-          <p className="text-xs font-bold text-zinc-300">{commodity.exportVolume || 'N/A'}</p>
-        </div>
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase">Top Exporter</p>
-          <p className="text-xs font-bold text-zinc-300 truncate">{commodity.topExporter || 'N/A'}</p>
-        </div>
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase">Top Importer</p>
-          <p className="text-xs font-bold text-zinc-300 truncate">{commodity.topImporter || 'N/A'}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const GlobalTradeComparisonChart = ({ data }: { data: Record<string, number> }) => {
-  const chartData = useMemo(() => {
-    return Object.entries(data).map(([region, volume]) => ({
-      name: region.toUpperCase(),
-      volume: volume,
-    })).sort((a, b) => b.volume - a.volume);
-  }, [data]);
-
-  return (
-    <div className="h-[300px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          layout="vertical"
-          data={chartData}
-          margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-        >
-          <XAxis type="number" hide />
-          <YAxis 
-            dataKey="name" 
-            type="category" 
-            axisLine={false} 
-            tickLine={false}
-            tick={{ fill: '#71717a', fontSize: 10, fontWeight: 'bold' }}
-          />
-          <Tooltip
-            cursor={{ fill: 'transparent' }}
-            content={({ active, payload }) => {
-              if (active && payload && payload.length) {
-                const val = payload[0].value as number;
-                return (
-                  <div className="bg-zinc-900 border border-zinc-800 p-2 rounded-lg shadow-xl">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">{payload[0].payload.name}</p>
-                    <p className={cn("text-sm font-bold", val >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                      {val >= 0 ? '+' : ''}{val}%
-                    </p>
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
-          <Bar dataKey="volume" radius={[0, 4, 4, 0]} barSize={20}>
-            {chartData.map((entry, index) => (
-              <Cell 
-                key={`cell-${index}`} 
-                fill={entry.volume >= 0 ? '#10b981' : '#ef4444'} 
-                fillOpacity={0.8}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
-
-const GlobalEconomyTradeChart = ({ data }: { data: Record<string, number> }) => {
-  const chartData = useMemo(() => {
-    return Object.entries(data).map(([region, volume]) => ({
-      name: region.toUpperCase(),
-      volume: volume,
-      color: volume >= 0 ? '#10b981' : '#ef4444'
-    }));
-  }, [data]);
-
-  return (
-    <div className="h-64 w-full mt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-          <XAxis 
-            dataKey="name" 
-            axisLine={false} 
-            tickLine={false} 
-            tick={{ fill: '#71717a', fontSize: 10, fontWeight: 'bold' }} 
-          />
-          <YAxis 
-            axisLine={false} 
-            tickLine={false} 
-            tick={{ fill: '#71717a', fontSize: 10 }} 
-            unit="%"
-          />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '10px' }}
-            itemStyle={{ fontWeight: 'bold' }}
-            cursor={{ fill: '#18181b' }}
-          />
-          <Bar dataKey="volume" radius={[4, 4, 0, 0]}>
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
-
-const SectorImpactChart = ({ patterns }: { patterns: NonNullable<GlobalState['patterns']>['patterns'] }) => {
-  const [view, setView] = useState<'bar' | 'heatmap'>('bar');
-
-  return (
-    <div className="space-y-6 mt-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <LayoutGrid size={14} className="text-emerald-500" />
-          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sector Impact Analysis</h4>
-        </div>
-        <div className="flex bg-zinc-900 p-1 rounded-lg border border-zinc-800">
-          <button 
-            onClick={() => setView('bar')}
-            className={cn("px-3 py-1 text-[8px] font-bold rounded uppercase transition-all", view === 'bar' ? "bg-zinc-800 text-emerald-400 shadow-sm" : "text-zinc-500")}
-          >
-            Bar Chart
-          </button>
-          <button 
-            onClick={() => setView('heatmap')}
-            className={cn("px-3 py-1 text-[8px] font-bold rounded uppercase transition-all", view === 'heatmap' ? "bg-zinc-800 text-emerald-400 shadow-sm" : "text-zinc-500")}
-          >
-            Heatmap
-          </button>
-        </div>
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={view}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          {view === 'bar' ? (
-            <div className="h-[300px] w-full bg-zinc-950/30 rounded-3xl p-4 border border-zinc-800/50">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={patterns} layout="vertical" margin={{ left: 20, right: 20, top: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
-                  <XAxis type="number" domain={[-100, 100]} stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis dataKey="sector" type="category" stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} width={80} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px', borderRadius: '12px' }}
-                    cursor={{ fill: '#27272a', opacity: 0.4 }}
-                  />
-                  <Bar dataKey="impactScore" radius={[0, 4, 4, 0]} barSize={20}>
-                    {patterns.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.impactScore > 0 ? '#10b981' : entry.impactScore < 0 ? '#ef4444' : '#71717a'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <SectorHeatmap patterns={patterns} />
-          )}
-        </motion.div>
-      </AnimatePresence>
-    </div>
-  );
-};
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-zinc-900/95 border border-zinc-800 p-3 rounded-xl shadow-2xl backdrop-blur-md">
-        <p className="text-[10px] font-bold text-zinc-500 mb-2 uppercase tracking-wider">
-          {new Date(label).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-        </p>
-        <div className="space-y-1.5">
-          {payload.map((entry: any, index: number) => {
-            if (entry.dataKey.startsWith('sim_')) return null;
-            return (
-              <div key={index} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                  <span className="text-[11px] text-zinc-300 font-medium">{entry.name}</span>
-                </div>
-                <span className="text-[11px] font-bold text-zinc-100">
-                  {Array.isArray(entry.value) 
-                    ? `$${entry.value[0].toFixed(2)} - $${entry.value[1].toFixed(2)}`
-                    : typeof entry.value === 'number' 
-                      ? `$${entry.value.toFixed(2)}`
-                      : entry.value}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* AI Insights Section */}
-        {payload[0].payload.sentiment && (
-          <div className="mt-4 pt-3 border-t border-zinc-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">AI Sentiment</span>
-              <div className={cn(
-                "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
-                payload[0].payload.sentiment.score > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-              )}>
-                {payload[0].payload.sentiment.score > 0 ? 'Bullish' : 'Bearish'}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Fair Value Est.</span>
-              <span className="text-[10px] font-bold text-emerald-400">${payload[0].payload.fairValue}</span>
-            </div>
-
-            {payload[0].payload.forecast && payload[0].payload.forecast.length > 0 && (
-              <div className="space-y-1.5">
-                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Short-term Forecast</span>
-                <div className="grid grid-cols-3 gap-1">
-                  {payload[0].payload.forecast.map((f: any, i: number) => (
-                    <div key={i} className="bg-zinc-950 p-1.5 rounded border border-zinc-800 text-center">
-                      <p className="text-[7px] text-zinc-500 font-bold uppercase">{new Date(f.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-                      <p className="text-[9px] font-bold text-zinc-200">${f.price.toFixed(0)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-  return null;
 };
 
 export default function App() {
@@ -1103,7 +347,15 @@ export default function App() {
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'summary' | 'dashboard' | 'projection' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'dashboard' | 'projection' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading' | 'markets' | 'portfolio' | 'montecarlo'>('summary');
+  const [portfolioTrades, setPortfolioTrades] = useState<Trade[]>([]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showQuickActions, setShowQuickActions] = useState(true);
+  const [marketOverview, setMarketOverview] = useState<{ nasdaq: any[], tsx: any[] } | null>(null);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [showFuzzyExplainer, setShowFuzzyExplainer] = useState(false);
   const [pennyStocks, setPennyStocks] = useState<any[]>([]);
   const [pennyLoading, setPennyLoading] = useState(false);
   const [minProfitThreshold, setMinProfitThreshold] = useState(10);
@@ -1121,6 +373,7 @@ export default function App() {
     { name: 'Deep', levels: [0, 0.5, 0.618, 0.786, 0.886, 1] }
   ]);
   const [showFibSettings, setShowFibSettings] = useState(false);
+  const [activePoint, setActivePoint] = useState<{ x: string | number; y: number } | null>(null);
 
   // Learning Model Status
   const [learningStatus, setLearningStatus] = useState({
@@ -1148,6 +401,16 @@ export default function App() {
     sector: 'All'
   });
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  useEffect(() => {
+    const fetchMarket = async () => {
+      setMarketLoading(true);
+      const data = await fetchMarketOverview();
+      setMarketOverview(data);
+      setMarketLoading(false);
+    };
+    fetchMarket();
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'daytrading' && pennyStocks.length === 0) {
@@ -1178,6 +441,40 @@ export default function App() {
         lastUpdate: new Date().toLocaleTimeString()
       });
     }, 1000);
+  };
+
+  const handleAddPortfolioTrade = (trade: Omit<Trade, 'id'>) => {
+    const newTrade: Trade = {
+      ...trade,
+      id: Math.random().toString(36).substring(2, 9),
+    };
+    setPortfolioTrades(prev => [...prev, newTrade]);
+    
+    // Also fetch data for the ticker if we don't have it
+    if (!allData[trade.ticker]) {
+      fetchData(trade.ticker);
+    }
+  };
+
+  const handleRemovePortfolioTrade = (id: string) => {
+    setPortfolioTrades(prev => prev.filter(t => t.id !== id));
+  };
+
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'search':
+        setIsSearchOpen(true);
+        break;
+      case 'add':
+        setActiveTab('portfolio');
+        break;
+      case 'trade':
+        setActiveTab('dashboard');
+        break;
+      case 'analyze':
+        setActiveTab('montecarlo');
+        break;
+    }
   };
 
   const COMMON_TICKERS = [
@@ -1250,85 +547,48 @@ export default function App() {
 
   // Sentiment analysis is now in api.ts
 
-  const getFuzzyVolatility = (data: StockData) => {
-    if (!data.sentiment) return { label: "Moderate", value: "2.5%", trend: "down" as const, reasons: ["Awaiting sentiment analysis"] };
-
-    const sentimentScore = Math.abs(data.sentiment.score); // 0 to 1
-    const summary = data.sentiment.summary.toLowerCase();
-    const reasons: string[] = [];
-    
-    // Fuzzy inputs
-    let volatilityScore = 0.5; // Base volatility (Moderate)
-
-    // Rule 1: High sentiment magnitude increases volatility
-    if (sentimentScore > 0.7) {
-      volatilityScore += 0.3;
-      reasons.push("High sentiment conviction detected");
-    } else if (sentimentScore > 0.4) {
-      volatilityScore += 0.1;
-      reasons.push("Moderate sentiment bias");
-    }
-
-    // Rule 2: Keywords in news summary
-    const highVolKeywords = ['uncertainty', 'volatile', 'crisis', 'lawsuit', 'earnings', 'breakthrough', 'crash', 'surge', 'fear', 'panic', 'conflict', 'war'];
-    const lowVolKeywords = ['stable', 'steady', 'consistent', 'neutral', 'sideways', 'calm', 'quiet', 'growth', 'solid'];
-
-    let foundHigh = false;
-    highVolKeywords.forEach(word => {
-      if (summary.includes(word)) {
-        volatilityScore += 0.15;
-        foundHigh = true;
-      }
-    });
-    if (foundHigh) reasons.push("Risk-elevating keywords in news");
-
-    let foundLow = false;
-    lowVolKeywords.forEach(word => {
-      if (summary.includes(word)) {
-        volatilityScore -= 0.1;
-        foundLow = true;
-      }
-    });
-    if (foundLow) reasons.push("Stability signals in recent reports");
-
-    // Rule 3: Price change magnitude
-    const absChange = Math.abs(data.changePercent);
-    if (absChange > 3) {
-      volatilityScore += 0.2;
-      reasons.push("Significant recent price momentum");
-    } else if (absChange > 1) {
-      volatilityScore += 0.1;
-      reasons.push("Active price discovery");
-    }
-
-    // Clamp score
-    volatilityScore = Math.max(0.1, Math.min(1.0, volatilityScore));
-
-    // Defuzzification to labels
-    let label = "Moderate";
-    let trend: 'up' | 'down' = 'down';
-    
-    if (volatilityScore > 0.8) {
-      label = "Extreme";
-      trend = "up";
-    } else if (volatilityScore > 0.6) {
-      label = "High";
-      trend = "up";
-    } else if (volatilityScore > 0.4) {
-      label = "Moderate";
-      trend = "down";
-    } else {
-      label = "Low";
-      trend = "down";
-    }
-
-    // Map score to a realistic percentage (e.g., 1% to 15%)
-    const percentage = (volatilityScore * 12 + 1).toFixed(1);
-
-    return { label, value: `${percentage}%`, trend, reasons };
-  };
 
   // Global trade fetch is now in api.ts
+
+  const handleChartMouseMove = (e: any) => {
+    if (e.activePayload && e.activePayload.length > 0) {
+      const payload = e.activePayload[0].payload;
+      const x = payload.name || payload.date;
+      
+      // Find the most relevant price to anchor the horizontal crosshair
+      let y = 0;
+      const activePrice = payload[`${activeTicker}_price`];
+      const activeForecast = payload[`${activeTicker}_forecast`];
+      
+      if (activePrice !== undefined) y = activePrice;
+      else if (activeForecast !== undefined) y = activeForecast;
+      else y = e.activePayload[0].value;
+
+      setActivePoint({ x, y });
+    }
+  };
+
+  const handleChartMouseLeave = () => {
+    setActivePoint(null);
+  };
+
+  const simulationStats = useMemo(() => {
+    const data = allData[activeTicker];
+    if (!data || !data.simulations || data.simulations.length === 0) return null;
+
+    const finalPrices = data.simulations.map(s => s[s.length - 1]);
+    const sortedPrices = [...finalPrices].sort((a, b) => a - b);
+    const mean = finalPrices.reduce((a, b) => a + b, 0) / finalPrices.length;
+    const median = sortedPrices[Math.floor(sortedPrices.length / 2)];
+    
+    const variance = finalPrices.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / finalPrices.length;
+    const stdDev = Math.sqrt(variance);
+    
+    const p5 = sortedPrices[Math.floor(sortedPrices.length * 0.05)];
+    const p95 = sortedPrices[Math.floor(sortedPrices.length * 0.95)];
+
+    return { mean, median, stdDev, p5, p95 };
+  }, [allData, activeTicker]);
 
   const fetchGlobalStateData = async () => {
     try {
@@ -1588,6 +848,101 @@ export default function App() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col pb-20 relative overflow-hidden">
+      {/* Search Modal */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <div className="fixed inset-0 z-[110] flex items-start justify-center p-6 pt-24">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSearchOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
+                <Search size={20} className="text-zinc-500" />
+                <input 
+                  autoFocus
+                  type="text"
+                  placeholder="Search tickers, assets, or tools..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 bg-transparent border-none outline-none text-zinc-100 placeholder:text-zinc-600"
+                />
+                <button 
+                  onClick={() => setIsSearchOpen(false)}
+                  className="p-1 hover:bg-zinc-800 rounded-lg transition-colors"
+                >
+                  <X size={18} className="text-zinc-500" />
+                </button>
+              </div>
+              <div className="p-2 max-h-[60vh] overflow-y-auto">
+                {searchQuery ? (
+                  <div className="space-y-1">
+                    <p className="px-3 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Results</p>
+                    {COMMON_TICKERS.filter(t => t.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          if (!tickers.includes(t)) {
+                            setTickers(prev => [...prev, t]);
+                            fetchData(t);
+                          }
+                          setActiveTicker(t);
+                          setIsSearchOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-zinc-800/50 transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-zinc-300">
+                            {t.substring(0, 2)}
+                          </div>
+                          <span className="font-bold text-zinc-200">{t}</span>
+                        </div>
+                        <ArrowUpRight size={14} className="text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4 p-2">
+                    <div>
+                      <p className="px-3 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Quick Navigation</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'summary', label: 'Dashboard', icon: LayoutGrid },
+                          { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
+                          { id: 'dashboard', label: 'Trade', icon: TrendingUp },
+                          { id: 'daytrading', label: 'Signals', icon: Zap },
+                        ].map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setActiveTab(item.id as any);
+                              setIsSearchOpen(false);
+                            }}
+                            className="flex items-center gap-3 p-3 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-zinc-700 transition-all"
+                          >
+                            <item.icon size={16} className="text-zinc-400" />
+                            <span className="text-xs font-bold text-zinc-300">{item.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {loading && <LoadingScreen key="loading" />}
       </AnimatePresence>
@@ -1604,63 +959,77 @@ export default function App() {
 
           {/* Header */}
           <header className="px-6 pt-8 pb-4 sticky top-0 bg-zinc-950/80 backdrop-blur-lg z-50">
-        <AnimatePresence>
-          {error && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="mb-4 overflow-hidden"
-            >
-              <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle className="text-rose-400 shrink-0 mt-0.5" size={18} />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-rose-200">Analysis Error</p>
-                  <p className="text-xs text-rose-400/80 mt-1 leading-relaxed">
-                    {(() => {
-                      try {
-                        const parsed = JSON.parse(error);
-                        if (parsed.error && parsed.error.message) {
-                          return parsed.error.message;
-                        }
-                        return error;
-                      } catch (e) {
-                        return error;
-                      }
-                    })()}
-                  </p>
-                  <div className="flex gap-3 mt-3">
-                    <button 
-                      onClick={() => fetchData(tickers[tickers.length - 1])}
-                      className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                    >
-                      <RefreshCw size={12} />
-                      Retry
-                    </button>
-                    <button 
-                      onClick={() => setError(null)}
-                      className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 px-2 py-1.5 transition-colors"
-                    >
-                      Dismiss
-                    </button>
+            <AnimatePresence>
+              {error && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="mb-4 overflow-hidden"
+                >
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="text-rose-400 shrink-0 mt-0.5" size={18} />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-rose-200">Analysis Error</p>
+                      <p className="text-xs text-rose-400/80 mt-1 leading-relaxed">
+                        {(() => {
+                          try {
+                            const parsed = JSON.parse(error);
+                            if (parsed.error && parsed.error.message) {
+                              return parsed.error.message;
+                            }
+                            return error;
+                          } catch (e) {
+                            return error;
+                          }
+                        })()}
+                      </p>
+                      <div className="flex gap-3 mt-3">
+                        <button 
+                          onClick={() => fetchData(tickers[tickers.length - 1])}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                        >
+                          <RefreshCw size={12} />
+                          Retry
+                        </button>
+                        <button 
+                          onClick={() => setError(null)}
+                          className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 px-2 py-1.5 transition-colors"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div className="flex items-center justify-between mb-6">
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setActiveTab('summary')}
+                className="cursor-pointer"
+              >
+                <h1 className="text-2xl font-bold tracking-tighter flex items-center gap-2">
+                  <Zap className="text-emerald-400 fill-emerald-400" size={24} />
+                  QuantTrade
+                </h1>
+                <p className="text-[9px] text-zinc-500 font-bold tracking-[0.2em] uppercase">Neural Intelligence v4.2</p>
+              </motion.div>
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-xl">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase">System Active</span>
                 </div>
+                <button 
+                  onClick={() => setIsMenuOpen(true)}
+                  className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center hover:bg-zinc-800 transition-all group"
+                >
+                  <LayoutGrid size={20} className="text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                </button>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tighter flex items-center gap-2">
-              <Zap className="text-emerald-400 fill-emerald-400" size={24} />
-              QuantTrade
-            </h1>
-            <p className="text-xs text-zinc-500 font-medium">AI-POWERED QUANTITATIVE ANALYSIS</p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden">
-            <img src="https://picsum.photos/seed/user/100/100" alt="User" referrerPolicy="no-referrer" />
-          </div>
-        </div>
+            </div>
 
         <div className="relative">
           <form onSubmit={handleSearch} className="relative z-10">
@@ -1843,6 +1212,11 @@ export default function App() {
         </div>
       </header>
 
+      <LearningStatus 
+        insight={globalState?.learningEngine} 
+        onRetrain={() => fetchGlobalState().then(setGlobalState)} 
+      />
+
       <main className="flex-1 px-6 space-y-6">
         <AnimatePresence mode="wait">
           <motion.div 
@@ -1856,33 +1230,55 @@ export default function App() {
             {activeTab === 'summary' && (
                 <div className="space-y-6">
                   {/* Executive Summary Header */}
-                  <div className="glass-card p-6 bg-gradient-to-br from-zinc-900 to-black border-emerald-500/20">
-                    <h2 className="text-2xl font-bold tracking-tight text-zinc-100">Executive Summary</h2>
-                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1">Cross-Domain Intelligence Overview</p>
+                  <motion.div 
+                    whileHover={{ scale: 1.01 }}
+                    className="glass-card p-6 bg-gradient-to-br from-zinc-900 to-black border-emerald-500/20 group relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-emerald-500/10 transition-all" />
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h2 className="text-2xl font-bold tracking-tight text-zinc-100">Executive Summary</h2>
+                        <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1">Cross-Domain Intelligence Overview</p>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <SentimentGauge value={globalState?.globalTrade.volumeIndex || 50} />
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-2">Market Sentiment</p>
+                      </div>
+                    </div>
                     
                     <div className="grid grid-cols-2 gap-4 mt-6">
-                      <div className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800">
+                      <div className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 group-hover:border-zinc-700 transition-all">
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Active Ticker</p>
                         <p className="text-xl font-bold text-emerald-400">{activeTicker}</p>
                         <p className="text-xs text-zinc-400 mt-1">${data?.currentPrice.toFixed(2)} ({data?.changePercent.toFixed(2)}%)</p>
                       </div>
-                      <div className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800">
+                      <div className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 group-hover:border-zinc-700 transition-all">
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1">Global Trade Index</p>
                         <p className="text-xl font-bold text-blue-400">{globalState?.globalTrade.volumeIndex || '---'}</p>
                         <p className="text-xs text-zinc-400 mt-1">{globalState?.globalTrade.status}</p>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
 
                   {/* Portfolio Overview */}
                   {portfolioData && (
-                    <div className="glass-card p-6 border-blue-500/20">
+                    <motion.div 
+                      whileHover={{ scale: 1.01 }}
+                      className="glass-card p-6 border-blue-500/20 group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-all" />
                       <div className="flex items-center justify-between mb-6">
                         <div>
                           <h3 className="text-lg font-bold text-zinc-100">Portfolio Intelligence</h3>
                           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Advanced Allocation & Risk Metrics</p>
                         </div>
                         <div className="flex gap-2">
+                          <button 
+                            onClick={() => setActiveTab('portfolio')}
+                            className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-[10px] font-bold text-blue-400 hover:bg-blue-500/20 transition-all"
+                          >
+                            MANAGE PORTFOLIO
+                          </button>
                           <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-[10px] font-bold text-blue-400">
                             SHARPE: 1.42
                           </div>
@@ -1913,12 +1309,16 @@ export default function App() {
                         </h4>
                         <RiskReturnScatterPlot data={portfolioData.riskReturn} />
                       </div>
-                    </div>
+                    </motion.div>
                   )}
 
                   {/* AI Pattern Learning Insights */}
                   {globalState?.patterns && (
-                    <div className="glass-card p-5 border-amber-500/20">
+                    <motion.div 
+                      whileHover={{ scale: 1.01 }}
+                      className="glass-card p-5 border-amber-500/20 group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-amber-500/10 transition-all" />
                       <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
                         <Zap size={16} className="text-amber-400" />
                         Neural Pattern Intelligence
@@ -1946,10 +1346,69 @@ export default function App() {
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </motion.div>
                   )}
 
-                  {/* Backtesting & Stability Summary */}
+                  {/* Model Intelligence Insights */}
+                  {globalState?.learningEngine && (
+                    <motion.div 
+                      whileHover={{ scale: 1.01 }}
+                      className="glass-card p-6 border-emerald-500/20 group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-emerald-500/10 transition-all" />
+                      <div className="flex items-start justify-between mb-6">
+                        <div>
+                          <h3 className="text-lg font-bold text-zinc-100">Neural Engine Insights</h3>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Real-time Model Adaptation & Event Log</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
+                            GOAL: {globalState.learningEngine.optimizationGoal}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-1 space-y-4">
+                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                            <Brain size={14} className="text-emerald-400" />
+                            Active Alpha Factors
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {globalState.learningEngine.activeFeatures.map(feature => (
+                              <span key={feature} className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded text-[10px] text-zinc-400 font-medium">
+                                {feature}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="lg:col-span-2 space-y-4">
+                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                            <Activity size={14} className="text-blue-400" />
+                            Recent Intelligence Events
+                          </h4>
+                          <div className="space-y-2">
+                            {globalState.learningEngine.recentEvents.map((event, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 bg-zinc-950/50 border border-zinc-800 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                  <div className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    event.impact === 'positive' ? "bg-emerald-500" : 
+                                    event.impact === 'negative' ? "bg-rose-500" : "bg-zinc-500"
+                                  )} />
+                                  <span className="text-xs text-zinc-300">{event.event}</span>
+                                </div>
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                  {new Date(event.timestamp).toLocaleTimeString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                   {data?.backtest && (
                     <BacktestReport backtest={data.backtest} />
                   )}
@@ -1957,7 +1416,10 @@ export default function App() {
                   {/* Summary Grid */}
                   <div className="grid grid-cols-1 gap-4">
                     {/* Risk Summary */}
-                    <div className="glass-card p-4 border-rose-500/10">
+                    <motion.div 
+                      whileHover={{ scale: 1.02 }}
+                      className="glass-card p-4 border-rose-500/10 group cursor-pointer"
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                           <AlertTriangle size={14} className="text-rose-400" />
@@ -1966,10 +1428,13 @@ export default function App() {
                         <span className="text-xs font-bold text-rose-400">{data?.riskAnalysis?.riskScore || '--'}/100</span>
                       </div>
                       <p className="text-xs text-zinc-400 line-clamp-2">{data?.riskAnalysis?.varAssessment}</p>
-                    </div>
+                    </motion.div>
 
                     {/* Logistics Summary */}
-                    <div className="glass-card p-4 border-emerald-500/10">
+                    <motion.div 
+                      whileHover={{ scale: 1.02 }}
+                      className="glass-card p-4 border-emerald-500/10 group cursor-pointer"
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                           <Ship size={14} className="text-emerald-400" />
@@ -1982,7 +1447,7 @@ export default function App() {
                           <span key={i} className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] text-zinc-500">{b}</span>
                         ))}
                       </div>
-                    </div>
+                    </motion.div>
                   </div>
                 </div>
               )}
@@ -2185,6 +1650,88 @@ export default function App() {
                         )}
                       </div>
                     )}
+                  </div>
+
+                  {/* Strategy Optimization Lab */}
+                  <div className="glass-card p-6 border-emerald-500/20 bg-zinc-950/30">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+                          <Brain size={20} className="text-emerald-400" />
+                          Strategy Optimization Lab
+                        </h3>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Neural Network Parameter Tuning</p>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Engine Ready</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-4 p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 hover:border-emerald-500/30 transition-all group">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Learning Depth</h4>
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">High</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                          Adjusts the number of hidden layers used in the neural network for pattern recognition. 
+                          Higher depth increases accuracy but requires more computational time.
+                        </p>
+                        <div className="pt-2">
+                          <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 w-[85%]" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 hover:border-blue-500/30 transition-all group">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sentiment Weight</h4>
+                          <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">0.65</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                          Determines how much weight is given to social sentiment and news analysis versus raw price action.
+                        </p>
+                        <div className="pt-2">
+                          <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 w-[65%]" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 hover:border-amber-500/30 transition-all group">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Risk Tolerance</h4>
+                          <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">Moderate</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                          Filters out strategies with high drawdown potential. Lower tolerance results in fewer but safer signals.
+                        </p>
+                        <div className="pt-2">
+                          <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 w-[45%]" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-center">
+                      <button 
+                        onClick={() => {
+                          // Simulated optimization
+                          setPennyLoading(true);
+                          setTimeout(() => {
+                            setPennyLoading(false);
+                            fetchPennyStocks().then(setPennyStocks);
+                          }, 1500);
+                        }}
+                        className="flex items-center gap-2 px-6 py-2 bg-emerald-500 text-black font-bold text-xs uppercase tracking-widest rounded-full hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                      >
+                        <Zap size={14} />
+                        Optimize Neural Strategy
+                      </button>
+                    </div>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/20">
@@ -2567,30 +2114,73 @@ export default function App() {
                     </h2>
 
                     <div className="space-y-8">
+                      {/* Live Shipping Map */}
+                      <div>
+                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Live Trade Shipping Map</h3>
+                        <ShippingMap />
+                      </div>
+
                       {/* Shipping Lanes */}
                       <div>
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Major Shipping Lanes</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Major Shipping Lanes & Congestion Heatmap</h3>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span className="text-[9px] text-zinc-500 font-bold uppercase">Clear</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              <span className="text-[9px] text-zinc-500 font-bold uppercase">Moderate</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              <span className="text-[9px] text-zinc-500 font-bold uppercase">Heavy</span>
+                            </div>
+                          </div>
+                        </div>
                         <div className="space-y-3">
                           {globalState?.logistics?.shipping?.map((s, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
+                            <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800 group hover:border-zinc-700 transition-all">
                               <div className="flex items-center gap-4">
-                                <div className={cn(
-                                  "w-2 h-2 rounded-full",
-                                  s.status.toLowerCase().includes('clear') ? "bg-emerald-500" : "bg-amber-500"
-                                )} />
+                                <div className="relative">
+                                  <div className={cn(
+                                    "w-3 h-3 rounded-full",
+                                    s.congestionLevel > 70 ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.4)]" : 
+                                    s.congestionLevel > 40 ? "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]" : 
+                                    "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+                                  )} />
+                                  <div className={cn(
+                                    "absolute inset-0 rounded-full animate-ping opacity-20",
+                                    s.congestionLevel > 70 ? "bg-rose-500" : 
+                                    s.congestionLevel > 40 ? "bg-amber-500" : 
+                                    "bg-emerald-500"
+                                  )} />
+                                </div>
                                 <div>
                                   <p className="text-sm font-bold text-zinc-200">{s.lane}</p>
                                   <p className="text-[10px] text-zinc-500 font-medium">{s.status}</p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-6">
+                              <div className="flex items-center gap-8">
                                 {s.congestionLevel !== undefined && (
-                                  <div className="text-right">
-                                    <p className={cn(
-                                      "text-xs font-bold",
-                                      s.congestionLevel > 70 ? "text-rose-400" : s.congestionLevel > 40 ? "text-amber-400" : "text-emerald-400"
-                                    )}>{s.congestionLevel}%</p>
-                                    <p className="text-[9px] text-zinc-600 font-bold uppercase">Congestion</p>
+                                  <div className="w-32 space-y-1.5">
+                                    <div className="flex justify-between items-center">
+                                      <p className="text-[9px] text-zinc-600 font-bold uppercase">Congestion</p>
+                                      <p className={cn(
+                                        "text-[10px] font-bold",
+                                        s.congestionLevel > 70 ? "text-rose-400" : s.congestionLevel > 40 ? "text-amber-400" : "text-emerald-400"
+                                      )}>{s.congestionLevel}%</p>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex">
+                                      <div 
+                                        className={cn(
+                                          "h-full transition-all duration-1000",
+                                          s.congestionLevel > 70 ? "bg-rose-500" : s.congestionLevel > 40 ? "bg-amber-500" : "bg-emerald-500"
+                                        )}
+                                        style={{ width: `${s.congestionLevel}%` }}
+                                      />
+                                    </div>
                                   </div>
                                 )}
                                 <div className="text-right">
@@ -2732,36 +2322,40 @@ export default function App() {
                           />
                         </div>
                       )}
-                    {(() => {
-                      const vol = getFuzzyVolatility(data);
-                      return (
-                        <div className="relative group">
-                          <div className="absolute -top-1 -right-1 z-10">
-                            <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-1.5 py-0.5 flex items-center gap-1">
-                              <Zap size={8} className="text-emerald-400 fill-emerald-400" />
-                              <span className="text-[6px] font-black text-emerald-400 uppercase tracking-tighter">Fuzzy AI</span>
+                      {(() => {
+                        const vol = getFuzzyVolatility(data);
+                        return (
+                          <div className="relative group">
+                            <div className="absolute -top-1 -right-1 z-10">
+                              <button 
+                                onClick={() => setShowFuzzyExplainer(true)}
+                                className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-1.5 py-0.5 flex items-center gap-1 hover:bg-emerald-500/40 transition-colors"
+                              >
+                                <Zap size={8} className="text-emerald-400 fill-emerald-400" />
+                                <span className="text-[6px] font-black text-emerald-400 uppercase tracking-tighter">Fuzzy AI</span>
+                              </button>
+                            </div>
+                            <StatCard 
+                              label="Volatility" 
+                              value={vol.label} 
+                              subValue={`Fuzzy VaR: ${vol.value}`}
+                              trend={vol.trend}
+                            />
+                            <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Fuzzy Inference Rules</p>
+                              <div className="space-y-1">
+                                {vol.reasons.map((r, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                                    <p className="text-[10px] text-zinc-300">{r}</p>
+                                  </div>
+                                ))}
+                              </div>
+                              <p className="text-[8px] text-zinc-600 mt-2 italic">Click badge for full logic map</p>
                             </div>
                           </div>
-                          <StatCard 
-                            label="Volatility" 
-                            value={vol.label} 
-                            subValue={`Fuzzy VaR: ${vol.value}`}
-                            trend={vol.trend}
-                          />
-                          <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Fuzzy Inference Rules</p>
-                            <div className="space-y-1">
-                              {vol.reasons.map((r, idx) => (
-                                <div key={idx} className="flex items-center gap-2">
-                                  <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                                  <p className="text-[10px] text-zinc-300">{r}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                        );
+                      })()}
                     <StatCard 
                       label="Signal" 
                       value="Strong Buy" 
@@ -2869,25 +2463,16 @@ export default function App() {
                             </div>
                           )}
                         </div>
-                        <div className="flex bg-zinc-900 p-1 rounded-lg border border-zinc-800">
-                          {(['1M', '3M', '6M', 'ALL'] as DateRange[]).map((r) => (
-                            <button
-                              key={r}
-                              onClick={() => setDateRange(r)}
-                              className={cn(
-                                "px-2 py-1 text-[10px] font-bold rounded-md transition-all",
-                                dateRange === r ? "bg-zinc-800 text-emerald-400 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
-                              )}
-                            >
-                              {r}
-                            </button>
-                          ))}
-                        </div>
+                        <DateRangeSelector currentRange={dateRange} onRangeChange={setDateRange} />
                       </div>
                     </div>
                     <div className="h-[240px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData}>
+                        <LineChart 
+                          data={chartData}
+                          onMouseMove={handleChartMouseMove}
+                          onMouseLeave={handleChartMouseLeave}
+                        >
                           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                           <XAxis 
                             dataKey="name" 
@@ -2912,6 +2497,38 @@ export default function App() {
                             content={<CustomTooltip />} 
                             cursor={{ stroke: '#3f3f46', strokeWidth: 1, strokeDasharray: '4 4' }}
                           />
+                          {activePoint && (
+                            <>
+                              <ReferenceLine 
+                                x={activePoint.x} 
+                                stroke="#10b981" 
+                                strokeDasharray="3 3" 
+                                strokeOpacity={0.5}
+                                label={{ 
+                                  position: 'bottom', 
+                                  value: new Date(activePoint.x).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                  fill: '#10b981',
+                                  fontSize: 8,
+                                  fontWeight: 'bold',
+                                  className: "bg-zinc-950"
+                                }}
+                              />
+                              <ReferenceLine 
+                                y={activePoint.y} 
+                                stroke="#10b981" 
+                                strokeDasharray="3 3" 
+                                strokeOpacity={0.5}
+                                label={{ 
+                                  position: 'right', 
+                                  value: `$${activePoint.y.toFixed(2)}`,
+                                  fill: '#10b981',
+                                  fontSize: 10,
+                                  fontWeight: 'bold',
+                                  className: "bg-zinc-950"
+                                }}
+                              />
+                            </>
+                          )}
                           <Legend 
                             verticalAlign="top" 
                             height={36}
@@ -3029,27 +2646,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Price Targets */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="glass-card p-3 border-rose-500/10">
-                      <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Bearish</p>
-                      <p className="text-lg font-bold text-rose-400">
-                        ${data.simulations ? Math.min(...data.simulations.map(s => s[s.length - 1])).toFixed(2) : '---'}
-                      </p>
-                    </div>
-                    <div className="glass-card p-3 border-zinc-500/10">
-                      <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Base Case</p>
-                      <p className="text-lg font-bold text-zinc-100">
-                        ${data.forecast[data.forecast.length - 1].price}
-                      </p>
-                    </div>
-                    <div className="glass-card p-3 border-emerald-500/10">
-                      <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Bullish</p>
-                      <p className="text-lg font-bold text-emerald-400">
-                        ${data.simulations ? Math.max(...data.simulations.map(s => s[s.length - 1])).toFixed(2) : '---'}
-                      </p>
-                    </div>
-                  </div>
+                  <PriceTargets data={data} />
                 </>
               )}
 
@@ -3127,7 +2724,11 @@ export default function App() {
                       </div>
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData.filter(d => d.name >= new Date().toISOString().split('T')[0])}>
+                      <AreaChart 
+                        data={chartData.filter(d => d.name >= new Date().toISOString().split('T')[0])}
+                        onMouseMove={handleChartMouseMove}
+                        onMouseLeave={handleChartMouseLeave}
+                      >
                         <defs>
                           <linearGradient id="colorCone" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -3153,6 +2754,30 @@ export default function App() {
                           tickLine={false}
                         />
                         <Tooltip content={<CustomTooltip />} />
+                        {activePoint && (
+                          <>
+                            <ReferenceLine 
+                              x={activePoint.x} 
+                              stroke="#10b981" 
+                              strokeDasharray="3 3" 
+                              strokeOpacity={0.5}
+                            />
+                            <ReferenceLine 
+                              y={activePoint.y} 
+                              stroke="#10b981" 
+                              strokeDasharray="3 3" 
+                              strokeOpacity={0.5}
+                              label={{ 
+                                position: 'right', 
+                                value: `$${activePoint.y.toFixed(2)}`,
+                                fill: '#10b981',
+                                fontSize: 10,
+                                fontWeight: 'bold',
+                                className: "bg-zinc-950"
+                              }}
+                            />
+                          </>
+                        )}
                         <Area 
                           type="monotone" 
                           dataKey="cone_range" 
@@ -3172,6 +2797,39 @@ export default function App() {
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
+
+                  {/* Simulation Statistics Summary */}
+                  {simulationStats && (
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <StatCard 
+                        label="Mean Final Price" 
+                        value={`$${simulationStats.mean.toFixed(2)}`} 
+                        subValue="Average Outcome"
+                      />
+                      <StatCard 
+                        label="Median Final Price" 
+                        value={`$${simulationStats.median.toFixed(2)}`} 
+                        subValue="50th Percentile"
+                      />
+                      <StatCard 
+                        label="Standard Deviation" 
+                        value={`$${simulationStats.stdDev.toFixed(2)}`} 
+                        subValue="Volatility Measure"
+                      />
+                      <StatCard 
+                        label="5th Percentile" 
+                        value={`$${simulationStats.p5.toFixed(2)}`} 
+                        subValue="Bearish Tail (5%)"
+                        trend="down"
+                      />
+                      <StatCard 
+                        label="95th Percentile" 
+                        value={`$${simulationStats.p95.toFixed(2)}`} 
+                        subValue="Bullish Tail (95%)"
+                        trend="up"
+                      />
+                    </div>
+                  )}
 
                   {/* Distribution Analysis */}
                   <div className="glass-card p-5">
@@ -3203,58 +2861,7 @@ export default function App() {
                           </div>
                         </div>
                       </section>
-                      {data.models && (
-                        <section>
-                          <h4 className="text-zinc-100 font-semibold mb-3 flex items-center gap-2">
-                            <Activity size={16} className="text-emerald-400" />
-                            Forecast Model Comparison
-                          </h4>
-                          <p className="text-xs text-zinc-500 mb-4 italic">
-                            Comparison of different predictive methodologies for the next 30 days.
-                          </p>
-                          <div className="space-y-3">
-                            {data.models.map((model, idx) => (
-                              <div key={idx} className="p-4 bg-zinc-950 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-colors">
-                                <div className="flex items-center justify-between mb-2">
-                                  <p className="text-xs font-bold text-zinc-200">{model.name}</p>
-                                  <div className={cn(
-                                    "px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter",
-                                    model.confidence === 'High' ? 'bg-emerald-500/10 text-emerald-400' : 
-                                    model.confidence === 'Medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'
-                                  )}>
-                                    {model.confidence} Confidence
-                                  </div>
-                                </div>
-                                <div className="flex items-end justify-between">
-                                  <div>
-                                    <p className="text-[10px] text-zinc-500 mb-1">Methodology</p>
-                                    <p className="text-[10px] text-zinc-400 max-w-[200px]">
-                                      {model.name.includes('GBM') ? 'Stochastic process using drift and volatility.' : 
-                                       model.name.includes('ARIMA') ? 'Statistical model for time series forecasting.' : 
-                                       'Deep learning model for complex pattern recognition.'}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-lg font-mono font-bold text-zinc-100 leading-none">
-                                      ${model.forecast[model.forecast.length - 1].price.toFixed(2)}
-                                    </p>
-                                    <p className="text-[10px] text-zinc-500 mt-1">30D Target Price</p>
-                                  </div>
-                                </div>
-                                <div className="mt-3 h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
-                                  <div 
-                                    className={cn(
-                                      "h-full rounded-full transition-all duration-1000",
-                                      model.confidence === 'High' ? 'bg-emerald-500 w-[90%]' : 
-                                      model.confidence === 'Medium' ? 'bg-amber-500 w-[60%]' : 'bg-rose-500 w-[30%]'
-                                    )}
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </section>
-                      )}
+                      <ModelComparison models={data.models} />
                       <section>
                         <h4 className="text-zinc-100 font-semibold mb-1">Fourier Signal Filtering</h4>
                         <p>Noise reduction via Fourier Transform indicates a underlying bullish cycle. The short-term volatility is being filtered to reveal a steady accumulation phase.</p>
@@ -3270,166 +2877,13 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="glass-card p-5">
-                    <h3 className="text-sm font-bold mb-4">Options Chain Implied Volatility</h3>
-                    <div className="space-y-3">
-                      {[
-                        { strike: (data.currentPrice * 1.05).toFixed(0), type: 'Call', iv: '24.2%', delta: '0.45' },
-                        { strike: (data.currentPrice * 0.95).toFixed(0), type: 'Put', iv: '28.1%', delta: '-0.38' },
-                        { strike: (data.currentPrice * 1.10).toFixed(0), type: 'Call', iv: '22.5%', delta: '0.22' },
-                      ].map((opt, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-zinc-950 rounded-xl border border-zinc-800">
-                          <div>
-                            <p className="text-xs font-bold">${opt.strike} {opt.type}</p>
-                            <p className="text-[10px] text-zinc-500">IV: {opt.iv}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs font-mono text-emerald-400">Δ {opt.delta}</p>
-                            <ChevronRight size={14} className="text-zinc-700 inline" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <OptionsChain currentPrice={data.currentPrice} />
                 </div>
               )}
 
               {activeTab === 'risk' && data && (
                 <div className="space-y-6">
-                  {/* Risk Score Header */}
-                  <div className="glass-card p-6 bg-gradient-to-br from-zinc-900 to-black border-rose-500/20">
-                    <div className="flex items-center justify-between mb-8">
-                      <div>
-                        <h2 className="text-2xl font-bold tracking-tight text-zinc-100">Risk Projection</h2>
-                        <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1">Multi-Model Risk Assessment</p>
-                      </div>
-                      <div className="text-right">
-                        <div className={cn(
-                          "text-4xl font-black",
-                          (data.riskAnalysis?.riskScore || 50) > 70 ? "text-rose-400" : 
-                          (data.riskAnalysis?.riskScore || 50) > 40 ? "text-amber-400" : "text-emerald-400"
-                        )}>
-                          {data.riskAnalysis?.riskScore || '---'}
-                        </div>
-                        <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-tighter">Composite Risk Score</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="space-y-4">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                          <AlertCircle size={14} className="text-rose-500" />
-                          Tail Risk Events
-                        </h3>
-                        <div className="space-y-2">
-                          {data.riskAnalysis?.tailRisks.map((risk, i) => (
-                            <div key={i} className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
-                              <p className="text-xs font-bold text-rose-200">{risk}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                          <Zap size={14} className="text-amber-500" />
-                          VaR Assessment
-                        </h3>
-                        <div className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800">
-                          <p className="text-sm text-zinc-300 leading-relaxed italic">
-                            {data.riskAnalysis?.varAssessment}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                          <RefreshCw size={14} className="text-emerald-500" />
-                          Mitigation Strategies
-                        </h3>
-                        <div className="space-y-2">
-                          {data.riskAnalysis?.mitigation.map((m, i) => (
-                            <div key={i} className="flex items-start gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                              <p className="text-xs text-zinc-400">{m}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Correlation Risks Section */}
-                    <div className="mt-8 p-5 rounded-2xl bg-zinc-900/30 border border-zinc-800/50">
-                      <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 mb-4">
-                        <Globe size={14} className="text-blue-400" />
-                        Trade & Logistics Correlation Risks
-                      </h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="space-y-4">
-                          <p className="text-sm text-zinc-300 leading-relaxed">
-                            {data.riskAnalysis?.correlationRisks}
-                          </p>
-                        </div>
-                        <div className="space-y-4">
-                          <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
-                            <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Risk Factor Sensitivity</h4>
-                            <div className="space-y-3">
-                              {data.riskAnalysis?.correlationFactors?.map((f, i) => (
-                                <div key={i} className="space-y-1">
-                                  <div className="flex justify-between text-[10px]">
-                                    <span className="text-zinc-500">{f.factor}</span>
-                                    <span className="text-zinc-300">{f.impactLabel}</span>
-                                  </div>
-                                  <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                    <motion.div 
-                                      className={cn(
-                                        "h-full",
-                                        f.impactScore > 80 ? "bg-rose-500" : f.impactScore > 50 ? "bg-amber-500" : "bg-emerald-500"
-                                      )}
-                                      initial={{ width: 0 }}
-                                      animate={{ width: `${f.impactScore}%` }}
-                                      transition={{ duration: 1, delay: i * 0.1 }}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                              {!data.riskAnalysis?.correlationFactors && (
-                                <>
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px]">
-                                      <span className="text-zinc-500">Shipping Lane Congestion</span>
-                                      <span className="text-zinc-300">High Impact</span>
-                                    </div>
-                                    <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                      <div className="h-full bg-rose-500 w-[85%]" />
-                                    </div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px]">
-                                      <span className="text-zinc-500">Commodity Price Volatility</span>
-                                      <span className="text-zinc-300">Moderate Impact</span>
-                                    </div>
-                                    <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                      <div className="h-full bg-amber-500 w-[60%]" />
-                                    </div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px]">
-                                      <span className="text-zinc-500">Geopolitical Trade Barriers</span>
-                                      <span className="text-zinc-300">Extreme Impact</span>
-                                    </div>
-                                    <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                      <div className="h-full bg-rose-600 w-[95%]" />
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <RiskAssessment riskAnalysis={data.riskAnalysis} />
 
                   {/* Live Risk Alerts */}
                   {data.riskAnalysis?.liveRiskAlerts && data.riskAnalysis.liveRiskAlerts.length > 0 && (
@@ -3463,7 +2917,11 @@ export default function App() {
                     
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data.stressBounds}>
+                        <AreaChart 
+                          data={data.stressBounds}
+                          onMouseMove={handleChartMouseMove}
+                          onMouseLeave={handleChartMouseLeave}
+                        >
                           <defs>
                             <linearGradient id="stressGradient" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#fb7185" stopOpacity={0.3}/>
@@ -3485,6 +2943,30 @@ export default function App() {
                             contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }}
                             itemStyle={{ fontSize: '12px' }}
                           />
+                          {activePoint && (
+                            <>
+                              <ReferenceLine 
+                                x={activePoint.x} 
+                                stroke="#fb7185" 
+                                strokeDasharray="3 3" 
+                                strokeOpacity={0.5}
+                              />
+                              <ReferenceLine 
+                                y={activePoint.y} 
+                                stroke="#fb7185" 
+                                strokeDasharray="3 3" 
+                                strokeOpacity={0.5}
+                                label={{ 
+                                  position: 'right', 
+                                  value: `$${activePoint.y.toFixed(2)}`,
+                                  fill: '#fb7185',
+                                  fontSize: 10,
+                                  fontWeight: 'bold',
+                                  className: "bg-zinc-950"
+                                }}
+                              />
+                            </>
+                          )}
                           <Area 
                             type="monotone" 
                             dataKey="max" 
@@ -3523,72 +3005,216 @@ export default function App() {
                 </div>
               )}
 
+              {activeTab === 'markets' && (
+                <div className="space-y-6">
+                  <div className="glass-card p-6 border-emerald-500/20 bg-gradient-to-br from-zinc-900 to-black">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
+                          <LayoutGrid className="text-emerald-400" size={24} />
+                          Market Intelligence
+                        </h2>
+                        <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1">NASDAQ & Toronto Stock Exchange (TSX) Overview</p>
+                      </div>
+                      <button 
+                        onClick={async () => {
+                          setMarketLoading(true);
+                          const data = await fetchMarketOverview();
+                          setMarketOverview(data);
+                          setMarketLoading(false);
+                        }}
+                        className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                        disabled={marketLoading}
+                      >
+                        <RefreshCw size={18} className={cn("text-zinc-400", marketLoading && "animate-spin")} />
+                      </button>
+                    </div>
+
+                    {marketLoading ? (
+                      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+                        <div className="w-12 h-12 border-4 border-zinc-800 border-t-emerald-500 rounded-full animate-spin" />
+                        <p className="text-xs text-zinc-500 animate-pulse font-medium uppercase tracking-widest">Scanning Global Exchanges...</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* NASDAQ Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300">NASDAQ (US)</h3>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3">
+                            {marketOverview?.nasdaq?.map((stock, i) => (
+                              <motion.div 
+                                key={stock.ticker}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 hover:border-blue-500/30 transition-all group cursor-pointer"
+                                onClick={() => {
+                                  if (!tickers.includes(stock.ticker)) {
+                                    setTickers(prev => [...prev, stock.ticker]);
+                                    fetchData(stock.ticker);
+                                  }
+                                  setActiveTicker(stock.ticker);
+                                  setActiveTab('dashboard');
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="text-lg font-bold text-blue-400">{stock.ticker}</p>
+                                    <p className="text-xs text-zinc-500 font-medium truncate max-w-[150px]">{stock.name}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className={cn(
+                                      "text-sm font-bold",
+                                      stock.recentPerformance >= 0 ? "text-emerald-400" : "text-rose-400"
+                                    )}>
+                                      {stock.recentPerformance >= 0 ? '+' : ''}{stock.recentPerformance.toFixed(2)}%
+                                    </p>
+                                    <p className="text-[10px] text-zinc-600 font-bold uppercase mt-1">30D Perf</p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex items-center gap-3">
+                                  <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] text-zinc-500 font-bold uppercase">{stock.sector}</span>
+                                  <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] text-zinc-500 font-bold uppercase">{stock.marketCap}</span>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* TSX Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300">Toronto Stock Exchange (TSX)</h3>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3">
+                            {marketOverview?.tsx?.map((stock, i) => (
+                              <motion.div 
+                                key={stock.ticker}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 hover:border-rose-500/30 transition-all group cursor-pointer"
+                                onClick={() => {
+                                  if (!tickers.includes(stock.ticker)) {
+                                    setTickers(prev => [...prev, stock.ticker]);
+                                    fetchData(stock.ticker);
+                                  }
+                                  setActiveTicker(stock.ticker);
+                                  setActiveTab('dashboard');
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="text-lg font-bold text-rose-400">{stock.ticker}</p>
+                                    <p className="text-xs text-zinc-500 font-medium truncate max-w-[150px]">{stock.name}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className={cn(
+                                      "text-sm font-bold",
+                                      stock.recentPerformance >= 0 ? "text-emerald-400" : "text-rose-400"
+                                    )}>
+                                      {stock.recentPerformance >= 0 ? '+' : ''}{stock.recentPerformance.toFixed(2)}%
+                                    </p>
+                                    <p className="text-[10px] text-zinc-600 font-bold uppercase mt-1">30D Perf</p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex items-center gap-3">
+                                  <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] text-zinc-500 font-bold uppercase">{stock.sector}</span>
+                                  <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] text-zinc-500 font-bold uppercase">{stock.marketCap}</span>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20">
+                    <div className="flex items-start gap-3">
+                      <Info className="text-blue-400 shrink-0" size={18} />
+                      <div>
+                        <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">Market Intelligence Note</h4>
+                        <p className="text-[10px] text-blue-400/70 leading-relaxed">
+                          The data displayed above represents major institutional holdings and high-volume assets on the NASDAQ and TSX. 
+                          Clicking on any ticker will load its full neural projection, risk profile, and historical analysis.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'portfolio' && (
+                <PortfolioManager 
+                  portfolioTrades={portfolioTrades}
+                  onAddTrade={handleAddPortfolioTrade}
+                  onRemoveTrade={handleRemovePortfolioTrade}
+                  allData={allData}
+                />
+              )}
+
               {/* Removed redundant global tab section */}
             </motion.div>
           </AnimatePresence>
         </main>
 
         {/* Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800 px-4 py-3 flex overflow-x-auto no-scrollbar gap-6 items-center z-50">
-        <button 
-          onClick={() => setActiveTab('summary')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'summary' ? "text-emerald-400" : "text-zinc-500")}
-        >
-          <Home size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">Home</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('dashboard')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'dashboard' ? "text-emerald-400" : "text-zinc-500")}
-        >
-          <TrendingUp size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">Trade</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('daytrading')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'daytrading' ? "text-amber-400" : "text-zinc-500")}
-        >
-          <Zap size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">DayTrade</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('projection')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'projection' ? "text-emerald-400" : "text-zinc-500")}
-        >
-          <PieChartIcon size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">Projection</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('fundamentals')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'fundamentals' ? "text-emerald-400" : "text-zinc-500")}
-        >
-          <BarChart3 size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">Stats</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('risk')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'risk' ? "text-rose-400" : "text-zinc-500")}
-        >
-          <AlertCircle size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">Risk</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('logistics')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'logistics' ? "text-emerald-400" : "text-zinc-500")}
-        >
-          <Ship size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">Logistics</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('global')}
-          className={cn("flex flex-col items-center gap-1 transition-colors shrink-0", activeTab === 'global' ? "text-emerald-400" : "text-zinc-500")}
-        >
-          <Globe size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter">Global</span>
-        </button>
-      </nav>
+        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800 px-6 py-4 flex justify-between items-center z-50">
+          <button 
+            onClick={() => setActiveTab('summary')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'summary' ? "text-emerald-400 scale-110" : "text-zinc-500 hover:text-zinc-300")}
+          >
+            <Home size={22} className={cn(activeTab === 'summary' && "fill-emerald-400/20")} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Home</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('portfolio')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'portfolio' ? "text-emerald-400 scale-110" : "text-zinc-500 hover:text-zinc-300")}
+          >
+            <Briefcase size={22} className={cn(activeTab === 'portfolio' && "fill-emerald-400/20")} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Assets</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'dashboard' ? "text-emerald-400 scale-110" : "text-zinc-500 hover:text-zinc-300")}
+          >
+            <TrendingUp size={22} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Trade</span>
+          </button>
+          <button 
+            onClick={() => setIsMenuOpen(true)}
+            className="flex flex-col items-center gap-1.5 text-zinc-500 hover:text-emerald-400 transition-all"
+          >
+            <LayoutGrid size={22} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Menu</span>
+          </button>
+        </nav>
+
+        {/* Floating Interactive Elements */}
+        <QuickActions onAction={handleQuickAction} />
+        
+        <NavigationMenu 
+          isOpen={isMenuOpen} 
+          onClose={() => setIsMenuOpen(false)} 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+        />
       </motion.div>
       )}
+
+      <AnimatePresence>
+        {showFuzzyExplainer && activeTicker && allData[activeTicker] && (
+          <FuzzyLogicExplainer 
+            data={allData[activeTicker]} 
+            onClose={() => setShowFuzzyExplainer(false)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
