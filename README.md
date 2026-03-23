@@ -1,71 +1,32 @@
-# QuantTrade Pro
+# QuantTrade
 
-> **Advanced mobile & web trading platform powered by AI, Monte Carlo simulations, Fuzzy Logic projections, Fourier signal filtering, and global trade tracking.**
+> AI-powered financial projection platform — combining quantitative models with Google Gemini LLM analysis to generate market forecasts in natural language.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-99%25-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Google Gemini](https://img.shields.io/badge/Google_Gemini_AI-Integrated-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
----
-
-## 📖 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [Environment Variables](#environment-variables)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Mathematical Models](#mathematical-models)
-- [Contributing](#contributing)
-- [Author](#author)
+[![TypeScript](https://img.shields.io/badge/TypeScript-99%25-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite)](https://vitejs.dev/)
+[![Express](https://img.shields.io/badge/Express-4-000000?style=flat-square&logo=express)](https://expressjs.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 ---
 
 ## Overview
 
-**QuantTrade Pro** is a full-stack, mobile-responsive financial projection platform that combines advanced quantitative mathematical models with the analytical power of Google Gemini AI. It enables traders, analysts, and researchers to generate multi-model financial projections, filter market noise using signal processing techniques, and track global trade activity — all from a single unified interface.
+**QuantTrade** is a full-stack financial projection web application that blends real-time quantitative financial modeling with LLM-powered narrative analysis. Users can input financial parameters and receive both interactive chart projections and AI-generated market insights from Google Gemini — all in a single, unified view.
 
-The platform is designed for both web and mobile use, supports geolocation for region-aware market data, and integrates Google Maps for visualising global trade flows.
+The entire codebase is written in **TypeScript (99%+)** and runs on a unified Express + Vite server, serving the React SPA in both development and production modes.
 
 ---
 
 ## Features
 
-### 🤖 AI-Powered Analysis
-- **Google Gemini AI** integration for natural-language financial analysis and market commentary
-- AI-generated narratives complement quantitative model outputs in a unified results view
-- Structured prompt engineering ensures consistent, context-aware financial insights
-
-### 📊 Quantitative Financial Models
-- **Monte Carlo Simulation** — runs thousands of randomised price-path scenarios to model outcome probability distributions and assess risk across a range of future states
-- **Fuzzy Logic Projections** — applies fuzzy inference rules to handle imprecise, real-world financial indicators and generate nuanced trend forecasts where hard thresholds fall short
-- **Fourier Signal Filtering** — decomposes market price series into frequency components using Fourier transform techniques, separating meaningful trends from high-frequency noise
-
-### 🌍 Global Trade Tracking
-- Track and visualise international trade flows across markets and geographies
-- **Google Maps Platform** integration for geographic visualisation of trade activity
-- **Geolocation support** for region-aware market context and local market data
-
-### 📈 Interactive Data Visualisation
-- **Recharts** dashboards displaying projection outputs, probability distributions, and trend lines
-- Animated transitions powered by the **Motion** library for smooth, responsive chart updates
-- Mobile-optimised chart layouts for on-the-go analysis
-
-### 💾 Data Persistence
-- **SQLite** (via `better-sqlite3`) for local persistence of projection history, saved analyses, and session data
-- Date-range filtering with **date-fns** for historical data queries
-
-### 🎨 Modern, Responsive UI
-- **Tailwind CSS v4** with utility-first responsive design — works seamlessly on mobile and desktop
-- **lucide-react** icons throughout for a clean, consistent visual language
-- **react-markdown** for rendering AI-generated analysis with full markdown formatting
-- `clsx` + `tailwind-merge` for dynamic, conflict-free class composition
+- **AI-Powered Analysis** — Integrates Google Gemini (`@google/genai`) to generate natural-language financial narratives alongside quantitative outputs
+- **Quantitative Financial Models** — Uses `mathjs` for projection calculations including trend analysis and forecasting
+- **Interactive Dashboards** — Recharts-powered charts with smooth animations via the Motion library
+- **Projection History** — SQLite persistence layer (`better-sqlite3`) stores and retrieves past projections and session data
+- **Secure Configuration** — All API keys managed exclusively via `.env`; no hardcoded credentials anywhere in the codebase
+- **Responsive UI** — Mobile-first layout with Tailwind CSS v4, `lucide-react` icons, and `react-markdown` for rendered AI output
+- **Strict TypeScript** — `tsc --noEmit` linting enforced across the full codebase; strict mode enabled
 
 ---
 
@@ -73,114 +34,14 @@ The platform is designed for both web and mobile use, supports geolocation for r
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 19, TypeScript (strict), Vite 6 |
-| **Styling** | Tailwind CSS v4, Motion (animations) |
-| **AI / LLM** | Google Gemini AI (`@google/genai`) |
-| **Math Engine** | mathjs — Monte Carlo, Fuzzy Logic, Fourier |
-| **Charts** | Recharts |
-| **Backend** | Express.js (Node.js) |
-| **Database** | SQLite via `better-sqlite3` |
-| **Maps** | Google Maps Platform |
-| **Utilities** | date-fns, lucide-react, react-markdown, clsx, tailwind-merge |
-| **Tooling** | tsx, TypeScript 5.8, ESLint, `tsc --noEmit` |
-
----
-
-## Architecture
-
-```
-QuantTrade Pro
-│
-├── Frontend (React 19 SPA)
-│   ├── Financial projection UI
-│   ├── Monte Carlo / Fuzzy Logic / Fourier result views
-│   ├── Interactive Recharts dashboards
-│   ├── Global trade map (Google Maps Platform)
-│   └── AI analysis panel (Google Gemini responses)
-│
-├── Backend (Express.js — server.ts)
-│   ├── Vite dev middleware (development mode — HMR)
-│   ├── Static SPA serving (production mode)
-│   └── JSON body parsing & API routing
-│
-├── Data Layer
-│   └── SQLite (better-sqlite3) — projection history & sessions
-│
-└── External APIs
-    ├── Google Gemini AI  — GEMINI_API_KEY
-    └── Google Maps Platform — GOOGLE_MAPS_PLATFORM_KEY
-```
-
-**Dev vs Production:** The Express server runs in two modes — in development it proxies to Vite's HMR dev server; in production it serves the pre-built `dist/` folder as a static SPA with a catch-all route for client-side routing.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** 18+ and **npm**
-- A **Google Gemini API key** — get one free at [aistudio.google.com](https://aistudio.google.com)
-- *(Optional)* A **Google Maps Platform API key** for the global trade map feature
-
-### Installation
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/BhargavA09/QuantTrade.git
-cd QuantTrade
-
-# 2. Install dependencies
-npm install
-
-# 3. Set up environment variables
-cp .env.example .env
-# Then edit .env and add your API keys (see below)
-
-# 4. Start the development server
-npm run dev
-```
-
-The app will be available at `http://localhost:3000`.
-
----
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill in your keys:
-
-```env
-# Required — Google Gemini AI
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Optional — Google Maps Platform (enables global trade map)
-GOOGLE_MAPS_PLATFORM_KEY=your_google_maps_key_here
-```
-
-> ⚠️ **Never commit your `.env` file.** It is already listed in `.gitignore`. Use `.env.example` as the template — it contains no real credentials.
-
----
-
-## Usage
-
-### Available Scripts
-
-| Command | Description |
-|---|---|
-| `npm run dev` | Start development server with HMR at `localhost:3000` |
-| `npm run build` | Build optimised production bundle to `dist/` |
-| `npm run preview` | Preview the production build locally |
-| `npm run lint` | Run TypeScript type-check (`tsc --noEmit`) |
-| `npm start` | Start Express server (production mode) |
-
-### Workflow
-
-1. **Enter a financial instrument or market** — stock ticker, commodity, index, or currency pair
-2. **Choose your projection model(s)** — Monte Carlo, Fuzzy Logic, Fourier, or run all three
-3. **View quantitative results** — probability distributions, trend projections, and filtered signal charts rendered in Recharts
-4. **Read the AI analysis** — Google Gemini provides a natural-language summary contextualising the model outputs
-5. **Explore global trade context** — switch to the map view to see related trade flows and geographic market exposure
-6. **Save your analysis** — projections are persisted to the local SQLite database for future reference
+| Frontend | React 19, TypeScript, Tailwind CSS v4 |
+| Build Tool | Vite 6 with `@vitejs/plugin-react` |
+| Backend | Express 4, Node.js, TypeScript (tsx) |
+| AI Integration | Google Gemini (`@google/genai`) |
+| Database | SQLite via `better-sqlite3` |
+| Charts | Recharts 3 |
+| Animation | Motion 12 |
+| Utilities | mathjs, date-fns, react-markdown, lucide-react |
 
 ---
 
@@ -188,47 +49,140 @@ GOOGLE_MAPS_PLATFORM_KEY=your_google_maps_key_here
 
 ```
 QuantTrade/
-├── src/                    # React + TypeScript application source
-│   └── main.tsx            # App entry point
-├── server.ts               # Express.js backend server
-├── index.html              # HTML shell (SPA root)
-├── vite.config.ts          # Vite config — React, Tailwind, env vars, aliases
-├── tsconfig.json           # TypeScript strict-mode configuration
-├── package.json            # Dependencies and npm scripts
-├── metadata.json           # App metadata (name, description, permissions)
-├── .env.example            # Environment variable template (no real keys)
-├── .gitignore              # Excludes .env, dist/, node_modules/
-└── test_py.js              # Utility test script
+├── src/                    # React frontend (TypeScript)
+├── server.ts               # Express server (dev: Vite middleware, prod: static SPA)
+├── vite.config.ts          # Vite configuration
+├── tsconfig.json           # TypeScript config (strict mode)
+├── index.html              # SPA entry point
+├── .env.example            # Environment variable template
+├── package.json            # Scripts and dependencies
+└── metadata.json           # App metadata
 ```
 
 ---
 
-## Mathematical Models
+## Getting Started
 
-### Monte Carlo Simulation
-Generates thousands of randomised price-path scenarios by sampling from a probability distribution (typically log-normal for returns). The aggregated outcomes form a probability distribution of future prices, enabling confidence interval estimation and risk quantification.
+### Prerequisites
 
-### Fuzzy Logic Projections
-Uses fuzzy membership functions to classify market indicators (e.g. momentum, volatility, volume) into linguistic variables (Low / Medium / High) and applies fuzzy inference rules to generate soft, graduated predictions — particularly useful when market signals are ambiguous or overlapping.
+- **Node.js** v18 or higher
+- **npm** v9 or higher
+- A [Google AI Studio](https://aistudio.google.com/) API key for Gemini
 
-### Fourier Signal Filtering
-Applies a Discrete Fourier Transform (DFT) to decompose a historical price series into constituent frequency components. High-frequency components (short-term noise) are attenuated, and an inverse transform reconstructs a smoothed trend signal — revealing the underlying direction beneath market volatility.
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/BhargavA09/QuantTrade.git
+cd QuantTrade
+
+# Install dependencies
+npm install
+```
+
+### Configuration
+
+Copy the environment template and add your API key:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+GEMINI_API_KEY="your_google_gemini_api_key_here"
+APP_URL="http://localhost:3000"
+```
+
+> ⚠️ **Never commit your `.env` file.** It is already listed in `.gitignore`.
+
+### Running in Development
+
+```bash
+npm run dev
+```
+
+Starts the Express server with Vite middleware at `http://localhost:3000`. Hot Module Replacement (HMR) is active.
+
+### Building for Production
+
+```bash
+npm run build
+```
+
+Outputs the compiled SPA to `dist/`. The Express server will serve static files from this folder in production mode.
+
+### Running in Production
+
+```bash
+npm start
+```
+
+### Linting
+
+```bash
+npm run lint
+```
+
+Runs `tsc --noEmit` to type-check the entire codebase without emitting files.
+
+---
+
+## Available Scripts
+
+| Script | Description |
+|---|---|
+| `npm run dev` | Start dev server with Vite HMR |
+| `npm run build` | Build production SPA to `dist/` |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | TypeScript type-check (no emit) |
+| `npm run clean` | Remove the `dist/` directory |
+| `npm start` | Start production Express server |
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | ✅ Yes | Google Gemini API key for AI analysis |
+| `APP_URL` | Optional | Deployed app URL (used for self-referential links) |
+
+---
+
+## Architecture Notes
+
+The server (`server.ts`) acts as a unified host for both environments:
+
+- **Development**: Vite runs as middleware inside Express, enabling HMR and fast refresh.
+- **Production**: Express serves the compiled static `dist/` folder and falls back to `index.html` for all routes (SPA routing support).
+
+All Gemini API calls are made directly from the frontend using environment variables injected at build time — keeping the server layer lightweight.
 
 ---
 
 ## Contributing
 
-Contributions, bug reports, and feature suggestions are welcome!
+Contributions are welcome!
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -m "feat: add your feature"`
+4. Push to the branch: `git push origin feature/your-feature`
+5. Open a Pull Request
+
+Please ensure your code passes TypeScript linting before submitting:
 
 ```bash
-# Fork the repo, then:
-git checkout -b feature/your-feature-name
-git commit -m "feat: add your feature"
-git push origin feature/your-feature-name
-# Open a Pull Request
+npm run lint
 ```
 
-Please ensure `npm run lint` passes before submitting a PR.
+---
+
+## License
+
+This project is licensed under the **MIT License**.
 
 ---
 
@@ -236,9 +190,8 @@ Please ensure `npm run lint` passes before submitting a PR.
 
 **Bhargav Patel**
 - GitHub: [@BhargavA09](https://github.com/BhargavA09)
-- LinkedIn: [linkedin.com/in/bhrgavpatel](https://www.linkedin.com/in/bhrgavpatel)
-- Email: bhrgavpatel04@gmail.com
+- LinkedIn: [linkedin.com/in/bhrgavpatel](https://linkedin.com/in/bhrgavpatel)
 
 ---
 
-*Built with React 19, Google Gemini AI, and advanced quantitative financial modelling.*
+*Built with TypeScript, React 19, Google Gemini AI, and Express.js*
