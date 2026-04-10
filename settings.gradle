@@ -1,0 +1,5 @@
+rootProject.name = 'quant-trade'
+include ':android'
+project(':android').projectDir = new File('./android')
+include ':backend'
+project(':backend').projectDir = new File('./backend')
