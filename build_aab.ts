@@ -5,6 +5,9 @@ import path from 'path';
 try {
   const env = { ...process.env };
 
+  console.log("Setting permissions for gradlew...");
+  fs.chmodSync('android/gradlew', 0o755);
+
   console.log("Building Unsigned Release APK...");
   execSync(`./gradlew assembleRelease`, { stdio: 'inherit', cwd: 'android', env });
 
