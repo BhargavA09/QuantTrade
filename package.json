@@ -10,7 +10,6 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "postinstall": "npm run build",
     "start": "node dist/server.js",
     "android:build": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",
