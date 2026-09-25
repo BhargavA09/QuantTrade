@@ -1,0 +1,17 @@
+plugins {
+    id "com.github.node-gradle.node" version "7.1.0"
+}
+
+node {
+    download = true
+    version = "20.11.0"
+    nodeProjectDir = file("${project.projectDir}/..")
+}
+
+task dev(type: NpmTask) {
+    args = ['run', 'dev']
+}
+
+task start(type: NpmTask) {
+    args = ['run', 'start']
+}

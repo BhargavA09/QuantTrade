@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
-import { Ship, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import { Ship, Anchor, AlertTriangle } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { renderToStaticMarkup } from 'react-dom/server';
 
-const API_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY || '';
-const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
+// Fix Leaflet default icon issues
+import 'leaflet/dist/leaflet.css';
 
 interface ShippingLane {
   lane: string;
@@ -41,164 +43,132 @@ const DEFAULT_VESSELS: Vessel[] = [
   { name: "Global Voyager", type: "Tanker", status: "In Transit", origin: "Ras Tanura", destination: "Ulsan", progress: 88, lat: 10.0, lng: 105.0, cargo: "Crude Oil" },
 ];
 
-const MarkerWithInfoWindow = ({ position, title, data, type }: { position: { lat: number, lng: number }, title: string, data: any, type: 'lane' | 'vessel' }) => {
-  const [markerRef, marker] = useAdvancedMarkerRef();
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <AdvancedMarker ref={markerRef} position={position} onClick={() => setOpen(true)}>
-        {type === 'lane' ? (
-          <Pin 
-            background={data.congestionLevel > 70 ? "#ef4444" : data.congestionLevel > 40 ? "#f59e0b" : "#10b981"} 
-            glyphColor="#fff"
-            borderColor="#000"
-          />
-        ) : (
-          <div className="p-1 bg-blue-500 rounded-full border-2 border-white shadow-lg">
-            <Ship size={14} className="text-white" />
-          </div>
-        )}
-      </AdvancedMarker>
-      {open && (
-        <InfoWindow anchor={marker} onCloseClick={() => setOpen(false)}>
-          <div className="p-2 min-w-[200px] text-zinc-900">
-            <h3 className="font-bold text-sm mb-1">{title}</h3>
-            {type === 'lane' ? (
-              <div className="space-y-1">
-                <p className="text-xs flex items-center gap-1">
-                  <span className="font-semibold">Status:</span> {data.status}
-                </p>
-                <p className="text-xs flex items-center gap-1">
-                  <span className="font-semibold">Congestion:</span> 
-                  <span className={cn(
-                    "font-bold",
-                    data.congestionLevel > 70 ? "text-red-600" : data.congestionLevel > 40 ? "text-amber-600" : "text-emerald-600"
-                  )}>{data.congestionLevel}%</span>
-                </p>
-                <p className="text-xs flex items-center gap-1">
-                  <span className="font-semibold">Delay:</span> +{data.delayDays} days
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <p className="text-xs"><span className="font-semibold">Type:</span> {data.type}</p>
-                <p className="text-xs"><span className="font-semibold">Cargo:</span> {data.cargo}</p>
-                <p className="text-xs"><span className="font-semibold">Route:</span> {data.origin} → {data.destination}</p>
-                <div className="pt-1">
-                  <div className="h-1 w-full bg-zinc-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500" style={{ width: `${data.progress}%` }} />
-                  </div>
-                  <p className="text-[10px] text-right mt-0.5">{data.progress}% Complete</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </InfoWindow>
-      )}
-    </>
+// Custom icons using Lucide
+const createLaneIcon = (congestionLevel: number) => {
+  const color = congestionLevel > 70 ? "#ef4444" : congestionLevel > 40 ? "#f59e0b" : "#10b981";
+  const html = renderToStaticMarkup(
+    <div style={{ 
+      backgroundColor: color, 
+      borderRadius: '50%', 
+      width: '24px', 
+      height: '24px', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      border: '2px solid white',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+    }}>
+      <Anchor size={14} color="white" />
+    </div>
   );
+  return L.divIcon({
+    html,
+    className: 'custom-lane-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
 };
 
-export const ShippingMap: React.FC = () => {
-  if (!hasValidKey) {
-    return (
-      <div className="flex items-center justify-center h-[400px] rounded-2xl bg-zinc-900/50 border border-zinc-800 p-8 text-center">
-        <div className="max-w-md space-y-4">
-          <div className="p-3 rounded-full bg-amber-500/10 text-amber-500 w-fit mx-auto">
-            <AlertTriangle size={32} />
-          </div>
-          <h2 className="text-xl font-bold text-zinc-100">Google Maps API Key Required</h2>
-          <p className="text-sm text-zinc-400">
-            To visualize live shipping lanes and vessel traffic, please add your Google Maps API key to the environment variables.
-          </p>
-          <div className="text-left bg-black/40 p-4 rounded-xl border border-zinc-800 space-y-2">
-            <p className="text-xs font-bold uppercase text-zinc-500">Setup Instructions:</p>
-            <ol className="text-xs text-zinc-400 list-decimal list-inside space-y-1">
-              <li>Open <strong>Settings</strong> (⚙️ gear icon)</li>
-              <li>Go to <strong>Secrets</strong></li>
-              <li>Add <code>GOOGLE_MAPS_PLATFORM_KEY</code></li>
-              <li>Paste your API key and press Enter</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    );
-  }
+const createVesselIcon = () => {
+  const html = renderToStaticMarkup(
+    <div style={{ 
+      backgroundColor: '#3b82f6', 
+      borderRadius: '50%', 
+      width: '24px', 
+      height: '24px', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      border: '2px solid white',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+    }}>
+      <Ship size={14} color="white" />
+    </div>
+  );
+  return L.divIcon({
+    html,
+    className: 'custom-vessel-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
+
+export const ShippingMap: React.FC<{ lanes?: ShippingLane[], vessels?: Vessel[] }> = ({ lanes, vessels }) => {
+  const displayLanes = lanes && lanes.length > 0 ? lanes : DEFAULT_LANES;
+  const displayVessels = vessels && vessels.length > 0 ? vessels : DEFAULT_VESSELS;
 
   return (
-    <div className="h-[500px] w-full rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl relative">
-      <APIProvider apiKey={API_KEY} version="weekly">
-        <Map
-          defaultCenter={{ lat: 20, lng: 0 }}
-          defaultZoom={2}
-          mapId="SHIPPING_LOGISTICS_MAP"
-          // @ts-ignore - Mandatory for AI Studio Build Mode
-          internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-          gestureHandling={'greedy'}
-          disableDefaultUI={true}
-          styles={[
-            {
-              "elementType": "geometry",
-              "stylers": [{ "color": "#212121" }]
-            },
-            {
-              "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }]
-            },
-            {
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#757575" }]
-            },
-            {
-              "elementType": "labels.text.stroke",
-              "stylers": [{ "color": "#212121" }]
-            },
-            {
-              "featureType": "administrative",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#757575" }]
-            },
-            {
-              "featureType": "administrative.country",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#9e9e9e" }]
-            },
-            {
-              "featureType": "water",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#000000" }]
-            },
-            {
-              "featureType": "water",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#3d3d3d" }]
-            }
-          ]}
-        >
-          {DEFAULT_LANES.map((lane, i) => (
-            <MarkerWithInfoWindow 
-              key={`lane-${i}`}
-              position={{ lat: lane.lat, lng: lane.lng }}
-              title={lane.lane}
-              data={lane}
-              type="lane"
-            />
-          ))}
-          {DEFAULT_VESSELS.map((vessel, i) => (
-            <MarkerWithInfoWindow 
-              key={`vessel-${i}`}
-              position={{ lat: vessel.lat, lng: vessel.lng }}
-              title={vessel.name}
-              data={vessel}
-              type="vessel"
-            />
-          ))}
-        </Map>
-      </APIProvider>
+    <div className="h-[500px] w-full rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl relative z-0">
+      <MapContainer 
+        center={[20, 0]} 
+        zoom={2} 
+        style={{ height: '100%', width: '100%', background: '#09090b' }}
+        scrollWheelZoom={true}
+        attributionControl={true}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+        />
+        
+        {displayLanes.map((lane, i) => (
+          <Marker 
+            key={`lane-${i}`} 
+            position={[lane.lat || 0, lane.lng || 0]} 
+            icon={createLaneIcon(lane.congestionLevel)}
+          >
+            <Popup>
+              <div className="p-1 min-w-[180px] text-zinc-900">
+                <h3 className="font-bold text-sm mb-1">{lane.lane}</h3>
+                <div className="space-y-1">
+                  <p className="text-xs flex items-center gap-1">
+                    <span className="font-semibold">Status:</span> {lane.status}
+                  </p>
+                  <p className="text-xs flex items-center gap-1">
+                    <span className="font-semibold">Congestion:</span> 
+                    <span className={cn(
+                      "font-bold",
+                      lane.congestionLevel > 70 ? "text-red-600" : lane.congestionLevel > 40 ? "text-amber-600" : "text-emerald-600"
+                    )}>{lane.congestionLevel}%</span>
+                  </p>
+                  <p className="text-xs flex items-center gap-1">
+                    <span className="font-semibold">Delay:</span> +{lane.delayDays} days
+                  </p>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {displayVessels.map((vessel, i) => (
+          <Marker 
+            key={`vessel-${i}`} 
+            position={[vessel.lat || 0, vessel.lng || 0]} 
+            icon={createVesselIcon()}
+          >
+            <Popup>
+              <div className="p-1 min-w-[180px] text-zinc-900">
+                <h3 className="font-bold text-sm mb-1">{vessel.name}</h3>
+                <div className="space-y-1">
+                  <p className="text-xs"><span className="font-semibold">Type:</span> {vessel.type}</p>
+                  <p className="text-xs"><span className="font-semibold">Cargo:</span> {vessel.cargo}</p>
+                  <p className="text-xs"><span className="font-semibold">Route:</span> {vessel.origin} → {vessel.destination}</p>
+                  <div className="pt-1">
+                    <div className="h-1 w-full bg-zinc-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500" style={{ width: `${vessel.progress}%` }} />
+                    </div>
+                    <p className="text-[10px] text-right mt-0.5">{vessel.progress}% Complete</p>
+                  </div>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
       
       {/* Legend Overlay */}
-      <div className="absolute bottom-4 left-4 p-3 rounded-xl bg-black/80 backdrop-blur-md border border-zinc-800 space-y-2 z-10">
+      <div className="absolute bottom-4 left-4 p-3 rounded-xl bg-black/80 backdrop-blur-md border border-zinc-800 space-y-2 z-[1000]">
         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Map Legend</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">

@@ -15,24 +15,38 @@ interface StatCardProps {
 }
 
 const StatCard = React.memo(({ label, value, subValue, trend }: StatCardProps) => (
-  <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-all min-w-[140px]">
-    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
+  <div className="glass-card p-4 hover:border-emerald-500/30 transition-all min-w-[140px] group relative overflow-hidden">
+    <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:opacity-30 transition-opacity">
+      <div className="w-8 h-8 border-t border-r border-zinc-500 rounded-tr-lg" />
+    </div>
+    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1.5">{label}</p>
     <div className="flex items-center gap-2">
-      <h3 className="text-lg font-bold text-zinc-100">{value}</h3>
+      <h3 className={cn(
+        "text-xl font-black tracking-tighter transition-colors",
+        trend === 'up' ? "text-emerald-400 glow-text-emerald" : 
+        trend === 'down' ? "text-rose-400 glow-text-rose" : "text-zinc-100"
+      )}>
+        {value}
+      </h3>
       {trend && (
         <div className={cn(
-          "p-1 rounded-full",
-          trend === 'up' ? "bg-emerald-500/10" : "bg-rose-500/10"
+          "p-1 rounded-lg border",
+          trend === 'up' ? "bg-emerald-500/10 border-emerald-500/20" : "bg-rose-500/10 border-rose-500/20"
         )}>
           {trend === 'up' ? (
-            <TrendingUp size={10} className="text-emerald-400" />
+            <TrendingUp size={12} className="text-emerald-400" />
           ) : (
-            <TrendingDown size={10} className="text-rose-400" />
+            <TrendingDown size={12} className="text-rose-400" />
           )}
         </div>
       )}
     </div>
-    {subValue && <p className="text-[10px] text-zinc-500 mt-1 font-medium">{subValue}</p>}
+    {subValue && (
+      <div className="flex items-center gap-1.5 mt-2">
+        <div className="w-1 h-1 rounded-full bg-zinc-700" />
+        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{subValue}</p>
+      </div>
+    )}
   </div>
 ));
 

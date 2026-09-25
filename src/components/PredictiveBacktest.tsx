@@ -3,6 +3,7 @@ import { History } from 'lucide-react';
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line } from 'recharts';
 import { twMerge } from 'tailwind-merge';
 import { clsx, type ClassValue } from 'clsx';
+import { motion } from 'motion/react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -10,10 +11,9 @@ function cn(...inputs: ClassValue[]) {
 
 interface PredictiveBacktestProps {
   backtest: any;
-  currentPrice: number;
 }
 
-const PredictiveBacktest = React.memo(({ backtest, currentPrice }: PredictiveBacktestProps) => {
+const PredictiveBacktest = React.memo(({ backtest }: PredictiveBacktestProps) => {
   if (!backtest || !backtest.results) return null;
 
   const totalProfit = backtest.results.reduce((acc: number, curr: any, idx: number, arr: any[]) => {
@@ -32,8 +32,16 @@ const PredictiveBacktest = React.memo(({ backtest, currentPrice }: PredictiveBac
 
   const profitPercent = (totalProfit / backtest.results[0].actual) * 100;
 
+  // Derive a stable and unique key so that the chart rebuilds and triggers animations whenever the data updates
+  const chartKey = `${backtest.results.length}-${backtest.accuracy}-${backtest.results[0]?.actual || 0}`;
+
   return (
-    <div className="glass-card p-5 space-y-4">
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="glass-card p-5 space-y-4"
+    >
       <div className="flex items-center justify-between">
         <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
           <History size={14} className="text-purple-400" />
@@ -45,19 +53,29 @@ const PredictiveBacktest = React.memo(({ backtest, currentPrice }: PredictiveBac
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800"
+        >
           <p className="text-[9px] text-zinc-600 font-bold uppercase mb-1">Model Accuracy</p>
           <div className="flex items-end gap-2">
             <p className="text-xl font-bold text-zinc-100">{backtest.accuracy}%</p>
             <div className="mb-1 h-1 w-12 bg-zinc-800 rounded-full overflow-hidden">
               <div 
-                className={cn("h-full transition-all", Number(backtest.accuracy) > 80 ? "bg-emerald-500" : "bg-amber-500")}
+                className={cn("h-full transition-all duration-1000", Number(backtest.accuracy) > 80 ? "bg-emerald-500" : "bg-amber-500")}
                 style={{ width: `${backtest.accuracy}%` }}
               />
             </div>
           </div>
-        </div>
-        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+        </motion.div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800"
+        >
           <p className="text-[9px] text-zinc-600 font-bold uppercase mb-1">Theoretical P/L</p>
           <div className="flex items-center gap-1">
             <p className={cn("text-xl font-bold", totalProfit >= 0 ? "text-emerald-400" : "text-rose-400")}>
@@ -67,12 +85,12 @@ const PredictiveBacktest = React.memo(({ backtest, currentPrice }: PredictiveBac
               ({profitPercent.toFixed(2)}%)
             </span>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <div className="h-32 w-full mt-4">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={backtest.results}>
+          <LineChart key={chartKey} data={backtest.results}>
             <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
             <XAxis dataKey="date" hide />
             <YAxis hide domain={['auto', 'auto']} />
@@ -87,6 +105,9 @@ const PredictiveBacktest = React.memo(({ backtest, currentPrice }: PredictiveBac
               strokeWidth={1} 
               dot={false} 
               name="Actual"
+              isAnimationActive={true}
+              animationDuration={1500}
+              animationEasing="ease-in-out"
             />
             <Line 
               type="monotone" 
@@ -95,6 +116,9 @@ const PredictiveBacktest = React.memo(({ backtest, currentPrice }: PredictiveBac
               strokeWidth={2} 
               dot={false} 
               name="AI Predicted"
+              isAnimationActive={true}
+              animationDuration={2200}
+              animationEasing="ease-out"
             />
           </LineChart>
         </ResponsiveContainer>
@@ -102,7 +126,7 @@ const PredictiveBacktest = React.memo(({ backtest, currentPrice }: PredictiveBac
       <p className="text-[9px] text-zinc-600 text-center italic">
         * Theoretical P/L assumes execution on every predicted trend shift.
       </p>
-    </div>
+    </motion.div>
   );
 });
 

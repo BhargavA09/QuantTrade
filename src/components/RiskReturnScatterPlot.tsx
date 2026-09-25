@@ -18,7 +18,7 @@ interface RiskReturnData {
   sharpe: number;
 }
 
-const RiskReturnScatterPlot = ({ data }: { data: RiskReturnData[] }) => {
+const RiskReturnScatterPlot = ({ data = [] }: { data?: RiskReturnData[] }) => {
   return (
     <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -46,7 +46,7 @@ const RiskReturnScatterPlot = ({ data }: { data: RiskReturnData[] }) => {
             }}
           />
           <Scatter name="Assets" data={data} fill="#3b82f6">
-            {data.map((entry, index) => (
+            {data?.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.sharpe > 1 ? '#10b981' : entry.sharpe > 0.5 ? '#3b82f6' : '#ef4444'} />
             ))}
           </Scatter>

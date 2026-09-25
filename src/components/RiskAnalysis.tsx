@@ -2,13 +2,14 @@ import React from 'react';
 import { ShieldAlert, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { clsx, type ClassValue } from 'clsx';
+import { RiskSummary } from '../types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 interface RiskAnalysisProps {
-  risk: any;
+  risk: RiskSummary;
   activeTicker: string;
 }
 

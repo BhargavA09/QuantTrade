@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -6,43 +7,197 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  :root.light {
+    color-scheme: light;
+    --color-zinc-950: #fafafa;
+    --color-zinc-900: #f4f4f5;
+    --color-zinc-800: #e4e4e7;
+    --color-zinc-700: #d4d4d8;
+    --color-zinc-600: #a1a1aa;
+    --color-zinc-500: #71717a;
+    --color-zinc-400: #52525b;
+    --color-zinc-300: #3f3f46;
+    --color-zinc-200: #27272a;
+    --color-zinc-100: #18181b;
+    --color-zinc-50: #09090b;
+    --color-black: #ffffff;
+    --color-white: #000000;
+  }
+
+  /* Subtle, professional theme toggle transition across surfaces, borders, and typography */
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition: background-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+                color 250ms cubic-bezier(0.4, 0, 0.2, 1),
+                fill 250ms cubic-bezier(0.4, 0, 0.2, 1),
+                stroke 250ms cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 320ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition-delay: 0s !important;
+  }
+
   body {
     @apply bg-zinc-950 text-zinc-100 font-sans antialiased;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    background-image: 
+      radial-gradient(circle at 50% -20%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 0% 100%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 100% 100%, rgba(244, 63, 94, 0.05) 0%, transparent 40%);
+    background-attachment: fixed;
+    transition: background-color 320ms cubic-bezier(0.4, 0, 0.2, 1), color 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight font-semibold;
   }
 }
 
 .glass-card {
-  @apply bg-zinc-900/50 border border-zinc-800 backdrop-blur-md rounded-2xl;
+  @apply bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-2xl rounded-2xl transition-all duration-500 relative overflow-hidden;
+  box-shadow: 
+    0 4px 24px -1px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.glass-card::after {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none;
+}
+
+.glass-card:hover {
+  @apply border-zinc-700/60 bg-zinc-900/60;
+  box-shadow: 
+    0 12px 48px -4px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+}
+
+.hardware-border {
+  @apply border border-zinc-800/80 rounded-xl p-4 relative overflow-hidden bg-zinc-950/50;
+  background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.02) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.hardware-border::before {
+  content: '';
+  @apply absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-zinc-600/50 to-transparent;
+}
+
+.glow-text-emerald {
+  text-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+.glow-text-blue {
+  text-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+}
+
+.glow-text-rose {
+  text-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
 }
 
 .chart-container {
-  @apply w-full h-[300px] mt-4;
+  @apply w-full h-[350px] mt-4;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-zinc-800 rounded-full border-2 border-transparent bg-clip-padding;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-zinc-700;
+}
+
+/* Hide Scrollbar Utility */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+/* Apply to specific elements requested by user */
+div#root:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1),
+div#root:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(3) {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+div#root:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1)::-webkit-scrollbar,
+div#root:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(3)::-webkit-scrollbar {
+  display: none;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 10px;
+/* Animations */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+.stat-value {
+  @apply font-mono tracking-tighter;
+}
+
+.label-caps {
+  @apply text-[10px] uppercase font-bold tracking-[0.15em] text-zinc-500;
+}
+
+/* Enhanced Visual Effects */
+@keyframes neural-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.2)); opacity: 0.8; }
+  50% { filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.6)); opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-neural-glow {
+  animation: neural-glow 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.icon-glow-emerald {
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
+}
+
+.icon-glow-blue {
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+}
+
+.icon-glow-amber {
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.5));
+}
+
+.icon-glow-rose {
+  filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.5));
 }

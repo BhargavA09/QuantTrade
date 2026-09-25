@@ -7,7 +7,24 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="apple-touch-icon" href="/logo.svg" />
-    <title>Quant Trade</title>
+    <title>QuantTrade Pro</title>
+    <meta name="description" content="Advanced mobile trading platform with Monte Carlo simulations, Fuzzy Logic projections, Fourier signal filtering, and global trade tracking." />
+    <meta property="og:title" content="QuantTrade Pro" />
+    <meta property="og:description" content="Advanced mobile trading platform with Monte Carlo simulations, Fuzzy Logic projections, Fourier signal filtering, and global trade tracking." />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('quant_theme') || localStorage.getItem('theme');
+          if (saved === 'light') {
+            document.documentElement.classList.add('light');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#fafafa');
+          } else {
+            document.documentElement.classList.remove('light');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

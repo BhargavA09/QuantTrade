@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
   Search, 
@@ -22,9 +22,10 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onAction }) => {
 
   const actions = [
     { id: 'search', label: 'Search Ticker', icon: Search, color: 'bg-emerald-500' },
-    { id: 'trade', label: 'Add Trade', icon: Briefcase, color: 'bg-blue-500' },
-    { id: 'daytrade', label: 'Day Trading', icon: Zap, color: 'bg-amber-500' },
-    { id: 'analysis', label: 'Run Analysis', icon: Activity, color: 'bg-purple-500' },
+    { id: 'trade', label: 'Add Simulation', icon: Briefcase, color: 'bg-blue-500' },
+    { id: 'quantlab', label: 'Quant Lab', icon: BarChart3, color: 'bg-purple-500' },
+    { id: 'daytrade', label: 'Day Simulation', icon: Zap, color: 'bg-amber-500' },
+    { id: 'analysis', label: 'Run Analysis', icon: Activity, color: 'bg-zinc-700' },
   ];
 
   return (

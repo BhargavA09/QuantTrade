@@ -15,7 +15,7 @@ interface AttributionData {
   value: number;
 }
 
-const PerformanceAttributionChart = ({ data }: { data: AttributionData[] }) => {
+const PerformanceAttributionChart = ({ data = [] }: { data?: AttributionData[] }) => {
   return (
     <div className="h-[250px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -27,7 +27,7 @@ const PerformanceAttributionChart = ({ data }: { data: AttributionData[] }) => {
             contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-            {data.map((entry, index) => (
+            {data?.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} />
             ))}
           </Bar>
