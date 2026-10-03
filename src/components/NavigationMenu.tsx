@@ -63,7 +63,7 @@ const NavigationMenu: React.FC<NavigationMenuProps> = ({ isOpen, onClose, active
     {
       title: "Simulations & Labs",
       items: [
-        { id: 'quantlab', label: 'Strategy Lab', description: 'Build & backtest custom strategies', icon: BarChart3, color: 'text-purple-400' },
+        { id: 'quantlab', label: 'Strategy & Backtest Lab', description: 'Execute, suggestive trades & Python generator', icon: BarChart3, color: 'text-purple-400' },
         { id: 'daytrading', label: 'Market Sim', description: 'High-frequency momentum scans', icon: Zap, color: 'text-amber-400' },
         { id: 'montecarlo', label: 'Monte Carlo Lab', description: 'Statistical risk & path simulations', icon: Activity, color: 'text-emerald-400' },
         { id: 'risk', label: 'Risk Analysis', description: 'Portfolio exposure & stress testing', icon: AlertCircle, color: 'text-rose-400' },

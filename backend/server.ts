@@ -560,6 +560,34 @@ async function startServer() {
     }
   });
 
+  // Single ticker quote endpoint
+  app.get("/api/stock/quote/:ticker", validateTicker, async (req, res) => {
+    try {
+      const ticker = (req.params.ticker || '').toUpperCase();
+      await fetchRealPrice([ticker]);
+      const d = tickerData.get(ticker) || getFallbackQuote(ticker);
+      
+      res.json({
+        type: 'PRICE_UPDATE',
+        ticker,
+        price: d.price,
+        change: d.change,
+        changePercent: d.changePercent,
+        volume: d.volume,
+        high: d.high,
+        low: d.low,
+        open: d.open,
+        previousClose: d.previousClose,
+        marketCap: d.marketCap,
+        peRatio: d.peRatio,
+        dividendYield: d.dividendYield,
+        timestamp: new Date(d.lastFetch || Date.now()).toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch quote", details: err.message });
+    }
+  });
+
   function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 3500): Promise<T> {
     return Promise.race([
       promise,

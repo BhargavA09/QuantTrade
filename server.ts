@@ -2,6 +2,7 @@ import express from "express";
 import "dotenv/config";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import { marketRouter } from "./server/marketData";
 
 async function startServer() {
   const app = express();
@@ -9,9 +10,18 @@ async function startServer() {
 
   app.use(express.json());
 
-  // --- API Routes ---
-  // All Gemini and data fetching routes have been moved to the frontend 
-  // to comply with security guidelines and resolve API key issues.
+  // Health endpoint
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development",
+      port: PORT
+    });
+  });
+
+  // Mount Market & Stock Data API routes
+  app.use("/api", marketRouter);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

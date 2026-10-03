@@ -17,6 +17,11 @@ import { StockData } from '../types';
 import SimulationLab from './SimulationLab';
 import { portfolioManager, StrategyConfig } from '../services/PortfolioManager';
 import { neuralBrain } from '../services/NeuralBrain';
+import PythonScriptGenerator from './PythonScriptGenerator';
+import MarketConditionAndSuggestiveTrades, { SuggestiveTrade } from './MarketConditionAndSuggestiveTrades';
+import LiveStrategyExecution from './LiveStrategyExecution';
+import GitHubDeploymentGuideModal from './GitHubDeploymentGuideModal';
+import { FileCode, Compass, Github } from 'lucide-react';
 
 interface QuantLabProps {
   data: StockData;
@@ -331,14 +336,69 @@ function runLocalBacktest(
 }
 
 export default function QuantLab({ data, allData }: QuantLabProps) {
-  const [activeView, setActiveView] = useState<'backtest' | 'simulation'>('backtest');
+  const [activeView, setActiveView] = useState<'backtest' | 'suggestive' | 'python' | 'execution' | 'simulation' | 'github'>('backtest');
   const [lookbackPeriod, setLookbackPeriod] = useState(252); // 1 year
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentMessage, setDeploymentMessage] = useState<string | null>(null);
+  const [isGithubModalOpen, setIsGithubModalOpen] = useState(false);
+
+  // Selected parameters for Python Script Generator
+  const [selectedPythonStrategy, setSelectedPythonStrategy] = useState<string>('neural_alpha');
+  const [selectedPythonParams, setSelectedPythonParams] = useState<any>({
+    fastPeriod: 12,
+    slowPeriod: 26,
+    rsiOversold: 30,
+    rsiOverbought: 70,
+    bollingerDeviation: 2.0,
+    stopLossPct: 0.04,
+    takeProfitPct: 0.08,
+    kellySizing: true
+  });
 
   // Active Live Bot Deployed Strategy State
   const [liveBotStrategy, setLiveBotStrategy] = useState<StrategyConfig>(() => portfolioManager.getActiveStrategy());
+
+  // Handlers for cross-tab communication
+  const handleSelectTradeForBacktest = (trade: SuggestiveTrade) => {
+    const newRun: BacktestRun = {
+      id: `trade_${Date.now()}`,
+      name: `${trade.ticker} ${trade.typeLabel}`,
+      strategyType: (trade.strategyKey as any) || 'neural_alpha',
+      parameters: {
+        stopLossPct: trade.stopLossPct / 100,
+        takeProfitPct: Math.abs(trade.target1Pct) / 100,
+        kellySizing: true,
+        rsiOversold: 30,
+        rsiOverbought: 70
+      },
+      isAI: true,
+      aiJustification: trade.rationale
+    };
+    setBacktestRuns(prev => [newRun, ...prev]);
+    setSelectedBacktestId(newRun.id);
+    setBacktestedIds(prev => ({ ...prev, [newRun.id]: true }));
+    setActiveView('backtest');
+  };
+
+  const handleSelectTradeForPython = (trade: SuggestiveTrade) => {
+    setSelectedPythonStrategy(trade.strategyKey || 'neural_alpha');
+    setSelectedPythonParams({
+      stopLossPct: trade.stopLossPct / 100,
+      takeProfitPct: Math.abs(trade.target1Pct) / 100,
+      kellySizing: true,
+      fastPeriod: 12,
+      slowPeriod: 26,
+      rsiOversold: 30,
+      rsiOverbought: 70,
+      bollingerDeviation: 2.0
+    });
+    setActiveView('python');
+  };
+
+  const handleExecutePaperTrade = (trade: SuggestiveTrade) => {
+    setActiveView('execution');
+  };
 
   // Multiple Comparative Backtest Runs
   const [backtestRuns, setBacktestRuns] = useState<BacktestRun[]>(() => {
@@ -609,38 +669,117 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
             <Logo size={24} className="icon-glow-emerald" />
             QuantLab Strategy Hub
           </h2>
-          <p className="text-zinc-500 text-sm font-medium mt-1 uppercase tracking-widest">
-            Multi-Strategy Backtesting Sandbox & Neural Network Tuning
-          </p>
+          <div className="flex items-center gap-2 text-xs text-zinc-400 mt-1">
+            <span className="font-bold text-white">{data.ticker}</span>
+            <span aria-hidden="true">·</span>
+            <span className="font-mono text-zinc-200">${data.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span aria-hidden="true">·</span>
+            <span className={cn("font-medium", data.change >= 0 ? "text-emerald-400" : "text-rose-400")}>
+              {data.change >= 0 ? '+' : ''}{data.changePercent.toFixed(2)}%
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{data.history?.length || 0} historical candles</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-zinc-950 p-1 rounded-2xl border border-zinc-800">
+          <div className="flex flex-wrap items-center gap-1.5 bg-zinc-950 p-1.5 rounded-2xl border border-zinc-800">
             <button
               onClick={() => setActiveView('backtest')}
               className={cn(
-                "px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                activeView === 'backtest' ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
+                "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5",
+                activeView === 'backtest' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
               )}
             >
-              Backtest Comparator
+              <BarChart3 size={13} />
+              Backtest Lab
+            </button>
+            <button
+              onClick={() => setActiveView('suggestive')}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 relative",
+                activeView === 'suggestive' ? "bg-emerald-500 text-black font-extrabold shadow-sm" : "text-emerald-400 hover:bg-emerald-500/10"
+              )}
+            >
+              <Compass size={13} />
+              Suggestive Trades
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping absolute -top-0.5 -right-0.5" />
+            </button>
+            <button
+              onClick={() => setActiveView('python')}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5",
+                activeView === 'python' ? "bg-emerald-500 text-black font-extrabold shadow-sm" : "text-zinc-400 hover:text-white"
+              )}
+            >
+              <FileCode size={13} />
+              Python Script
+            </button>
+            <button
+              onClick={() => setActiveView('execution')}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5",
+                activeView === 'execution' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              <Zap size={13} />
+              Live Paper Execution
             </button>
             <button
               onClick={() => setActiveView('simulation')}
               className={cn(
-                "px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                activeView === 'simulation' ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
+                "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5",
+                activeView === 'simulation' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
               )}
             >
+              <Activity size={13} />
               Day Simulation
+            </button>
+            <button
+              onClick={() => setIsGithubModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent hover:border-zinc-800"
+            >
+              <Github size={13} />
+              GitHub & Run
             </button>
           </div>
         </div>
       </div>
 
-      {activeView === 'simulation' ? (
+      {activeView === 'suggestive' && (
+        <MarketConditionAndSuggestiveTrades
+          data={data}
+          allData={allData}
+          onSelectTradeForBacktest={handleSelectTradeForBacktest}
+          onSelectTradeForPython={handleSelectTradeForPython}
+          onExecutePaperTrade={handleExecutePaperTrade}
+        />
+      )}
+
+      {activeView === 'python' && (
+        <PythonScriptGenerator
+          data={data}
+          selectedStrategy={selectedPythonStrategy}
+          strategyParams={selectedPythonParams}
+          marketRegime={neuralBrain.getMemory()?.regime || 'Bullish Momentum Expansion'}
+          marketBias={neuralBrain.getMemory()?.quantBias ? Math.round(neuralBrain.getMemory().quantBias * 100) : 45}
+        />
+      )}
+
+      {activeView === 'execution' && (
+        <LiveStrategyExecution
+          data={data}
+          activeStrategyName={activeRun?.name || 'Neural Alpha Multi-Factor Engine'}
+          initialStopLossPct={activeRun?.parameters.stopLossPct || 0.04}
+          initialTakeProfitPct={activeRun?.parameters.takeProfitPct || 0.08}
+        />
+      )}
+
+      {activeView === 'simulation' && (
         <SimulationLab data={data} fill-emerald-500 />
-      ) : (
+      )}
+
+      {activeView === 'backtest' && (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           {/* LEFT SIDEBAR: Strategies Comparer & Sandbox parameters generator */}
           <div className="xl:col-span-4 space-y-6">
@@ -1075,20 +1214,43 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
                 </div>
               </div>
 
-              {activeRun?.id === liveBotStrategy.id ? (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-black uppercase tracking-widest text-2xs px-4 py-2.5 rounded-xl flex items-center gap-2">
-                  <Check size={14} className="stroke-[3]" /> Deployed & Live
-                </div>
-              ) : (
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={handleDeployStrategy}
-                  disabled={isDeploying}
-                  className="bg-white text-black font-black uppercase tracking-widest text-xs px-5 py-3 rounded-2xl hover:bg-emerald-400 hover:text-black transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                  onClick={() => {
+                    setSelectedPythonStrategy(activeRun?.strategyType || 'neural_alpha');
+                    setSelectedPythonParams(activeRun?.parameters || {});
+                    setActiveView('python');
+                  }}
+                  className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold uppercase tracking-wider text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5"
+                  title="Generate Python script for this strategy"
                 >
-                  {isDeploying ? <RefreshCw className="w-4.5 h-4.5 animate-spin" /> : <Play size={14} className="fill-current" />}
-                  Deploy to Live Bot
+                  <FileCode size={13} />
+                  Python Code
                 </button>
-              )}
+
+                <button
+                  onClick={() => setActiveView('suggestive')}
+                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 font-bold uppercase tracking-wider text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5"
+                >
+                  <Compass size={13} />
+                  Suggestive Setups
+                </button>
+
+                {activeRun?.id === liveBotStrategy.id ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-black uppercase tracking-widest text-2xs px-4 py-2.5 rounded-xl flex items-center gap-2">
+                    <Check size={14} className="stroke-[3]" /> Deployed & Live
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleDeployStrategy}
+                    disabled={isDeploying}
+                    className="bg-white text-black font-black uppercase tracking-widest text-xs px-5 py-3 rounded-2xl hover:bg-emerald-400 hover:text-black transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                  >
+                    {isDeploying ? <RefreshCw className="w-4.5 h-4.5 animate-spin" /> : <Play size={14} className="fill-current" />}
+                    Deploy to Live Bot
+                  </button>
+                )}
+              </div>
             </div>
 
             {activeRun?.isAI && activeRun.aiJustification && (
@@ -1422,6 +1584,11 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
           </div>
         </div>
       )}
+
+      <GitHubDeploymentGuideModal
+        isOpen={isGithubModalOpen}
+        onClose={() => setIsGithubModalOpen(false)}
+      />
     </div>
   );
 }

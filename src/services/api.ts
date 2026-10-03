@@ -1,5 +1,6 @@
 import { neuralBrain } from "./NeuralBrain";
 import { runMonteCarlo } from "../utils/simulations";
+import { EXPANDED_STOCK_DATABASE } from "../data/expandedStockDatabase";
 
 // Base URL for backend API calls. In production (e.g. Capacitor), 
 // this should point to the hosted backend URL.
@@ -118,22 +119,27 @@ const setSessionCache = (key: string, data: any) => {
 };
 
 export const generateMockHistory = (ticker: string, days: number = 100) => {
-  let price = 100 + Math.random() * 400;
+  const normalized = ticker.trim().toUpperCase();
+  const foundStock = EXPANDED_STOCK_DATABASE.find(s => s.ticker === normalized);
+  let price = foundStock ? foundStock.price : (normalized.includes('BTC') ? 66000 : normalized.includes('ETH') ? 2600 : 150 + Math.random() * 200);
+  const beta = foundStock ? foundStock.beta : 1.0;
   const history = [];
   const now = new Date();
+  
   for (let i = days; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const change = (Math.random() - 0.48) * (price * 0.03);
-    price += change;
+    const vol = (normalized.includes('BTC') || normalized.includes('ETH')) ? 0.025 : 0.012 * beta;
+    const change = (Math.sin(i * 0.15) * 0.3 + (Math.random() - 0.48)) * (price * vol);
+    price = Math.max(1, price + change);
     history.push({
       date: date.toISOString().split('T')[0],
       price: parseFloat(price.toFixed(2)),
-      open: parseFloat((price - change/2).toFixed(2)),
-      high: parseFloat((price + Math.abs(change)).toFixed(2)),
-      low: parseFloat((price - Math.abs(change)).toFixed(2)),
+      open: parseFloat((price - change / 2).toFixed(2)),
+      high: parseFloat((price + Math.abs(change) * 0.8).toFixed(2)),
+      low: parseFloat((price - Math.abs(change) * 0.8).toFixed(2)),
       close: parseFloat(price.toFixed(2)),
-      volume: Math.floor(Math.random() * 1000000) + 500000
+      volume: Math.floor(Math.random() * 10000000) + 1500000
     });
   }
   return history;
@@ -279,42 +285,41 @@ export const computeNeuralFeatures = (prices: number[]) => {
 let portfolioCache: { data: any; timestamp: number } | null = null;
 const pendingRequests = new Map<string, Promise<any>>();
 
-// Helper for backend API calls with retry logic
-const fetchWithRetry = async (url: string, options: RequestInit = {}, maxRetries = 3) => {
+// Helper for backend API calls with fast-fail logic
+const fetchWithRetry = async (url: string, options: RequestInit = {}, maxRetries = 2) => {
   let lastError: any;
   const fullUrl = `${BASE_API_URL}${url}`;
   
   for (let i = 0; i < maxRetries; i++) {
     try {
-      console.log(`[Fetch with Retry] Requesting: ${fullUrl}`);
       const response = await fetch(fullUrl, options);
       const contentType = response.headers.get('content-type');
       
       if (!response.ok) {
-        let errorData;
+        let errorData: any = {};
         if (contentType && contentType.includes('application/json')) {
           errorData = await response.json().catch(() => ({}));
-        } else {
-          const text = await response.text().catch(() => 'No body');
-          console.warn(`[Fetch with Retry] Non-JSON error response from ${fullUrl}. Body start: ${text.substring(0, 50)}`);
-          errorData = { error: `HTTP ${response.status}: ${text.substring(0, 100)}` };
+        }
+        // Don't retry client errors (404, 400)
+        if (response.status === 404 || response.status === 400) {
+          throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
       if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.warn(`[Fetch with Retry] Expected JSON but got ${contentType} from ${fullUrl}. Body start: ${text.substring(0, 100)}`);
         throw new Error(`Expected JSON but got ${contentType || 'unknown content type'}`);
       }
       
       return await response.json();
     } catch (error: any) {
       lastError = error;
+      // Do not delay or retry on 404
+      if (error?.message?.includes('404')) {
+        break;
+      }
       if (i < maxRetries - 1) {
-        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
-        console.warn(`Backend API error (retryable). Retrying in ${Math.round(delay)}ms (Attempt ${i + 1}/${maxRetries}): ${error.message}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, 250));
       }
     }
   }
