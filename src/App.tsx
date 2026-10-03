@@ -211,6 +211,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { FinvizDashboard } from './components/finviz/FinvizDashboard';
 import GitHubDeploymentGuideModal from './components/GitHubDeploymentGuideModal';
 import StockSelectorModal from './components/StockSelectorModal';
+import AdaptiveTraderLab from './components/AdaptiveTraderLab';
 
 const fallbackStockData: StockData = {
   ticker: 'SPY',
@@ -510,7 +511,7 @@ export default function App() {
     }
   }, [portfolioData]);
 
-  const [activeTab, setActiveTab] = useState<'finviz' | 'summary' | 'dashboard' | 'projection' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading' | 'markets' | 'portfolio' | 'montecarlo' | 'options' | 'fairvalue' | 'quantlab' | 'neural' | 'advancedchart' | 'aiscan' | 'quant' | 'sentiment' | 'technical' | 'yieldcurve'>('finviz');
+  const [activeTab, setActiveTab] = useState<'finviz' | 'summary' | 'dashboard' | 'projection' | 'traderai' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading' | 'markets' | 'portfolio' | 'montecarlo' | 'options' | 'fairvalue' | 'quantlab' | 'neural' | 'advancedchart' | 'aiscan' | 'quant' | 'sentiment' | 'technical' | 'yieldcurve'>('finviz');
   const [showGithubGuide, setShowGithubGuide] = useState(false);
 
   const [portfolioStats, setPortfolioStats] = useState(() => portfolioManager.getStats());
@@ -1951,6 +1952,19 @@ export default function App() {
                 >
                   <Cpu size={14} className={cn("transition-transform group-hover:scale-110", activeTab === 'quantlab' && "fill-white")} />
                   <span className="hidden sm:inline">Strategy Lab</span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('traderai')}
+                  className={cn(
+                    "text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 px-3 py-1 rounded-xl border group relative", 
+                    activeTab === 'traderai' 
+                      ? "bg-emerald-600 text-white border-emerald-500 shadow-md" 
+                      : "text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10"
+                  )}
+                >
+                  <Brain size={14} className={cn("transition-transform group-hover:scale-110", activeTab === 'traderai' && "fill-white")} />
+                  <span className="hidden sm:inline">Trader AI</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse absolute -top-0.5 -right-0.5" />
                 </button>
               </nav>
 
@@ -5362,6 +5376,22 @@ export default function App() {
 
               {activeTab === 'quantlab' && (
                 <QuantLab data={data || Object.values(allData)[0] || fallbackStockData} allData={allData} />
+              )}
+
+              {activeTab === 'traderai' && (
+                <AdaptiveTraderLab
+                  data={data || Object.values(allData)[0] || fallbackStockData}
+                  allData={allData}
+                  onExecuteTrade={(trade) => {
+                    if (trade.type === 'BUY') {
+                      portfolioManager.manualBuy(trade.ticker, trade.shares, trade.price);
+                    } else {
+                      portfolioManager.manualSell(trade.ticker, trade.shares, trade.price);
+                    }
+                  }}
+                  onSelectForBacktest={() => setActiveTab('quantlab')}
+                  onOpenPythonScript={() => setActiveTab('quantlab')}
+                />
               )}
 
               {/* Removed redundant global tab section */}

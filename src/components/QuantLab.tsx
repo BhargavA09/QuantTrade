@@ -21,6 +21,7 @@ import PythonScriptGenerator from './PythonScriptGenerator';
 import MarketConditionAndSuggestiveTrades, { SuggestiveTrade } from './MarketConditionAndSuggestiveTrades';
 import LiveStrategyExecution from './LiveStrategyExecution';
 import GitHubDeploymentGuideModal from './GitHubDeploymentGuideModal';
+import AdaptiveTraderLab from './AdaptiveTraderLab';
 import { FileCode, Compass, Github } from 'lucide-react';
 
 interface QuantLabProps {
@@ -336,7 +337,7 @@ function runLocalBacktest(
 }
 
 export default function QuantLab({ data, allData }: QuantLabProps) {
-  const [activeView, setActiveView] = useState<'backtest' | 'suggestive' | 'python' | 'execution' | 'simulation' | 'github'>('backtest');
+  const [activeView, setActiveView] = useState<'backtest' | 'suggestive' | 'traderai' | 'python' | 'execution' | 'simulation' | 'github'>('backtest');
   const [lookbackPeriod, setLookbackPeriod] = useState(252); // 1 year
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
@@ -706,6 +707,17 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping absolute -top-0.5 -right-0.5" />
             </button>
             <button
+              onClick={() => setActiveView('traderai')}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 relative",
+                activeView === 'traderai' ? "bg-emerald-500 text-black font-extrabold shadow-sm" : "text-emerald-400 hover:bg-emerald-500/10"
+              )}
+            >
+              <Brain size={13} />
+              Adaptive Trader AI
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse absolute -top-0.5 -right-0.5" />
+            </button>
+            <button
               onClick={() => setActiveView('python')}
               className={cn(
                 "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5",
@@ -753,6 +765,19 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
           onSelectTradeForBacktest={handleSelectTradeForBacktest}
           onSelectTradeForPython={handleSelectTradeForPython}
           onExecutePaperTrade={handleExecutePaperTrade}
+        />
+      )}
+
+      {activeView === 'traderai' && (
+        <AdaptiveTraderLab
+          data={data}
+          allData={allData}
+          onExecuteTrade={handleExecutePaperTrade}
+          onSelectForBacktest={handleSelectTradeForBacktest}
+          onOpenPythonScript={(strat) => {
+            setSelectedPythonStrategy(strat);
+            setActiveView('python');
+          }}
         />
       )}
 

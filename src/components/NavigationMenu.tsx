@@ -43,6 +43,7 @@ const NavigationMenu: React.FC<NavigationMenuProps> = ({ isOpen, onClose, active
     {
       title: "AI & Neural Core",
       items: [
+        { id: 'traderai', label: 'Adaptive Trader AI', description: 'Profit-optimizing algorithms, trader skills & continuous learning', icon: Brain, color: 'text-emerald-400' },
         { id: 'neural', label: 'Neural Engine', description: 'Real-time AI learning & pattern logs', icon: Brain, color: 'text-blue-400' },
         { id: 'aiscan', label: 'AI Vision Scan', description: 'Neural visual chart recognition', icon: Zap, color: 'text-emerald-400' },
         { id: 'quant', label: 'Quant Agent', description: 'Autonomous agent trade simulations', icon: Briefcase, color: 'text-blue-400' },
