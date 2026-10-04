@@ -47,7 +47,9 @@ import {
   Cpu,
   FileCode,
   Compass,
-  Database
+  Database,
+  User,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   BarChart,
@@ -212,6 +214,8 @@ import { FinvizDashboard } from './components/finviz/FinvizDashboard';
 import GitHubDeploymentGuideModal from './components/GitHubDeploymentGuideModal';
 import StockSelectorModal from './components/StockSelectorModal';
 import AdaptiveTraderLab from './components/AdaptiveTraderLab';
+import AboutMePage from './components/AboutMePage';
+import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 
 const fallbackStockData: StockData = {
   ticker: 'SPY',
@@ -511,7 +515,7 @@ export default function App() {
     }
   }, [portfolioData]);
 
-  const [activeTab, setActiveTab] = useState<'finviz' | 'summary' | 'dashboard' | 'projection' | 'traderai' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading' | 'markets' | 'portfolio' | 'montecarlo' | 'options' | 'fairvalue' | 'quantlab' | 'neural' | 'advancedchart' | 'aiscan' | 'quant' | 'sentiment' | 'technical' | 'yieldcurve'>('finviz');
+  const [activeTab, setActiveTab] = useState<'finviz' | 'summary' | 'dashboard' | 'projection' | 'traderai' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading' | 'markets' | 'portfolio' | 'montecarlo' | 'options' | 'fairvalue' | 'quantlab' | 'neural' | 'advancedchart' | 'aiscan' | 'quant' | 'sentiment' | 'technical' | 'yieldcurve' | 'about' | 'privacy'>('finviz');
   const [showGithubGuide, setShowGithubGuide] = useState(false);
 
   const [portfolioStats, setPortfolioStats] = useState(() => portfolioManager.getStats());
@@ -1190,7 +1194,7 @@ export default function App() {
       
       // Learn patterns from the new state
       const patterns = await analyzeSimulationPatterns(gData);
-      const updatedGlobalState = gData ? { ...gData, patterns } : null;
+      const updatedGlobalState: GlobalState | null = gData ? { ...gData, patterns } : null;
       
       // Consolidate updates to reduce re-renders
       setGlobalState(updatedGlobalState);
@@ -1965,6 +1969,30 @@ export default function App() {
                   <Brain size={14} className={cn("transition-transform group-hover:scale-110", activeTab === 'traderai' && "fill-white")} />
                   <span className="hidden sm:inline">Trader AI</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse absolute -top-0.5 -right-0.5" />
+                </button>
+                <button 
+                  onClick={() => setActiveTab('about')}
+                  className={cn(
+                    "text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 px-3 py-1 rounded-xl border group", 
+                    activeTab === 'about' 
+                      ? "bg-zinc-800 text-white border-zinc-700 shadow-md" 
+                      : "text-zinc-400 border-zinc-800/80 hover:bg-zinc-800/40"
+                  )}
+                >
+                  <User size={14} className={cn("transition-transform group-hover:scale-110", activeTab === 'about' && "text-emerald-400")} />
+                  <span className="hidden xl:inline">About</span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('privacy')}
+                  className={cn(
+                    "text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 px-3 py-1 rounded-xl border group", 
+                    activeTab === 'privacy' 
+                      ? "bg-zinc-800 text-white border-zinc-700 shadow-md" 
+                      : "text-zinc-400 border-zinc-800/80 hover:bg-zinc-800/40"
+                  )}
+                >
+                  <ShieldCheck size={14} className={cn("transition-transform group-hover:scale-110", activeTab === 'privacy' && "text-blue-400")} />
+                  <span className="hidden xl:inline">Privacy</span>
                 </button>
               </nav>
 
@@ -5394,6 +5422,20 @@ export default function App() {
                 />
               )}
 
+              {activeTab === 'about' && (
+                <AboutMePage 
+                  onNavigateToTab={setActiveTab}
+                  onOpenContact={() => setIsContactModalOpen(true)}
+                />
+              )}
+
+              {activeTab === 'privacy' && (
+                <PrivacyPolicyPage 
+                  onNavigateToTab={setActiveTab}
+                  onOpenContact={() => setIsContactModalOpen(true)}
+                />
+              )}
+
               {/* Removed redundant global tab section */}
             </motion.div>
           </AnimatePresence>
@@ -5446,14 +5488,31 @@ export default function App() {
             This application does not provide financial advice, and no real trades are executed. 
             Users should consult with a licensed financial advisor before making any investment decisions.
           </p>
-          <div className="flex items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-widest text-zinc-700">
-            <button className="hover:text-zinc-500 transition-colors">Terms of Service</button>
+          <div className="flex items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+            <button 
+              onClick={() => setActiveTab('about')}
+              className={cn("hover:text-emerald-400 transition-colors", activeTab === 'about' && "text-emerald-400")}
+            >
+              About Me
+            </button>
             <div className="w-1 h-1 rounded-full bg-zinc-800" />
-            <button className="hover:text-zinc-500 transition-colors">Privacy Policy</button>
+            <button 
+              onClick={() => setActiveTab('privacy')}
+              className={cn("hover:text-emerald-400 transition-colors", activeTab === 'privacy' && "text-emerald-400")}
+            >
+              Privacy Policy
+            </button>
+            <div className="w-1 h-1 rounded-full bg-zinc-800" />
+            <button 
+              onClick={() => setActiveTab('privacy')}
+              className="hover:text-emerald-400 transition-colors"
+            >
+              Terms of Service
+            </button>
             <div className="w-1 h-1 rounded-full bg-zinc-800" />
             <button 
               onClick={() => setIsContactModalOpen(true)}
-              className="hover:text-zinc-500 transition-colors"
+              className="hover:text-emerald-400 transition-colors"
             >
               Contact Us
             </button>

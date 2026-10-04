@@ -69,7 +69,7 @@ export interface StockData {
   };
   news?: { title: string; source: string; time: string; url: string; sentiment: string }[];
   forecast: { date: string; price: number }[];
-  models?: { name: string; forecast: { date: string; price: number }[]; confidence: string }[];
+  models?: { name: string; forecast: { date: string; price: number }[]; confidence: string; description?: string }[];
   mean: number;
   stdDev: number;
   sentiment?: { 

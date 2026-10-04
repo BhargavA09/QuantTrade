@@ -18,7 +18,8 @@ import {
   User,
   LogOut,
   Brain,
-  Activity
+  Activity,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 
@@ -76,6 +77,13 @@ const NavigationMenu: React.FC<NavigationMenuProps> = ({ isOpen, onClose, active
         { id: 'logistics', label: 'Supply Chain', description: 'Trade flows & logistics monitoring', icon: Ship, color: 'text-emerald-400' },
         { id: 'global', label: 'Macro Economics', description: 'World economy simulation & trends', icon: Globe, color: 'text-blue-400' },
         { id: 'yieldcurve', label: 'Yield Curve', description: 'Treasury yields & economic indicators', icon: Activity, color: 'text-amber-400' },
+      ]
+    },
+    {
+      title: "Profile & Sovereignty",
+      items: [
+        { id: 'about', label: 'About Creator', description: 'Quantitative engineer background & trading tenets', icon: User, color: 'text-emerald-400' },
+        { id: 'privacy', label: 'Privacy & Sovereignty', description: 'Local storage audit & data protection policy', icon: ShieldCheck, color: 'text-blue-400' },
       ]
     }
   ];
@@ -156,15 +164,32 @@ const NavigationMenu: React.FC<NavigationMenuProps> = ({ isOpen, onClose, active
                 <span className="text-sm font-bold">Contact Support</span>
               </button>
               
-              <div className="flex items-center gap-3 p-3 rounded-2xl hover:bg-zinc-900 transition-colors cursor-pointer group">
-                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden">
-                  <img src="https://picsum.photos/seed/user/100/100" alt="User" />
+              <div 
+                onClick={() => {
+                  onTabChange('about');
+                  onClose();
+                }}
+                className="flex items-center gap-3 p-3 rounded-2xl hover:bg-zinc-900 transition-colors cursor-pointer group border border-transparent hover:border-zinc-800"
+              >
+                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden shrink-0">
+                  <img 
+                    src="/src/assets/images/quant_creator_portrait_1791050190330.jpg" 
+                    alt="Quant Analyst Profile" 
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-emerald-400">
+                    <User size={18} />
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-zinc-200">Quant Analyst</p>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Active Session</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors truncate">Alexander Vance</p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest truncate">View Creator Profile</p>
                 </div>
-                <Settings size={16} className="text-zinc-600 group-hover:text-zinc-400" />
+                <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
               </div>
             </div>
           </motion.div>
