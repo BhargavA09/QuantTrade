@@ -31,13 +31,19 @@ interface FinvizDashboardProps {
   onOpenRiskEngine?: () => void;
   watchlist?: string[];
   onToggleWatchlist?: (ticker: string) => void;
+  allData?: Record<string, any>;
+  lastUpdate?: any;
+  fetchData?: (ticker: string) => Promise<void>;
 }
 
 export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
   initialTicker = 'NVDA',
   onOpenRiskEngine,
   watchlist = ['AAPL', 'NVDA', 'MSFT', 'TSLA'],
-  onToggleWatchlist
+  onToggleWatchlist,
+  allData = {},
+  lastUpdate,
+  fetchData
 }) => {
   const [activeTab, setActiveTab] = useState<FinvizTab>('home');
   const [selectedTicker, setSelectedTicker] = useState<string>(initialTicker);
@@ -46,10 +52,14 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
   const [isSearching, setIsSearching] = useState(false);
 
   const handleSelectTicker = (ticker: string) => {
-    setSelectedTicker(ticker.toUpperCase());
+    const upper = ticker.toUpperCase();
+    setSelectedTicker(upper);
     setActiveTab('chart');
     setIsSearching(false);
     setSearchQuery('');
+    if (fetchData) {
+      fetchData(upper);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,8 +87,8 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
-      {/* 1. Finviz Live Ticker Marquee */}
-      <FinvizTickerTape />
+      {/* 1. Finviz Live Ticker Marquee with real-time Stock & Bond Market Streaming */}
+      <FinvizTickerTape allData={allData} lastUpdate={lastUpdate} />
 
       {/* 2. Authentic Finviz Navigation & Branding Bar */}
       <header className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50 shadow-md">
@@ -285,19 +295,20 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
             onSelectTicker={handleSelectTicker}
             onNavigateToMap={() => setActiveTab('map')}
             onNavigateToScreener={() => setActiveTab('screener')}
+            allData={allData}
           />
         )}
 
         {activeTab === 'screener' && (
-          <FinvizScreener onSelectTicker={handleSelectTicker} />
+          <FinvizScreener onSelectTicker={handleSelectTicker} allData={allData} />
         )}
 
         {activeTab === 'map' && (
-          <FinvizMap onSelectTicker={handleSelectTicker} />
+          <FinvizMap onSelectTicker={handleSelectTicker} allData={allData} />
         )}
 
         {activeTab === 'groups' && (
-          <FinvizGroups />
+          <FinvizGroups allData={allData} />
         )}
 
         {activeTab === 'chart' && (
@@ -306,6 +317,9 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
             onSelectTicker={handleSelectTicker}
             onAddWatchlist={onToggleWatchlist}
             isWatchlisted={watchlist.includes(selectedTicker)}
+            allData={allData}
+            lastUpdate={lastUpdate}
+            fetchData={fetchData}
           />
         )}
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Activity, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, RefreshCw, ShieldCheck } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { ConnectionState } from '../hooks/useWebSocket';
 
@@ -24,7 +24,7 @@ export const LivePriceBadge: React.FC<LivePriceBadgeProps> = ({ price, change, c
 
   const getStatusText = () => {
     switch (connectionState) {
-      case 'connected': return 'Live Feed';
+      case 'connected': return 'Live Stream';
       case 'reconnecting': return 'Reconnecting...';
       case 'connecting': return 'Connecting...';
       default: return 'Offline';
@@ -86,6 +86,11 @@ export const LivePriceBadge: React.FC<LivePriceBadgeProps> = ({ price, change, c
           <span>{change >= 0 ? '+' : ''}{change.toFixed(2)}</span>
           <span className="opacity-60">({changePercent.toFixed(2)}%)</span>
         </div>
+      </div>
+
+      <div className="hidden lg:flex items-center gap-1 pl-2 border-l border-zinc-800 text-[10px] font-mono text-zinc-400">
+        <ShieldCheck size={12} className="text-emerald-400" />
+        <span className="text-emerald-400/90 font-medium">Consensus Shield</span>
       </div>
     </div>
   );

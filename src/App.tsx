@@ -735,80 +735,112 @@ export default function App() {
   const [portfolioSimulations, setPortfolioSimulations] = useState<Simulation[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { lastUpdate, isConnected, connectionState } = useWebSocket(tickers);
-  const pendingUpdateRef = useRef<any>(null);
+  // Unified Streaming Subscriptions: Active Tickers, Watchlist, Benchmark Stocks & Bond Market feeds
+  const streamingTickers = useMemo(() => {
+    const defaultStream = [
+      '^GSPC', '^IXIC', '^DJI', '^RUT',
+      '^TNX', '^TYX', '^FVX', '^IRX', // Live Bond Yields
+      'TLT', 'IEF', 'BND',            // Treasury & Bond Market ETFs
+      'CL=F', 'GC=F',                  // Commodities
+      'SPY', 'QQQ', 'BTC-USD', 'ETH-USD'
+    ];
+    return [...new Set([
+      ...tickers,
+      ...watchlist,
+      activeTicker,
+      ...defaultStream
+    ].filter(Boolean))];
+  }, [tickers, watchlist, activeTicker]);
+
+  const { lastUpdate, isConnected, connectionState } = useWebSocket(streamingTickers);
+  const pendingUpdatesRef = useRef<Map<string, any>>(new Map());
   const hasFetchedInitialData = useRef(false);
 
-  // Handle Real-time Price Updates from WebSocket with Throttling
+  // Handle Real-time Price Updates from WebSocket with Batch Buffering (never drop concurrent ticks)
   useEffect(() => {
-    if (lastUpdate) {
-      pendingUpdateRef.current = lastUpdate;
+    if (lastUpdate && lastUpdate.ticker) {
+      pendingUpdatesRef.current.set(lastUpdate.ticker, lastUpdate);
     }
   }, [lastUpdate]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (pendingUpdateRef.current) {
-        const update = pendingUpdateRef.current;
-        pendingUpdateRef.current = null;
+      if (pendingUpdatesRef.current.size > 0) {
+        const updates = Array.from(pendingUpdatesRef.current.values());
+        pendingUpdatesRef.current.clear();
 
         setAllData(prev => {
-          const data = prev[update.ticker];
-          
-          const updatedData = {
-            ...(data || {
-              ticker: update.ticker,
-              history: [],
-              filtered: [],
-              simulations: [],
-              forecast: [],
-              mean: 0,
-              stdDev: 0
-            }),
-            currentPrice: update.price,
-            change: update.change,
-            changePercent: update.changePercent,
-            volume: update.volume,
-            high: update.high,
-            low: update.low,
-            open: update.open,
-            previousClose: update.previousClose,
-            marketCap: update.marketCap,
-            peRatio: update.peRatio,
-            dividendYield: update.dividendYield
-          };
+          const updatedPrev = { ...prev };
 
-          // Sync live price update directly to Portfolio Manager's holding blocks
-          portfolioManager.updatePrices(update.ticker, update.price);
+          for (const update of updates) {
+            const data = updatedPrev[update.ticker];
+            
+            const historyCopy = data?.history ? [...data.history] : [];
+            if (historyCopy.length > 0) {
+              const lastCandle = { ...historyCopy[historyCopy.length - 1] };
+              lastCandle.price = update.price;
+              lastCandle.close = update.price;
+              if (update.high) lastCandle.high = Math.max(lastCandle.high ?? update.price, update.price);
+              if (update.low) lastCandle.low = Math.min(lastCandle.low ?? update.price, update.price);
+              historyCopy[historyCopy.length - 1] = lastCandle;
+            }
 
-          // If high-frequency scalper is activated, scan and execute on every incoming market tick in milliseconds
-          if (portfolioManager.isBotActive() && portfolioManager.getActiveStrategy().type === 'hft_scalper') {
-            portfolioManager.runStrategy(update.ticker, update.price, updatedData.history || []);
+            const updatedData = {
+              ...(data || {
+                ticker: update.ticker,
+                history: [],
+                filtered: [],
+                simulations: [],
+                forecast: [],
+                mean: 0,
+                stdDev: 0
+              }),
+              currentPrice: update.price,
+              change: update.change,
+              changePercent: update.changePercent,
+              volume: update.volume,
+              high: update.high,
+              low: update.low,
+              open: update.open,
+              previousClose: update.previousClose,
+              marketCap: update.marketCap,
+              peRatio: update.peRatio,
+              dividendYield: update.dividendYield,
+              history: historyCopy
+            };
+
+            // Sync live price update directly to Portfolio Manager's holding blocks
+            portfolioManager.updatePrices(update.ticker, update.price);
+
+            // If high-frequency scalper is activated, scan and execute on every incoming market tick in milliseconds
+            if (portfolioManager.isBotActive() && portfolioManager.getActiveStrategy().type === 'hft_scalper') {
+              portfolioManager.runStrategy(update.ticker, update.price, updatedData.history || []);
+            }
+
+            updatedPrev[update.ticker] = updatedData as StockData;
           }
 
-          return {
-            ...prev,
-            [update.ticker]: updatedData as StockData
-          };
+          return updatedPrev;
         });
 
         setSimulations(prev => {
-          const tickerSimulations = prev[update.ticker] || [];
-          const newSimulation: Simulation = {
-            id: Math.random().toString(36).substr(2, 9),
-            ticker: update.ticker,
-            price: update.price,
-            quantity: Math.floor(Math.random() * 500) + 10,
-            side: Math.random() > 0.5 ? 'buy' : 'sell',
-            timestamp: new Date()
-          };
-          return {
-            ...prev,
-            [update.ticker]: [newSimulation, ...tickerSimulations].slice(0, 50)
-          };
+          const updatedSims = { ...prev };
+          for (const update of updates) {
+            const tickerSimulations = updatedSims[update.ticker] || [];
+            const newSimulation: Simulation = {
+              id: Math.random().toString(36).substr(2, 9),
+              ticker: update.ticker,
+              price: update.price,
+              quantity: Math.floor(Math.random() * 500) + 10,
+              side: Math.random() > 0.5 ? 'buy' : 'sell',
+              timestamp: new Date()
+            };
+            updatedSims[update.ticker] = [newSimulation, ...tickerSimulations].slice(0, 50);
+          }
+          return updatedSims;
         });
       }
-    }, 500); // Update every 500ms
+    }, 400); // Batch update every 400ms
 
     return () => clearInterval(timer);
   }, []);
@@ -1281,7 +1313,7 @@ export default function App() {
             history: fallbackHist,
             fundamentals: stockMeta ? {
               marketCap: stockMeta.marketCap,
-              trailingPE: stockMeta.pe ? String(stockMeta.pe) : undefined,
+              peRatio: stockMeta.pe ? String(stockMeta.pe) : undefined,
               beta: stockMeta.beta ? String(stockMeta.beta) : "1.0",
               dividendYield: stockMeta.dividendYield ? String(stockMeta.dividendYield) : undefined,
               sector: stockMeta.sector,
@@ -2309,6 +2341,9 @@ export default function App() {
                 onOpenRiskEngine={() => setActiveTab('risk')}
                 watchlist={watchlist}
                 onToggleWatchlist={handleToggleWatchlist}
+                allData={allData}
+                lastUpdate={lastUpdate}
+                fetchData={fetchData}
               />
             )}
 
@@ -2328,6 +2363,7 @@ export default function App() {
                 onAddWatchlist={handleAddWatchlist}
                 onRemoveWatchlist={handleRemoveWatchlist}
                 onToggleWatchlist={handleToggleWatchlist}
+                allData={allData}
               />
             )}
 
@@ -3478,7 +3514,7 @@ export default function App() {
               )}
 
               {activeTab === 'yieldcurve' && (
-                <YieldCurveAnalysis />
+                <YieldCurveAnalysis allData={allData} />
               )}
 
               {activeTab === 'logistics' && (

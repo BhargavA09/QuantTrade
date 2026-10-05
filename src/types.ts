@@ -57,15 +57,17 @@ export interface StockData {
     annualizedVol: number;
   };
   fundamentals?: {
-    marketCap: string;
-    peRatio: string;
-    dividendYield: string;
-    revenue: string;
-    netIncome: string;
-    eps: string;
-    beta: string;
-    fiftyTwoWeekHigh: string;
-    fiftyTwoWeekLow: string;
+    marketCap?: string;
+    peRatio?: string;
+    dividendYield?: string;
+    revenue?: string;
+    netIncome?: string;
+    eps?: string;
+    beta?: string;
+    fiftyTwoWeekHigh?: string;
+    fiftyTwoWeekLow?: string;
+    sector?: string;
+    industry?: string;
   };
   news?: { title: string; source: string; time: string; url: string; sentiment: string }[];
   forecast: { date: string; price: number }[];

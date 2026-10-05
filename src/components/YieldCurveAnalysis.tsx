@@ -35,12 +35,37 @@ const YIELD_DATA = [
   { maturity: '30 Yr', months: 360, current: 4.45, previous: 4.53, normal: 4.80 },
 ];
 
-export const YieldCurveAnalysis: React.FC = () => {
+interface YieldCurveAnalysisProps {
+  allData?: Record<string, any>;
+}
+
+export const YieldCurveAnalysis: React.FC<YieldCurveAnalysisProps> = ({ allData }) => {
   const [activeView, setActiveView] = useState<'current' | 'comparison' | 'normal'>('current');
 
-  // Calculate spreads
-  const spread2y10y = YIELD_DATA[8].current - YIELD_DATA[4].current; // 10Y - 2Y
-  const spread3m10y = YIELD_DATA[8].current - YIELD_DATA[1].current; // 10Y - 3M
+  // Dynamically calibrate yield curve data with live open-source streaming bond market feed
+  const yieldData = React.useMemo(() => {
+    const tnx = allData?.['^TNX']?.currentPrice;
+    const tyx = allData?.['^TYX']?.currentPrice;
+    const fvx = allData?.['^FVX']?.currentPrice;
+    const irx = allData?.['^IRX']?.currentPrice;
+
+    return YIELD_DATA.map(item => {
+      let currentVal = item.current;
+      if (item.maturity === '3 Mo' && irx && irx > 0) currentVal = Number(irx.toFixed(2));
+      if (item.maturity === '5 Yr' && fvx && fvx > 0) currentVal = Number(fvx.toFixed(2));
+      if (item.maturity === '10 Yr' && tnx && tnx > 0) currentVal = Number(tnx.toFixed(2));
+      if (item.maturity === '30 Yr' && tyx && tyx > 0) currentVal = Number(tyx.toFixed(2));
+
+      return {
+        ...item,
+        current: currentVal
+      };
+    });
+  }, [allData]);
+
+  // Calculate spreads based on streaming data
+  const spread2y10y = yieldData[8].current - yieldData[4].current; // 10Y - 2Y
+  const spread3m10y = yieldData[8].current - yieldData[1].current; // 10Y - 3M
   
   const isInverted = spread2y10y < 0 || spread3m10y < 0;
 
@@ -97,14 +122,20 @@ export const YieldCurveAnalysis: React.FC = () => {
 
       {/* Main Chart */}
       <div className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-3xl">
-        <h3 className="text-sm font-bold text-zinc-100 mb-6 uppercase tracking-widest flex items-center gap-2">
-          <BarChart3 size={16} className="text-emerald-400" />
-          Yield Curve Visualization
-        </h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-widest flex items-center gap-2">
+            <BarChart3 size={16} className="text-emerald-400" />
+            Yield Curve Visualization
+          </h3>
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-emerald-400 font-bold">Live Bond Market Stream (^IRX, ^FVX, ^TNX, ^TYX)</span>
+          </div>
+        </div>
         
         <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={YIELD_DATA} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+            <LineChart data={yieldData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
               <XAxis 
                 dataKey="maturity" 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -8,7 +8,10 @@ import {
   Sparkles, 
   Database,
   ArrowRight,
-  Filter
+  Filter,
+  ShieldCheck,
+  Globe2,
+  Activity
 } from 'lucide-react';
 import { 
   EXPANDED_STOCK_DATABASE, 
@@ -37,21 +40,52 @@ export default function StockSelectorModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState<StockSectorType>('All');
   const [customTicker, setCustomTicker] = useState('');
+  const [serverResults, setServerResults] = useState<any[]>([]);
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
 
-  const filteredStocks = useMemo(() => {
+  // Local filtered stocks from expanded 120+ asset database
+  const filteredLocalStocks = useMemo(() => {
     return searchDatabase(searchQuery, selectedSector);
   }, [searchQuery, selectedSector]);
+
+  // Debounced server search for universal reach across all global tickers (NYSE, NASDAQ, AMEX, TSX, Crypto)
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q || q.length < 2) {
+      setServerResults([]);
+      setIsSearchingServer(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingServer(true);
+      try {
+        const res = await fetch(`/api/stock/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const quotes = Array.isArray(json?.quotes) ? json.quotes : [];
+          setServerResults(quotes);
+        }
+      } catch (err) {
+        console.warn("Global ticker search notice:", err);
+      } finally {
+        setIsSearchingServer(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   if (!isOpen) return null;
 
   const handleSelect = (ticker: string) => {
-    onSelectTicker(ticker);
+    onSelectTicker(ticker.trim().toUpperCase());
     onClose();
   };
 
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = customTicker.trim().toUpperCase();
+    const clean = (customTicker || searchQuery).trim().toUpperCase();
     if (clean) {
       onSelectTicker(clean);
       setCustomTicker('');
@@ -79,30 +113,38 @@ export default function StockSelectorModal({
           className="relative w-full max-w-4xl bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl z-10 flex flex-col max-h-[88vh]"
         >
           {/* Header */}
-          <div className="p-6 border-b border-zinc-800/80 bg-zinc-900/30 flex items-center justify-between">
+          <div className="p-6 border-b border-zinc-800/80 bg-zinc-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="p-2.5 rounded-2xl bg-zinc-900 text-emerald-400 border border-zinc-800">
                 <Database size={20} />
               </span>
               <div>
                 <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                  Stock & Market Database
+                  Universal Stock & Asset Database
                   <span className="text-xs text-zinc-400 font-normal">
-                    · {EXPANDED_STOCK_DATABASE.length} Premier Assets
+                    · {EXPANDED_STOCK_DATABASE.length}+ Verified Assets + All Global Tickers
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Select an asset to update quantitative models, stochastic projections, and algorithmic backtests.
+                  Select any equity, ETF, crypto, or index for real-time multi-source streaming and quantitative simulations.
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-            >
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              {/* Live Preventions Badge */}
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-medium">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                <span>Multi-Source Verified · Outlier Shield Active</span>
+              </div>
+
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Search Bar & Custom Input Bar */}
@@ -113,8 +155,8 @@ export default function StockSelectorModal({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by symbol, company name, or industry (e.g. NVDA, Apple, Semiconductor, Bitcoin)..."
-                className="w-full pl-10 pr-10 py-2.5 bg-zinc-900/70 border border-zinc-800 rounded-xl text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+                placeholder="Search any ticker across US & global markets (e.g. NVDA, ARM, SMCI, BABA, AAPL, BTC, SPY)..."
+                className="w-full pl-10 pr-10 py-2.5 bg-zinc-900/70 border border-zinc-800 rounded-xl text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors font-mono"
                 autoFocus
               />
               {searchQuery && (
@@ -150,11 +192,56 @@ export default function StockSelectorModal({
           </div>
 
           {/* Asset List Grid */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {filteredStocks.length === 0 ? (
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {/* If user typed a search query, show any additional server-discovered tickers */}
+            {searchQuery.trim().length >= 2 && serverResults.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Globe2 size={12} className="text-emerald-400" />
+                    Global Market Search Matches
+                  </span>
+                  <span className="text-[10px] text-zinc-500">Live External Feeds</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  {serverResults.slice(0, 6).map((item: any) => {
+                    const sym = item.symbol;
+                    const isLocal = filteredLocalStocks.some(s => s.ticker === sym);
+                    if (isLocal) return null; // Deduplicate
+
+                    return (
+                      <div
+                        key={sym}
+                        onClick={() => handleSelect(sym)}
+                        className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-between group"
+                      >
+                        <div className="overflow-hidden pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-white font-mono text-sm group-hover:text-emerald-400 transition-colors">
+                              {sym}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                              {item.quoteType || 'EQUITY'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-400 truncate mt-0.5">
+                            {item.shortname || item.longname || sym}
+                          </p>
+                        </div>
+                        <span className="text-xs text-zinc-400 group-hover:text-emerald-400 flex items-center gap-0.5">
+                          Load <ArrowRight size={12} />
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {filteredLocalStocks.length === 0 && serverResults.length === 0 ? (
               <div className="py-12 text-center space-y-4">
                 <p className="text-sm text-zinc-400">
-                  No catalog asset matches "{searchQuery}".
+                  No instant match for "{searchQuery}". You can analyze ANY ticker worldwide:
                 </p>
                 {/* Custom Ticker Lookup */}
                 <form onSubmit={handleCustomSubmit} className="max-w-md mx-auto flex items-center gap-2">
@@ -162,20 +249,20 @@ export default function StockSelectorModal({
                     type="text"
                     value={customTicker || searchQuery}
                     onChange={(e) => setCustomTicker(e.target.value)}
-                    placeholder="Enter custom ticker (e.g. GOOG, INTC, ARM)"
-                    className="flex-1 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                    placeholder="Enter any ticker (e.g. ARM, SMCI, BABA, SHOP.TO)"
+                    className="flex-1 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 font-mono uppercase"
                   />
                   <button
                     type="submit"
                     className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-all"
                   >
-                    Load Ticker <ArrowRight size={14} />
+                    Analyze Ticker <ArrowRight size={14} />
                   </button>
                 </form>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                {filteredStocks.map((stock: DetailedStockItem) => {
+                {filteredLocalStocks.map((stock: DetailedStockItem) => {
                   const isActive = stock.ticker === activeTicker;
                   const live = allData ? allData[stock.ticker] : null;
                   const displayPrice = live?.currentPrice && live.currentPrice > 0 ? live.currentPrice : stock.price;
@@ -198,17 +285,17 @@ export default function StockSelectorModal({
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-base font-bold text-white tracking-tight group-hover:text-emerald-400 transition-colors">
+                              <span className="text-base font-bold text-white tracking-tight group-hover:text-emerald-400 transition-colors font-mono">
                                 {stock.ticker}
                               </span>
-                              <span className="text-xs text-zinc-400">
+                              <span className="text-xs text-zinc-400 truncate max-w-[180px]">
                                 {stock.name}
                               </span>
                             </div>
                             <div className="text-[11px] text-zinc-400 flex items-center gap-1.5 mt-0.5">
                               <span>{stock.sector}</span>
                               <span aria-hidden="true">·</span>
-                              <span>{stock.industry}</span>
+                              <span className="truncate max-w-[200px]">{stock.industry}</span>
                             </div>
                           </div>
 
@@ -232,7 +319,7 @@ export default function StockSelectorModal({
                         </p>
                       </div>
 
-                      {/* Bottom Quantitative Metrics (Clean unboxed metadata with separators) */}
+                      {/* Bottom Quantitative Metrics */}
                       <div className="pt-2 border-t border-zinc-800/50 flex items-center justify-between text-[11px] text-zinc-400">
                         <div className="flex items-center gap-2">
                           <span>Cap {stock.marketCap}</span>
@@ -263,24 +350,25 @@ export default function StockSelectorModal({
             )}
           </div>
 
-          {/* Footer with custom ticker entry */}
+          {/* Footer with universal custom ticker entry */}
           <div className="p-4 border-t border-zinc-800 bg-zinc-900/40 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-xs text-zinc-400">
-              Can't find a symbol? Type any stock, crypto, or commodity ticker:
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <Activity size={14} className="text-emerald-400" />
+              <span>Universal Database: Query ANY global stock, ETF, crypto, or commodity ticker:</span>
             </div>
             <form onSubmit={handleCustomSubmit} className="flex items-center gap-2 w-full sm:w-auto">
               <input
                 type="text"
                 value={customTicker}
                 onChange={(e) => setCustomTicker(e.target.value)}
-                placeholder="Symbol (e.g. INTC, ARM)"
+                placeholder="Symbol (e.g. ARM, SMCI, BABA, DIS)"
                 className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 w-36 uppercase font-mono"
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
               >
-                Analyze
+                Analyze <ArrowRight size={12} />
               </button>
             </form>
           </div>

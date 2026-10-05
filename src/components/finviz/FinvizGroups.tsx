@@ -1,23 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
-import { FINVIZ_SECTORS } from '../../data/finvizData';
+import { FINVIZ_SECTORS, FINVIZ_STOCKS } from '../../data/finvizData';
 import { cn } from '../../utils/cn';
 
-export const FinvizGroups: React.FC = () => {
+interface FinvizGroupsProps {
+  allData?: Record<string, any>;
+}
+
+export const FinvizGroups: React.FC<FinvizGroupsProps> = ({ allData }) => {
   const [timeframe, setTimeframe] = useState<'1D' | '1W' | '1M' | 'YTD'>('1D');
 
-  const data = FINVIZ_SECTORS.map(s => {
-    let perf = s.perfDay;
-    if (timeframe === '1W') perf = s.perfWeek;
-    if (timeframe === '1M') perf = s.perfMonth;
-    if (timeframe === 'YTD') perf = s.perfYtd;
+  const data = useMemo(() => {
+    return FINVIZ_SECTORS.map(s => {
+      let perf = s.perfDay;
 
-    return {
-      sector: s.name,
-      perf: Number(perf.toFixed(2)),
-      marketCap: (s.marketCap / 1e12).toFixed(1)
-    };
-  }).sort((a, b) => b.perf - a.perf);
+      // If live streaming stock data is available for 1D, compute live sector average from constituent stocks
+      if (timeframe === '1D' && allData && Object.keys(allData).length > 0) {
+        const sectorStocks = FINVIZ_STOCKS.filter(st => st.sector.toLowerCase() === s.name.toLowerCase());
+        const liveChanges = sectorStocks
+          .map(st => allData[st.ticker]?.changePercent)
+          .filter((chg): chg is number => typeof chg === 'number' && !isNaN(chg));
+
+        if (liveChanges.length > 0) {
+          const avgLiveChange = liveChanges.reduce((a, b) => a + b, 0) / liveChanges.length;
+          perf = avgLiveChange;
+        }
+      } else if (timeframe === '1W') {
+        perf = s.perfWeek;
+      } else if (timeframe === '1M') {
+        perf = s.perfMonth;
+      } else if (timeframe === 'YTD') {
+        perf = s.perfYtd;
+      }
+
+      return {
+        sector: s.name,
+        perf: Number(perf.toFixed(2)),
+        marketCap: (s.marketCap / 1e12).toFixed(1)
+      };
+    }).sort((a, b) => b.perf - a.perf);
+  }, [timeframe, allData]);
 
   return (
     <div className="space-y-4">

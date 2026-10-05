@@ -15,6 +15,10 @@ export interface PriceUpdate {
   peRatio?: number;
   dividendYield?: number;
   timestamp: string;
+  source?: string;
+  verified?: boolean;
+  accuracyScore?: number;
+  preventionApplied?: boolean;
 }
 
 export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';

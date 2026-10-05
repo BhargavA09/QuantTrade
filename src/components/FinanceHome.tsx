@@ -73,6 +73,7 @@ interface FinanceHomeProps {
   onRemoveWatchlist?: (ticker: string) => void;
   onToggleWatchlist?: (ticker: string) => void;
   watchlist?: string[];
+  allData?: Record<string, any>;
 }
 
 export const FinanceHome: React.FC<FinanceHomeProps> = ({ 
@@ -81,13 +82,14 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
   onAddWatchlist,
   onRemoveWatchlist,
   onToggleWatchlist,
-  watchlist = []
+  watchlist = [],
+  allData
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [marketData, setMarketData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeMarketTab, setActiveMarketTab] = useState<'us' | 'crypto' | 'commodities'>('us');
+  const [activeMarketTab, setActiveMarketTab] = useState<'us' | 'bonds' | 'crypto' | 'commodities'>('us');
 
   // Watchlist specific state
   const [watchlistQuotes, setWatchlistQuotes] = useState<Record<string, any>>({});
@@ -257,13 +259,29 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
     // Check marketData fallback
     const allMarketItems = [
       ...(marketData?.us || []),
+      ...(marketData?.bonds || []),
       ...(marketData?.crypto || []),
       ...(marketData?.commodities || []),
     ];
     return allMarketItems.find(item => item.ticker === ticker);
   };
 
-  const marketIndices = marketData?.[activeMarketTab] || [];
+  const marketIndices = React.useMemo(() => {
+    const raw = marketData?.[activeMarketTab] || [];
+    if (!allData || Object.keys(allData).length === 0) return raw;
+    return raw.map((item: any) => {
+      const live = allData[item.ticker];
+      if (live && live.currentPrice > 0) {
+        return {
+          ...item,
+          price: live.currentPrice,
+          change: live.change || 0,
+          changePercent: live.changePercent || 0
+        };
+      }
+      return item;
+    });
+  }, [marketData, activeMarketTab, allData]);
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full">
@@ -337,18 +355,18 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
               Market Overview
             </h2>
             <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
-              {(['us', 'crypto', 'commodities'] as const).map((tab) => (
+              {(['us', 'bonds', 'crypto', 'commodities'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveMarketTab(tab)}
                   className={cn(
-                    "px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                    "px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
                     activeMarketTab === tab 
                       ? "bg-emerald-500 text-zinc-950 shadow-lg shadow-emerald-500/20" 
                       : "text-zinc-500 hover:text-zinc-300"
                   )}
                 >
-                  {tab}
+                  {tab === 'bonds' ? 'Bonds & Yields' : tab}
                 </button>
               ))}
             </div>

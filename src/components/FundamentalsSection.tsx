@@ -3,30 +3,32 @@ import { motion } from 'motion/react';
 import { Info, BarChart2, Users, TrendingUp, DollarSign } from 'lucide-react';
 import { cn } from '../utils/cn';
 
-interface FundamentalsData {
-  marketCap: string;
-  peRatio: string;
-  dividendYield: string;
-  revenue: string;
-  netIncome: string;
-  eps: string;
-  beta: string;
-  fiftyTwoWeekHigh: string;
-  fiftyTwoWeekLow: string;
+export interface FundamentalsData {
+  marketCap?: string;
+  peRatio?: string;
+  dividendYield?: string;
+  revenue?: string;
+  netIncome?: string;
+  eps?: string;
+  beta?: string;
+  fiftyTwoWeekHigh?: string;
+  fiftyTwoWeekLow?: string;
   floatShares?: string;
   heldByInstitutions?: string;
   shortRatio?: string;
+  sector?: string;
+  industry?: string;
 }
 
 export const FundamentalsSection: React.FC<{ fundamentals: FundamentalsData }> = ({ fundamentals }) => {
   const cards = [
-    { label: 'Market Cap', value: fundamentals.marketCap, icon: DollarSign, color: 'text-blue-400' },
-    { label: 'P/E Ratio', value: fundamentals.peRatio, icon: BarChart2, color: 'text-emerald-400' },
-    { label: 'Div Yield', value: fundamentals.dividendYield, icon: TrendingUp, color: 'text-purple-400' },
-    { label: 'Rev (TTM)', value: fundamentals.revenue, icon: Info, color: 'text-zinc-400' },
-    { label: 'Net Income', value: fundamentals.netIncome, icon: DollarSign, color: 'text-emerald-400' },
-    { label: 'EPS', value: fundamentals.eps, icon: Info, color: 'text-zinc-400' },
-    { label: 'Beta', value: fundamentals.beta, icon: Activity, iconColor: 'text-rose-400' },
+    { label: 'Market Cap', value: fundamentals.marketCap || 'N/A', icon: DollarSign, color: 'text-blue-400' },
+    { label: 'P/E Ratio', value: fundamentals.peRatio || 'N/A', icon: BarChart2, color: 'text-emerald-400' },
+    { label: 'Div Yield', value: fundamentals.dividendYield || 'N/A', icon: TrendingUp, color: 'text-purple-400' },
+    { label: 'Rev (TTM)', value: fundamentals.revenue || 'N/A', icon: Info, color: 'text-zinc-400' },
+    { label: 'Net Income', value: fundamentals.netIncome || 'N/A', icon: DollarSign, color: 'text-emerald-400' },
+    { label: 'EPS', value: fundamentals.eps || 'N/A', icon: Info, color: 'text-zinc-400' },
+    { label: 'Beta', value: fundamentals.beta || '1.00', icon: Activity, color: 'text-rose-400' },
     { label: 'Float', value: fundamentals.floatShares || 'N/A', icon: Users, color: 'text-amber-400' },
     { label: 'Inst. Owned', value: fundamentals.heldByInstitutions || 'N/A', icon: Users, color: 'text-blue-400' },
     { label: 'Short Ratio', value: fundamentals.shortRatio || 'N/A', icon: TrendingUp, color: 'text-rose-400' },

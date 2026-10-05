@@ -26,13 +26,14 @@ export const fetchForecast = async (
   if (cached) return cached;
 
   return defaultApiClient.deduplicate(cacheKey, async () => {
-    // 1. Fetch real historical candles, live quote, and fundamentals in parallel for speed and accuracy
+    // 1. Fetch real historical candles, live quote, fundamentals, and live bond yield in parallel
     let history: StockHistoryCandle[] = [];
     let liveQuote: any = null;
     let extraData: any = { fundamentals: {}, management: {}, profile: {} };
+    let bondQuote: any = null;
 
     try {
-      const [historyResult, quoteResult, fundamentalsResult] = await Promise.all([
+      const [historyResult, quoteResult, fundamentalsResult, bondResult] = await Promise.all([
         defaultApiClient.fetchWithRetry<any[]>(`/api/stock/history/${ticker}`).catch(e => {
           console.warn(`Real history fetch notice for ${ticker}:`, e);
           return null;
@@ -41,7 +42,8 @@ export const fetchForecast = async (
           console.warn(`Live quote fetch notice for ${ticker}:`, e);
           return null;
         }),
-        defaultApiClient.fetchWithRetry<any>(`/api/stock/fundamentals/${ticker}`).catch(() => ({ fundamentals: {}, management: {}, profile: {} }))
+        defaultApiClient.fetchWithRetry<any>(`/api/stock/fundamentals/${ticker}`).catch(() => ({ fundamentals: {}, management: {}, profile: {} })),
+        defaultApiClient.fetchWithRetry<any>(`/api/stock/quote/^TNX`).catch(() => null)
       ]);
 
       if (historyResult && Array.isArray(historyResult) && historyResult.length >= 5) {
@@ -58,6 +60,7 @@ export const fetchForecast = async (
 
       liveQuote = quoteResult;
       extraData = fundamentalsResult || extraData;
+      bondQuote = bondResult;
     } catch (e) {
       console.warn(`Data gathering notice for ${ticker}:`, e);
     }
@@ -100,13 +103,18 @@ export const fetchForecast = async (
       ? Math.sqrt(returns.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / returns.length)
       : 0.015;
 
-    // 6. Neural Brain & Sentiment Drift Integration
+    // 6. Neural Brain, Sentiment, and Bond Market Yield Integration
+    const bondRate = (bondQuote?.price && bondQuote.price > 0) ? bondQuote.price : 4.14;
+    const dailyRiskFreeRate = (bondRate / 100) / 252;
+
     const brainMemory = neuralBrain.getMemory();
     const brainBias = brainMemory?.quantBias || 0;
     const modelConfidence = brainMemory?.modelConfidence || 0.5;
     const sentimentDrift = ((sentiment.score - 50) / 50) * 0.005;
     const weightedBias = brainBias * modelConfidence;
-    mean += sentimentDrift + weightedBias;
+    
+    // Condition mean drift on the live stock returns and bond market hurdle
+    mean = (mean * 0.6) + (dailyRiskFreeRate * 0.4) + sentimentDrift + weightedBias;
 
     // 7. Monte Carlo Path Simulation
     const mcResults = runMonteCarlo(lastPrice, mean, stdDev, numSimulations, confidenceInterval, 30, prices);
