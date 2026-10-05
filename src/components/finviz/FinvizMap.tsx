@@ -17,15 +17,33 @@ import { cn } from '../../utils/cn';
 
 interface FinvizMapProps {
   onSelectTicker: (ticker: string) => void;
+  allData?: Record<string, any>;
 }
 
-export const FinvizMap: React.FC<FinvizMapProps> = ({ onSelectTicker }) => {
+export const FinvizMap: React.FC<FinvizMapProps> = ({ onSelectTicker, allData }) => {
   const [timeframe, setTimeframe] = useState<'1D' | '1W' | '1M' | 'YTD'>('1D');
   const [mapUniverse, setMapUniverse] = useState<'sp500' | 'world' | 'crypto'>('sp500');
   const [sizeBy, setSizeBy] = useState<'marketCap' | 'volume'>('marketCap');
   const [searchFilter, setSearchFilter] = useState('');
   const [hoveredStock, setHoveredStock] = useState<FinvizStock | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Synchronize stocks with live data if available
+  const stocks = useMemo(() => {
+    if (!allData || Object.keys(allData).length === 0) return FINVIZ_STOCKS;
+    return FINVIZ_STOCKS.map(s => {
+      const live = allData[s.ticker];
+      if (live && live.currentPrice > 0) {
+        return {
+          ...s,
+          price: live.currentPrice,
+          change: live.changePercent !== undefined ? live.changePercent : s.change,
+          volume: live.volume || s.volume
+        };
+      }
+      return s;
+    });
+  }, [allData]);
 
   // Get change percentage based on selected timeframe
   const getChange = (stock: FinvizStock) => {
@@ -61,7 +79,7 @@ export const FinvizMap: React.FC<FinvizMapProps> = ({ onSelectTicker }) => {
   const sectors = useMemo(() => {
     const grouped: Record<string, FinvizStock[]> = {};
     
-    FINVIZ_STOCKS.forEach(stock => {
+    stocks.forEach(stock => {
       if (searchFilter) {
         const query = searchFilter.toLowerCase();
         const matches = stock.ticker.toLowerCase().includes(query) || 
@@ -90,8 +108,8 @@ export const FinvizMap: React.FC<FinvizMapProps> = ({ onSelectTicker }) => {
   }, [searchFilter, sizeBy]);
 
   const totalMarketVal = useMemo(() => {
-    return FINVIZ_STOCKS.reduce((acc, s) => acc + (sizeBy === 'marketCap' ? s.marketCap : s.volume * s.price), 0);
-  }, [sizeBy]);
+    return stocks.reduce((acc, s) => acc + (sizeBy === 'marketCap' ? s.marketCap : s.volume * s.price), 0);
+  }, [stocks, sizeBy]);
 
   const handleMouseMove = (e: React.MouseEvent, stock: FinvizStock) => {
     setHoveredStock(stock);

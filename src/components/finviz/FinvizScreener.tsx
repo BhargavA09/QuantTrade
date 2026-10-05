@@ -23,11 +23,12 @@ import { cn } from '../../utils/cn';
 
 interface FinvizScreenerProps {
   onSelectTicker: (ticker: string) => void;
+  allData?: Record<string, any>;
 }
 
 type ScreenerView = 'overview' | 'valuation' | 'financial' | 'ownership' | 'performance' | 'technical' | 'charts';
 
-export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker }) => {
+export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker, allData }) => {
   const [activeView, setActiveView] = useState<ScreenerView>('overview');
   const [exchangeFilter, setExchangeFilter] = useState<string>('any');
   const [marketCapFilter, setMarketCapFilter] = useState<string>('any');
@@ -39,6 +40,23 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker }
   const [rsiFilter, setRsiFilter] = useState<string>('any');
   const [signalFilter, setSignalFilter] = useState<string>('any');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Synchronize stocks with live data if available
+  const stocks = useMemo(() => {
+    if (!allData || Object.keys(allData).length === 0) return FINVIZ_STOCKS;
+    return FINVIZ_STOCKS.map(s => {
+      const live = allData[s.ticker];
+      if (live && live.currentPrice > 0) {
+        return {
+          ...s,
+          price: live.currentPrice,
+          change: live.changePercent !== undefined ? live.changePercent : s.change,
+          volume: live.volume || s.volume
+        };
+      }
+      return s;
+    });
+  }, [allData]);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<keyof FinvizStock>('marketCap');
@@ -67,7 +85,7 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker }
   };
 
   const filteredStocks = useMemo(() => {
-    return FINVIZ_STOCKS.filter(stock => {
+    return stocks.filter(stock => {
       // Exchange
       if (exchangeFilter !== 'any' && stock.exchange !== exchangeFilter) return false;
 
@@ -149,7 +167,7 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker }
               Finviz Stock Screener & Filter Engine
             </h2>
             <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
-              {filteredStocks.length} of {FINVIZ_STOCKS.length} Stocks
+              {filteredStocks.length} of {stocks.length} Stocks
             </span>
           </div>
 

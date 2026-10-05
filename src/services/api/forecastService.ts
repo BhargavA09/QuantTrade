@@ -26,39 +26,62 @@ export const fetchForecast = async (
   if (cached) return cached;
 
   return defaultApiClient.deduplicate(cacheKey, async () => {
-    // 1. Fetch real historical candles from backend with fallback
+    // 1. Fetch real historical candles, live quote, and fundamentals in parallel for speed and accuracy
     let history: StockHistoryCandle[] = [];
+    let liveQuote: any = null;
+    let extraData: any = { fundamentals: {}, management: {}, profile: {} };
+
     try {
-      const rawHistory = await defaultApiClient.fetchWithRetry<any[]>(`/api/stock/history/${ticker}`);
-      if (rawHistory && Array.isArray(rawHistory)) {
-        history = rawHistory.map((h: any) => ({
+      const [historyResult, quoteResult, fundamentalsResult] = await Promise.all([
+        defaultApiClient.fetchWithRetry<any[]>(`/api/stock/history/${ticker}`).catch(e => {
+          console.warn(`Real history fetch notice for ${ticker}:`, e);
+          return null;
+        }),
+        defaultApiClient.fetchWithRetry<any>(`/api/stock/quote/${ticker}`).catch(e => {
+          console.warn(`Live quote fetch notice for ${ticker}:`, e);
+          return null;
+        }),
+        defaultApiClient.fetchWithRetry<any>(`/api/stock/fundamentals/${ticker}`).catch(() => ({ fundamentals: {}, management: {}, profile: {} }))
+      ]);
+
+      if (historyResult && Array.isArray(historyResult) && historyResult.length >= 5) {
+        history = historyResult.map((h: any) => ({
           date: new Date(h.date).toISOString().split('T')[0],
-          price: h.close,
-          open: h.open || h.close,
-          high: h.high || h.close,
-          low: h.low || h.close,
-          close: h.close,
-          volume: h.volume
+          price: Number(h.close),
+          open: Number(h.open ?? h.close),
+          high: Number(h.high ?? h.close),
+          low: Number(h.low ?? h.close),
+          close: Number(h.close),
+          volume: Number(h.volume || 0)
         }));
       }
+
+      liveQuote = quoteResult;
+      extraData = fundamentalsResult || extraData;
     } catch (e) {
-      console.warn(`Real history fetch notice for ${ticker}, using calibrated history:`, e);
+      console.warn(`Data gathering notice for ${ticker}:`, e);
     }
 
     if (history.length < 5) {
       history = generateMockHistory(ticker, 90);
     }
 
-    // 2. Fetch fundamentals and metadata
-    const extraData = await defaultApiClient.fetchWithRetry<any>(
-      `/api/stock/fundamentals/${ticker}`
-    ).catch(() => ({ fundamentals: {}, management: {}, profile: {} }));
+    // Synchronize latest historical close with live quote price
+    const latestQuotePrice = liveQuote?.price && liveQuote.price > 0 ? Number(liveQuote.price) : history[history.length - 1].price;
+    if (history.length > 0) {
+      history[history.length - 1].price = latestQuotePrice;
+      history[history.length - 1].close = latestQuotePrice;
+      if (liveQuote?.high) history[history.length - 1].high = Math.max(history[history.length - 1].high, liveQuote.high);
+      if (liveQuote?.low) history[history.length - 1].low = Math.min(history[history.length - 1].low, liveQuote.low);
+    }
 
     const prices = history.map(h => h.price);
-    const lastPrice = prices[prices.length - 1];
-    const prevPrice = prices[prices.length - 2] || lastPrice;
-    const change = lastPrice - prevPrice;
-    const changePercent = prevPrice !== 0 ? (change / prevPrice) * 100 : 0;
+    const lastPrice = latestQuotePrice;
+    const prevPrice = liveQuote?.previousClose ?? (prices.length > 1 ? prices[prices.length - 2] : lastPrice);
+    const change = liveQuote?.change !== undefined ? Number(liveQuote.change) : lastPrice - prevPrice;
+    const changePercent = liveQuote?.changePercent !== undefined 
+      ? Number(liveQuote.changePercent) 
+      : (prevPrice !== 0 ? (change / prevPrice) * 100 : 0);
 
     // 3. Technical Indicator derivations for Neural Network
     const neuralFeatures = computeNeuralFeatures(prices);
@@ -172,6 +195,14 @@ export const fetchForecast = async (
       currentPrice: lastPrice,
       change,
       changePercent,
+      volume: liveQuote?.volume,
+      high: liveQuote?.high,
+      low: liveQuote?.low,
+      open: liveQuote?.open,
+      previousClose: liveQuote?.previousClose,
+      marketCap: liveQuote?.marketCap,
+      peRatio: liveQuote?.peRatio,
+      dividendYield: liveQuote?.dividendYield,
       history,
       fundamentals: extraData.fundamentals,
       management: extraData.management,

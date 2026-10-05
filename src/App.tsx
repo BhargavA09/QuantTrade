@@ -75,7 +75,8 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './utils/cn';
-import { fetchForecast, fetchGlobalState, fetchSentiment, fetchRiskAnalysis, analyzeSimulationPatterns, fetchPortfolioData, searchTicker, fetchPennyStocks, fetchMarketOverview, resolveTickerSymbol } from './services/api';
+import { fetchForecast, fetchGlobalState, fetchSentiment, fetchRiskAnalysis, analyzeSimulationPatterns, fetchPortfolioData, searchTicker, fetchPennyStocks, fetchMarketOverview, resolveTickerSymbol, generateMockHistory } from './services/api';
+import { EXPANDED_STOCK_DATABASE } from './data/expandedStockDatabase';
 import { runMonteCarlo as runMonteCarloUtil } from './utils/simulations';
 
 import { neuralBrain } from './services/NeuralBrain';
@@ -414,8 +415,18 @@ export default function App() {
   const [isStockSelectorOpen, setIsStockSelectorOpen] = useState(false);
   const [inputTicker, setInputTicker] = useState('');
   const [allData, setAllData] = useState<Record<string, StockData>>(() => {
-    const saved = localStorage.getItem('logistics_alpha_all_data');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const cacheVersion = localStorage.getItem('logistics_alpha_cache_version');
+      if (cacheVersion !== 'v3_calibrated_market') {
+        localStorage.removeItem('logistics_alpha_all_data');
+        localStorage.setItem('logistics_alpha_cache_version', 'v3_calibrated_market');
+        return {};
+      }
+      const saved = localStorage.getItem('logistics_alpha_all_data');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
   });
   const [simulations, setSimulations] = useState<Record<string, Simulation[]>>({});
   const [globalState, setGlobalState] = useState<GlobalState | null>(() => {
@@ -1207,9 +1218,9 @@ export default function App() {
     }
   };
 
-  const fetchData = async (t: string) => {
+  const fetchData = async (t: string, forceRefresh: boolean = false) => {
     const resolvedT = resolveTickerSymbol(t);
-    if (allData[resolvedT] || fetchingTickers.current.has(resolvedT) || failedTickers.current.has(resolvedT)) return;
+    if ((!forceRefresh && allData[resolvedT]) || fetchingTickers.current.has(resolvedT) || failedTickers.current.has(resolvedT)) return;
     fetchingTickers.current.add(resolvedT);
     setLoading(true);
     setError(null);
@@ -1253,19 +1264,29 @@ export default function App() {
       }));
     } catch (error: any) {
       console.warn(`Fetch notice for ${resolvedT}, applying calibrated fallback`, error);
+      const stockMeta = EXPANDED_STOCK_DATABASE.find(s => s.ticker === resolvedT);
+      const fallbackPrice = stockMeta ? stockMeta.price : (resolvedT.includes('BTC') ? 66200 : resolvedT.includes('ETH') ? 2640 : (resolvedT.startsWith('^') ? 5860 : 150));
+      const fallbackHist = generateMockHistory(resolvedT, 180);
       setAllData(prev => {
-        if (prev[resolvedT]) return prev;
+        if (prev[resolvedT] && !forceRefresh) return prev;
         return {
           ...prev,
           [resolvedT]: {
             ...fallbackStockData,
             ticker: resolvedT,
-            currentPrice: fallbackStockData.currentPrice,
-            history: Array.from({ length: 180 }).map((_, i) => ({
-              date: new Date(Date.now() - (180 - i) * 86400000).toISOString().split('T')[0],
-              price: 150 + Math.sin(i / 10) * 20 + i * 0.2,
-              volume: 15000000
-            }))
+            currentPrice: fallbackPrice,
+            mean: fallbackPrice,
+            change: stockMeta?.change || 0,
+            changePercent: stockMeta?.changePercent || 0,
+            history: fallbackHist,
+            fundamentals: stockMeta ? {
+              marketCap: stockMeta.marketCap,
+              trailingPE: stockMeta.pe ? String(stockMeta.pe) : undefined,
+              beta: stockMeta.beta ? String(stockMeta.beta) : "1.0",
+              dividendYield: stockMeta.dividendYield ? String(stockMeta.dividendYield) : undefined,
+              sector: stockMeta.sector,
+              industry: stockMeta.industry
+            } : undefined
           }
         };
       });
@@ -3964,7 +3985,7 @@ export default function App() {
                       sentimentScore={data.sentiment ? data.sentiment.score : 50} 
                       forecast={data.forecast || []}
                       currentPrice={data.currentPrice}
-                      onRefresh={() => fetchData(activeTicker)}
+                      onRefresh={() => fetchData(activeTicker, true)}
                     />
                     <SimulationFeed simulations={simulations[activeTicker] || []} />
                   </div>

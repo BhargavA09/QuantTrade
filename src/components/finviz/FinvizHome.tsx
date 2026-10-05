@@ -24,6 +24,7 @@ interface FinvizHomeProps {
   onSelectTicker: (ticker: string) => void;
   onNavigateToMap: () => void;
   onNavigateToScreener: () => void;
+  allData?: Record<string, any>;
 }
 
 type SignalTab = 'gainers' | 'losers' | 'newhigh' | 'unusualvol' | 'overbought' | 'oversold';
@@ -31,30 +32,48 @@ type SignalTab = 'gainers' | 'losers' | 'newhigh' | 'unusualvol' | 'overbought' 
 export const FinvizHome: React.FC<FinvizHomeProps> = ({
   onSelectTicker,
   onNavigateToMap,
-  onNavigateToScreener
+  onNavigateToScreener,
+  allData
 }) => {
   const [activeSignalTab, setActiveSignalTab] = useState<SignalTab>('gainers');
   const [newsFilter, setNewsFilter] = useState<'all' | 'news' | 'blogs'>('all');
+
+  // Synchronize stocks with live data if available
+  const stocks = React.useMemo(() => {
+    if (!allData || Object.keys(allData).length === 0) return FINVIZ_STOCKS;
+    return FINVIZ_STOCKS.map(s => {
+      const live = allData[s.ticker];
+      if (live && live.currentPrice > 0) {
+        return {
+          ...s,
+          price: live.currentPrice,
+          change: live.changePercent !== undefined ? live.changePercent : s.change,
+          volume: live.volume || s.volume
+        };
+      }
+      return s;
+    });
+  }, [allData]);
 
   // Filter stocks by signal
   const signalStocks = React.useMemo(() => {
     switch (activeSignalTab) {
       case 'gainers':
-        return [...FINVIZ_STOCKS].sort((a, b) => b.change - a.change).slice(0, 8);
+        return [...stocks].sort((a, b) => b.change - a.change).slice(0, 8);
       case 'losers':
-        return [...FINVIZ_STOCKS].sort((a, b) => a.change - b.change).slice(0, 8);
+        return [...stocks].sort((a, b) => a.change - b.change).slice(0, 8);
       case 'newhigh':
-        return [...FINVIZ_STOCKS].sort((a, b) => b.high52wDist - a.high52wDist).slice(0, 8);
+        return [...stocks].sort((a, b) => b.high52wDist - a.high52wDist).slice(0, 8);
       case 'unusualvol':
-        return [...FINVIZ_STOCKS].sort((a, b) => (b.volume / b.avgVolume) - (a.volume / a.avgVolume)).slice(0, 8);
+        return [...stocks].sort((a, b) => (b.volume / b.avgVolume) - (a.volume / a.avgVolume)).slice(0, 8);
       case 'overbought':
-        return [...FINVIZ_STOCKS].sort((a, b) => b.rsi - a.rsi).slice(0, 8);
+        return [...stocks].sort((a, b) => b.rsi - a.rsi).slice(0, 8);
       case 'oversold':
-        return [...FINVIZ_STOCKS].sort((a, b) => a.rsi - b.rsi).slice(0, 8);
+        return [...stocks].sort((a, b) => a.rsi - b.rsi).slice(0, 8);
       default:
-        return FINVIZ_STOCKS.slice(0, 8);
+        return stocks.slice(0, 8);
     }
-  }, [activeSignalTab]);
+  }, [activeSignalTab, stocks]);
 
   // Major market indices
   const indices = [
@@ -182,7 +201,7 @@ export const FinvizHome: React.FC<FinvizHomeProps> = ({
 
             {/* Mini Treemap Mosaic */}
             <div className="grid grid-cols-4 gap-1.5 h-44 cursor-pointer" onClick={onNavigateToMap}>
-              {FINVIZ_STOCKS.slice(0, 8).map((stock) => {
+              {stocks.slice(0, 8).map((stock) => {
                 const isGreen = stock.change >= 0;
                 return (
                   <div

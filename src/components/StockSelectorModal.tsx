@@ -24,13 +24,15 @@ interface StockSelectorModalProps {
   onClose: () => void;
   activeTicker: string;
   onSelectTicker: (ticker: string) => void;
+  allData?: Record<string, any>;
 }
 
 export default function StockSelectorModal({
   isOpen,
   onClose,
   activeTicker,
-  onSelectTicker
+  onSelectTicker,
+  allData
 }: StockSelectorModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState<StockSectorType>('All');
@@ -175,7 +177,10 @@ export default function StockSelectorModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {filteredStocks.map((stock: DetailedStockItem) => {
                   const isActive = stock.ticker === activeTicker;
-                  const isPositive = stock.change >= 0;
+                  const live = allData ? allData[stock.ticker] : null;
+                  const displayPrice = live?.currentPrice && live.currentPrice > 0 ? live.currentPrice : stock.price;
+                  const displayChangePct = live?.changePercent !== undefined ? live.changePercent : stock.changePercent;
+                  const isPositive = displayChangePct >= 0;
 
                   return (
                     <div
@@ -209,14 +214,14 @@ export default function StockSelectorModal({
 
                           <div className="text-right">
                             <div className="text-sm font-bold text-white font-mono">
-                              ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                             <div className={cn(
                               "text-xs font-semibold flex items-center justify-end gap-0.5",
                               isPositive ? "text-emerald-400" : "text-rose-400"
                             )}>
                               {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                              <span>{isPositive ? '+' : ''}{stock.changePercent.toFixed(2)}%</span>
+                              <span>{isPositive ? '+' : ''}{displayChangePct.toFixed(2)}%</span>
                             </div>
                           </div>
                         </div>

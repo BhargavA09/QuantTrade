@@ -14,29 +14,49 @@ import { StockHistoryCandle, TechnicalIndicators } from "./types";
 export const generateMockHistory = (ticker: string, days: number = 100): StockHistoryCandle[] => {
   const normalized = ticker.trim().toUpperCase();
   const foundStock = EXPANDED_STOCK_DATABASE.find(s => s.ticker === normalized);
-  let price = foundStock 
+  const targetEndPrice = foundStock 
     ? foundStock.price 
-    : (normalized.includes('BTC') ? 66000 : normalized.includes('ETH') ? 2600 : 150 + Math.random() * 200);
+    : (normalized.includes('BTC') ? 66200 : normalized.includes('ETH') ? 2640 : (normalized.startsWith('^') ? 5000 : 150));
   
   const beta = foundStock ? foundStock.beta : 1.0;
   const history: StockHistoryCandle[] = [];
   const now = new Date();
-  
-  for (let i = days; i >= 0; i--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
-    const vol = (normalized.includes('BTC') || normalized.includes('ETH')) ? 0.025 : 0.012 * beta;
-    const change = (Math.sin(i * 0.15) * 0.3 + (Math.random() - 0.48)) * (price * vol);
-    price = Math.max(1, price + change);
+  const isCrypto = normalized.includes('BTC') || normalized.includes('ETH') || normalized.includes('SOL');
+  const dailyVol = isCrypto ? 0.025 : 0.012 * beta;
+
+  // Generate backwards from targetEndPrice so the latest candle is EXACTLY targetEndPrice
+  const prices: number[] = new Array(days + 1);
+  prices[days] = targetEndPrice;
+
+  // Use deterministic seed based on ticker characters to avoid chaotic UI jumps
+  let seed = 0;
+  for (let c = 0; c < normalized.length; c++) seed += normalized.charCodeAt(c);
+
+  for (let i = days - 1; i >= 0; i--) {
+    const cycle = Math.sin((i + seed) * 0.17) * 0.4 + Math.cos((i + seed) * 0.06) * 0.3;
+    const stepChange = (cycle * 0.5 + Math.sin(i * 1.2) * 0.5) * dailyVol;
+    prices[i] = Math.max(0.5, prices[i + 1] / (1 + stepChange));
+  }
+
+  for (let i = 0; i <= days; i++) {
+    const dayOffset = days - i;
+    const date = new Date(now.getTime() - dayOffset * 86400000);
+    const close = Number(prices[i].toFixed(targetEndPrice < 2 ? 4 : 2));
+    const prevClose = i > 0 ? prices[i - 1] : close * 0.998;
+    const open = Number((prevClose * (1 + Math.sin((i + seed) * 0.5) * dailyVol * 0.3)).toFixed(targetEndPrice < 2 ? 4 : 2));
+    const spread = close * dailyVol * 0.7;
+    const high = Number((Math.max(open, close) + spread).toFixed(targetEndPrice < 2 ? 4 : 2));
+    const low = Number((Math.max(0.01, Math.min(open, close) - spread)).toFixed(targetEndPrice < 2 ? 4 : 2));
+    const volume = Math.floor(1500000 + Math.abs(Math.sin((i + seed) * 0.8)) * 8000000);
 
     history.push({
       date: date.toISOString().split('T')[0],
-      price: parseFloat(price.toFixed(2)),
-      open: parseFloat((price - change / 2).toFixed(2)),
-      high: parseFloat((price + Math.abs(change) * 0.8).toFixed(2)),
-      low: parseFloat((price - Math.abs(change) * 0.8).toFixed(2)),
-      close: parseFloat(price.toFixed(2)),
-      volume: Math.floor(Math.random() * 10000000) + 1500000
+      price: close,
+      open,
+      high,
+      low,
+      close,
+      volume
     });
   }
   return history;
