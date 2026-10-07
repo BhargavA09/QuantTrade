@@ -14,7 +14,7 @@ export const corsConfig: CorsOptions = {
 // Rate limiter for general public API endpoints
 export const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 300,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests from this IP, please try again after 60 seconds." }

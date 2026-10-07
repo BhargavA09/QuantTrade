@@ -161,21 +161,42 @@ export const BASELINE_MARKET_PRICES: Record<string, { price: number; name: strin
   'DOGE-USD': { price: 0.114, name: 'Dogecoin USD', sector: 'Cryptocurrency', cap: 16500000000 },
   'DOT-USD': { price: 4.25, name: 'Polkadot USD', sector: 'Cryptocurrency', cap: 6100000000 },
 
-  // Commodities
+  // Commodities & Futures
   'GC=F': { price: 2685.40, name: 'Gold Futures', sector: 'Commodity' },
   'CL=F': { price: 71.20, name: 'Crude Oil WTI', sector: 'Commodity' },
   'SI=F': { price: 32.40, name: 'Silver Futures', sector: 'Commodity' },
   'HG=F': { price: 4.38, name: 'Copper Futures', sector: 'Commodity' },
   'NG=F': { price: 2.85, name: 'Natural Gas Futures', sector: 'Commodity' },
+  'BZ=F': { price: 74.80, name: 'Brent Crude Oil', sector: 'Commodity' },
+  'RB=F': { price: 2.054, name: 'RBOB Gasoline', sector: 'Commodity' },
+  'HO=F': { price: 2.185, name: 'Heating Oil', sector: 'Commodity' },
+  'PL=F': { price: 985.20, name: 'Platinum Futures', sector: 'Commodity' },
+  'PA=F': { price: 1015.00, name: 'Palladium Futures', sector: 'Commodity' },
   'ZC=F': { price: 425.00, name: 'Corn Futures', sector: 'Commodity' },
   'ZS=F': { price: 1015.00, name: 'Soybean Futures', sector: 'Commodity' },
+  'ZW=F': { price: 585.50, name: 'Wheat Futures', sector: 'Commodity' },
   'KC=F': { price: 245.00, name: 'Coffee Futures', sector: 'Commodity' },
+  'SB=F': { price: 21.80, name: 'Sugar #11 Futures', sector: 'Commodity' },
+  'CT=F': { price: 72.40, name: 'Cotton #2 Futures', sector: 'Commodity' },
+  'CC=F': { price: 7450.00, name: 'Cocoa Futures', sector: 'Commodity' },
 
-  // Bonds & Treasuries
+  // Index Futures
+  'ES=F': { price: 5885.50, name: 'E-mini S&P 500', sector: 'Index Futures' },
+  'NQ=F': { price: 20350.25, name: 'E-mini Nasdaq 100', sector: 'Index Futures' },
+  'YM=F': { price: 42520.00, name: 'E-mini Dow Jones', sector: 'Index Futures' },
+  'RTY=F': { price: 2225.40, name: 'E-mini Russell 2000', sector: 'Index Futures' },
+  'BTC=F': { price: 66800.00, name: 'Bitcoin Futures', sector: 'Crypto Futures' },
+  'ETH=F': { price: 2660.00, name: 'Ethereum Futures', sector: 'Crypto Futures' },
+
+  // Bonds & Treasuries (Cash & Futures)
   '^TNX': { price: 4.120, name: '10-Year Treasury Yield', sector: 'Bond Yield' },
   '^TYX': { price: 4.420, name: '30-Year Treasury Yield', sector: 'Bond Yield' },
   '^FVX': { price: 3.920, name: '5-Year Treasury Yield', sector: 'Bond Yield' },
   '^IRX': { price: 4.580, name: '13-Week Treasury Bill', sector: 'Bond Yield' },
+  'ZB=F': { price: 118.25, name: '30-Year Treasury Bond Futures', sector: 'Bond Futures' },
+  'ZN=F': { price: 110.15, name: '10-Year Treasury Note Futures', sector: 'Bond Futures' },
+  'ZF=F': { price: 106.85, name: '5-Year Treasury Note Futures', sector: 'Bond Futures' },
+  'ZT=F': { price: 102.40, name: '2-Year Treasury Note Futures', sector: 'Bond Futures' },
   'TLT': { price: 94.50, name: 'iShares 20+ Year Treasury Bond ETF', sector: 'Fixed Income ETF', cap: 54000000000 },
   'IEF': { price: 95.20, name: 'iShares 7-10 Year Treasury Bond ETF', sector: 'Fixed Income ETF', cap: 31000000000 },
   'SHY': { price: 82.40, name: 'iShares 1-3 Year Treasury Bond ETF', sector: 'Fixed Income ETF', cap: 24000000000 },
@@ -184,10 +205,18 @@ export const BASELINE_MARKET_PRICES: Record<string, { price: number; name: strin
   'HYG': { price: 78.50, name: 'iShares iBoxx $ High Yield Corporate Bond ETF', sector: 'Fixed Income ETF', cap: 18000000000 },
   'LQD': { price: 108.40, name: 'iShares iBoxx $ Investment Grade Corporate Bond ETF', sector: 'Fixed Income ETF', cap: 32000000000 },
 
-  // Currencies
+  // Currencies & FX Pairs
+  'DX-Y.NYB': { price: 103.45, name: 'US Dollar Index (DXY)', sector: 'Currency Index' },
   'EURUSD=X': { price: 1.0880, name: 'EUR/USD', sector: 'Currency' },
   'JPY=X': { price: 149.20, name: 'USD/JPY', sector: 'Currency' },
   'GBPUSD=X': { price: 1.3050, name: 'GBP/USD', sector: 'Currency' },
+  'AUDUSD=X': { price: 0.6720, name: 'AUD/USD', sector: 'Currency' },
+  'USDCAD=X': { price: 1.3650, name: 'USD/CAD', sector: 'Currency' },
+  'USDCHF=X': { price: 0.8650, name: 'USD/CHF', sector: 'Currency' },
+  'NZDUSD=X': { price: 0.6120, name: 'NZD/USD', sector: 'Currency' },
+  'EURGBP=X': { price: 0.8340, name: 'EUR/GBP', sector: 'Currency' },
+  'EURJPY=X': { price: 162.30, name: 'EUR/JPY', sector: 'Currency' },
+  'GBPJPY=X': { price: 194.70, name: 'GBP/JPY', sector: 'Currency' },
 };
 
 /**

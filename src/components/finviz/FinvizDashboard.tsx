@@ -13,18 +13,22 @@ import {
   ArrowRight,
   Zap,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Flame,
+  ArrowUpDown
 } from 'lucide-react';
 import { FinvizTickerTape } from './FinvizTickerTape';
 import { FinvizHome } from './FinvizHome';
 import { FinvizScreener } from './FinvizScreener';
 import { FinvizMap } from './FinvizMap';
 import { FinvizGroups } from './FinvizGroups';
+import { FinvizFutures } from './FinvizFutures';
+import { FinvizForex } from './FinvizForex';
 import { FinvizChartWithProjections } from './FinvizChartWithProjections';
 import { FINVIZ_NEWS, FINVIZ_STOCKS } from '../../data/finvizData';
 import { cn } from '../../utils/cn';
 
-export type FinvizTab = 'home' | 'news' | 'screener' | 'map' | 'groups' | 'chart';
+export type FinvizTab = 'home' | 'news' | 'screener' | 'map' | 'groups' | 'futures' | 'forex' | 'chart';
 
 interface FinvizDashboardProps {
   initialTicker?: string;
@@ -261,6 +265,30 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
               Groups
             </button>
             <button
+              onClick={() => setActiveTab('futures')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1",
+                activeTab === 'futures'
+                  ? "bg-zinc-800 text-amber-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <Flame size={13} className="text-amber-400" />
+              Futures
+            </button>
+            <button
+              onClick={() => setActiveTab('forex')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1",
+                activeTab === 'forex'
+                  ? "bg-zinc-800 text-cyan-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <ArrowUpDown size={13} className="text-cyan-400" />
+              Forex
+            </button>
+            <button
               onClick={() => setActiveTab('chart')}
               className={cn(
                 "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border",
@@ -309,6 +337,21 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
 
         {activeTab === 'groups' && (
           <FinvizGroups allData={allData} />
+        )}
+
+        {activeTab === 'futures' && (
+          <FinvizFutures 
+            allData={allData} 
+            onSelectTicker={handleSelectTicker} 
+            lastUpdate={lastUpdate} 
+          />
+        )}
+
+        {activeTab === 'forex' && (
+          <FinvizForex 
+            allData={allData} 
+            onSelectTicker={handleSelectTicker} 
+          />
         )}
 
         {activeTab === 'chart' && (

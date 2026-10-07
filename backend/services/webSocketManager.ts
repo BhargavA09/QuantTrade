@@ -14,8 +14,17 @@ export class WebSocketManager {
   }
 
   private init() {
-    // Prime core Stock & Bond market benchmarks on startup for instant zero-latency availability
-    const coreBenchmarks = ['^GSPC', '^DJI', '^IXIC', '^RUT', '^TNX', '^TYX', '^FVX', '^IRX', 'TLT', 'IEF', 'BND', 'SPY', 'QQQ', 'BTC-USD', 'ETH-USD', 'NVDA', 'AAPL', 'MSFT', 'TSLA'];
+    // Prime core Stock, Bond, and Futures market benchmarks on startup for instant zero-latency availability
+    const coreBenchmarks = [
+      '^GSPC', '^DJI', '^IXIC', '^RUT',
+      'ES=F', 'NQ=F', 'YM=F', 'RTY=F',
+      'CL=F', 'BZ=F', 'NG=F', 'GC=F', 'SI=F', 'HG=F',
+      'ZB=F', 'ZN=F', 'ZF=F', 'ZT=F', '^TNX', '^TYX', '^FVX', '^IRX',
+      'TLT', 'IEF', 'BND', 'SPY', 'QQQ',
+      'DX-Y.NYB', 'EURUSD=X', 'JPY=X', 'GBPUSD=X',
+      'BTC-USD', 'ETH-USD', 'SOL-USD', 'BTC=F',
+      'NVDA', 'AAPL', 'MSFT', 'TSLA'
+    ];
     getAccurateBatchQuotes(coreBenchmarks).catch(() => {});
 
     this.wss.on("connection", (ws: WebSocket) => {
@@ -31,7 +40,7 @@ export class WebSocketManager {
             if (ticker.length > 20 || !/^[A-Za-z0-9.\-=^]+$/.test(ticker)) return;
 
             const subs = this.subscriptions.get(ws);
-            if (subs && subs.size < 100) {
+            if (subs && subs.size < 150) {
               subs.add(ticker);
               // Send immediate quote confirmation
               getAccurateQuote(ticker).then(quote => {
