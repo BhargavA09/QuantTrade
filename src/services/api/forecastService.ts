@@ -9,6 +9,7 @@ import { generateMockHistory, fourierLowPass, computeNeuralFeatures } from "./si
 import { fetchSentiment } from "./analysisService";
 import { neuralBrain } from "../NeuralBrain";
 import { runMonteCarlo } from "../../utils/simulations";
+import { runQuantVortexProjection } from "../../utils/vortexEngine";
 import { ForecastResponse, StockHistoryCandle } from "./types";
 
 /**
@@ -182,6 +183,27 @@ export const fetchForecast = async (
     const momentumForecast = generateMomentumForecast();
     const neuralForecast = generateNeuralRegimeForecast();
 
+    // Quant Vortex Flow Projection (Botes & Siepman VI Indicator + Phase Plane Vorticity)
+    const vortexResult = runQuantVortexProjection({
+      currentPrice: lastPrice,
+      history: history.map(h => ({
+        date: h.date,
+        open: h.open,
+        high: h.high,
+        low: h.low,
+        close: h.close,
+        volume: h.volume
+      })),
+      period: 14,
+      bondYield10Y: bondRate,
+      horizonDays: forecastDays,
+      volatility: stdDev
+    });
+    const vortexForecast = vortexResult.timeline.map(t => ({
+      date: t.date,
+      price: t.meanSpiral
+    }));
+
     // 9. Fourier Low-Pass Smoothing
     const filtered = fourierLowPass(prices, 0.15);
 
@@ -221,6 +243,7 @@ export const fetchForecast = async (
       ...mcResults,
       forecast: gbmForecast,
       models: [
+        { name: "Quant Vortex Flow (Attractor Spiral)", forecast: vortexForecast, confidence: vortexResult.metrics.signalConfidence > 75 ? "High" : "Medium", description: `Vortex Indicators (VI+ ${vortexResult.metrics.viPlus.toFixed(2)} vs VI- ${vortexResult.metrics.viMinus.toFixed(2)}) with ${vortexResult.metrics.signal.replace(/_/g, ' ')} trajectory.` },
         { name: "GBM (Stochastic Diffusion)", forecast: gbmForecast, confidence: "High", description: "Standard statistical drift model." },
         { name: "Momentum/ARIMA (Hybrid)", forecast: momentumForecast, confidence: "Medium", description: "Weights recent log-returns with long-term drift." },
         { name: "Neural Regime (Probabilistic)", forecast: neuralForecast, confidence: "Medium", description: "Adjusted by Neural Brain's identified market regime." }

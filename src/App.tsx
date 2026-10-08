@@ -4955,7 +4955,12 @@ export default function App() {
                     </h2>
                     <p className="text-zinc-500 text-sm font-medium mt-1 uppercase tracking-widest">Advanced Risk Engine & Portfolio Stress Testing</p>
                   </div>
-                  <RiskAssessment riskAnalysis={data.riskAnalysis} />
+                  <RiskAssessment 
+                    riskAnalysis={data.riskAnalysis} 
+                    currentVolatility={data.risk?.volatility ?? (data.stdDev ? parseFloat((data.stdDev * 100).toFixed(1)) : 24.5)}
+                    ticker={activeTicker || data.ticker}
+                    currentPrice={data.currentPrice}
+                  />
 
                   {/* Live Risk Alerts */}
                   {data.riskAnalysis?.liveRiskAlerts && data.riskAnalysis.liveRiskAlerts.length > 0 && (

@@ -10,7 +10,10 @@ import {
   YAxis, 
   Tooltip, 
   CartesianGrid, 
-  ReferenceLine 
+  ReferenceLine,
+  ScatterChart,
+  Scatter,
+  ZAxis
 } from 'recharts';
 import { 
   TrendingUp, 
@@ -27,10 +30,26 @@ import {
   Calendar,
   Share2,
   Bookmark,
-  Check
+  Check,
+  Disc,
+  Compass,
+  RotateCw,
+  Wind,
+  Flame,
+  Orbit,
+  ArrowUpRight,
+  ArrowDownRight,
+  Bell,
+  BellRing,
+  BellOff,
+  Volume2,
+  CheckCircle2,
+  AlertTriangle,
+  Send
 } from 'lucide-react';
 import { FINVIZ_STOCKS, FinvizStock } from '../../data/finvizData';
 import { runMonteCarlo } from '../../utils/simulations';
+import { runQuantVortexProjection, VortexCandle, VortexRegime } from '../../utils/vortexEngine';
 import { cn } from '../../utils/cn';
 
 interface FinvizChartWithProjectionsProps {
@@ -43,7 +62,7 @@ interface FinvizChartWithProjectionsProps {
   fetchData?: (ticker: string) => Promise<void>;
 }
 
-type ProjectionTab = 'montecarlo' | 'fuzzylogic' | 'fairvalue' | 'fourier' | 'risk';
+type ProjectionTab = 'vortex' | 'montecarlo' | 'fuzzylogic' | 'fairvalue' | 'fourier' | 'risk';
 
 export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProps> = ({
   ticker,
@@ -59,7 +78,35 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
   const [showSMA50, setShowSMA50] = useState(true);
   const [showSMA200, setShowSMA200] = useState(true);
   const [showTrendlines, setShowTrendlines] = useState(true);
-  const [activeProjTab, setActiveProjTab] = useState<ProjectionTab>('montecarlo');
+  const [activeProjTab, setActiveProjTab] = useState<ProjectionTab>('vortex');
+
+  // Interactive Quant Vortex Projection Engine State
+  const [vortexPeriod, setVortexPeriod] = useState<number>(14);
+  const [vortexOmega, setVortexOmega] = useState<number>(1.0);
+  const [vortexDamping, setVortexDamping] = useState<number>(0.05);
+  const [vortexRegime, setVortexRegime] = useState<VortexRegime>('spiral_attractor');
+  const [vortexHorizon, setVortexHorizon] = useState<number>(30);
+  const [vortexCouplingBond, setVortexCouplingBond] = useState<boolean>(true);
+  const [vortexActiveView, setVortexActiveView] = useState<'projection' | 'phase_plane' | 'oscillator'>('projection');
+
+  // User-Configurable Volatility Threshold & Automated Push Alerts
+  const [volThreshold, setVolThreshold] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('quant_volatility_threshold');
+      return saved ? parseFloat(saved) : 28.0;
+    } catch {
+      return 28.0;
+    }
+  });
+  const [pushAlertsEnabled, setPushAlertsEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('quant_volatility_push_enabled');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+  const [testSent, setTestSent] = useState(false);
 
   // Trigger historical candle fetch on selection
   React.useEffect(() => {
@@ -263,6 +310,30 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
     );
   }, [stock.price, stock.volatilityM, volMultiplier, driftAdj, numSims, confInterval, historicalData, bond10YYield]);
 
+  // Run Quant Vortex Dynamical Projection (Botes & Siepman VI+ / VI- Phase Plane Flow)
+  const vortexResult = useMemo(() => {
+    const candles: VortexCandle[] = historicalData.map(h => ({
+      date: h.date,
+      open: h.open,
+      high: h.high,
+      low: h.low,
+      close: h.close,
+      volume: h.volume
+    }));
+
+    return runQuantVortexProjection({
+      currentPrice: stock.price,
+      history: candles,
+      period: vortexPeriod,
+      angularVelocity: vortexOmega,
+      damping: vortexDamping,
+      regime: vortexRegime,
+      bondYield10Y: vortexCouplingBond ? bond10YYield : 4.0,
+      horizonDays: vortexHorizon,
+      volatility: (stock.volatilityM / 100 / Math.sqrt(252)) * 1.2
+    });
+  }, [stock.price, historicalData, vortexPeriod, vortexOmega, vortexDamping, vortexRegime, vortexCouplingBond, bond10YYield, vortexHorizon, stock.volatilityM]);
+
   // Combined Projection Timeline (Historical + 30-Day MC Cone)
   const projectionTimeline = useMemo(() => {
     const lastHist = historicalData[historicalData.length - 1];
@@ -456,10 +527,20 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
         </div>
 
         {/* Live Scenario-Based 30-Day Projections Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 pt-2 border-t border-zinc-800/80 text-[10px] font-mono">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2 pt-2 border-t border-zinc-800/80 text-[10px] font-mono">
+          <div 
+            onClick={() => setActiveProjTab('vortex')}
+            className="bg-emerald-950/40 p-1.5 rounded border border-emerald-500/40 cursor-pointer hover:bg-emerald-900/40 transition-colors"
+          >
+            <span className="text-emerald-400 uppercase font-bold flex items-center justify-between">
+              <span>Vortex Spiral ({vortexHorizon}D)</span>
+              <Disc size={10} className="animate-spin" />
+            </span>
+            <span className="font-black text-emerald-300 text-xs">${vortexResult.metrics.targetHorizonPrice.toFixed(2)}</span>
+          </div>
           <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-800">
             <span className="text-zinc-500 uppercase block">Monte Carlo 30D Median</span>
-            <span className="font-bold text-emerald-400 text-xs">${targets.base.toFixed(2)}</span>
+            <span className="font-bold text-zinc-100 text-xs">${targets.base.toFixed(2)}</span>
           </div>
           <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-800">
             <span className="text-zinc-500 uppercase block">30D Scenario Range</span>
@@ -470,7 +551,7 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
             <span className="font-bold text-amber-400 text-xs">${valuationData.grahamValue.toFixed(2)}</span>
           </div>
           <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-800">
-            <span className="text-zinc-500 uppercase block">DCF Bond-Calibrated Value</span>
+            <span className="text-zinc-500 uppercase block">DCF Bond-Calibrated</span>
             <span className="font-bold text-blue-400 text-xs">${valuationData.dcfValue.toFixed(2)}</span>
           </div>
         </div>
@@ -835,7 +916,19 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
           </div>
 
           {/* Sub-tabs for Quantitative features */}
-          <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
+          <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800 flex-wrap">
+            <button
+              onClick={() => setActiveProjTab('vortex')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center gap-1.5",
+                activeProjTab === 'vortex' 
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black shadow-md shadow-emerald-950" 
+                  : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40"
+              )}
+            >
+              <Disc size={13} className={cn(activeProjTab === 'vortex' && "animate-spin")} />
+              Quant Vortex Flow
+            </button>
             <button
               onClick={() => setActiveProjTab('montecarlo')}
               className={cn(
@@ -883,6 +976,490 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
             </button>
           </div>
         </div>
+
+        {/* Tab 0: Quant Vortex Flow & Phase-Space Projection Suite */}
+        {activeProjTab === 'vortex' && (
+          <div className="space-y-4">
+            {/* Interactive Quick Presets */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-zinc-900/70 rounded-xl border border-zinc-800 text-xs">
+              <div className="flex items-center gap-1.5">
+                <Compass size={14} className="text-teal-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Vortex Presets:</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => {
+                    setVortexRegime('trend_vortex');
+                    setVortexPeriod(14);
+                    setVortexOmega(1.2);
+                    setVortexDamping(0.03);
+                    setVortexHorizon(30);
+                  }}
+                  className="px-2.5 py-1 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 rounded text-[11px] font-mono font-bold transition-all flex items-center gap-1"
+                >
+                  <ArrowUpRight size={12} /> Bullish Golden Spiral
+                </button>
+                <button
+                  onClick={() => {
+                    setVortexRegime('trend_vortex');
+                    setVortexPeriod(14);
+                    setVortexOmega(1.4);
+                    setVortexDamping(0.04);
+                    setVortexHorizon(30);
+                  }}
+                  className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-300 rounded text-[11px] font-mono font-bold transition-all flex items-center gap-1"
+                >
+                  <ArrowDownRight size={12} /> Bearish Polar Vortex
+                </button>
+                <button
+                  onClick={() => {
+                    setVortexRegime('spiral_attractor');
+                    setVortexPeriod(20);
+                    setVortexOmega(1.0);
+                    setVortexDamping(0.08);
+                    setVortexHorizon(30);
+                  }}
+                  className="px-2.5 py-1 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300 rounded text-[11px] font-mono font-bold transition-all flex items-center gap-1"
+                >
+                  <Orbit size={12} /> Harmonic Attractor
+                </button>
+                <button
+                  onClick={() => {
+                    setVortexRegime('turbulent_breakout');
+                    setVortexPeriod(10);
+                    setVortexOmega(2.0);
+                    setVortexDamping(0.02);
+                    setVortexHorizon(45);
+                  }}
+                  className="px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 text-amber-300 rounded text-[11px] font-mono font-bold transition-all flex items-center gap-1"
+                >
+                  <Wind size={12} /> Turbulent Breakout
+                </button>
+                <button
+                  onClick={() => {
+                    setVortexRegime('bond_coupled');
+                    setVortexCouplingBond(true);
+                    setVortexPeriod(14);
+                    setVortexOmega(0.8);
+                    setVortexDamping(0.06);
+                    setVortexHorizon(60);
+                  }}
+                  className="px-2.5 py-1 bg-fuchsia-950/60 hover:bg-fuchsia-900/80 border border-fuchsia-500/40 text-fuchsia-300 rounded text-[11px] font-mono font-bold transition-all flex items-center gap-1"
+                >
+                  <Flame size={12} /> 10Y Bond Gravitation
+                </button>
+              </div>
+            </div>
+
+            {/* Interactive Parameters Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 text-xs">
+              {/* Parameter 1: Lookback Period L */}
+              <div>
+                <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                  <span>Vortex Lookback (L):</span>
+                  <span className="font-mono text-emerald-400">{vortexPeriod} Days</span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="50"
+                  step="1"
+                  value={vortexPeriod}
+                  onChange={(e) => setVortexPeriod(Number(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-[9px] text-zinc-500 font-mono mt-1">
+                  <span>5d (Micro)</span>
+                  <span>14d (Standard)</span>
+                  <span>50d (Macro)</span>
+                </div>
+              </div>
+
+              {/* Parameter 2: Angular Velocity Omega */}
+              <div>
+                <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                  <span>Angular Frequency (ω):</span>
+                  <span className="font-mono text-teal-400">{vortexOmega.toFixed(2)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="3.0"
+                  step="0.1"
+                  value={vortexOmega}
+                  onChange={(e) => setVortexOmega(Number(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded appearance-none cursor-pointer accent-teal-500"
+                />
+                <div className="flex justify-between text-[9px] text-zinc-500 font-mono mt-1">
+                  <span>Slow Orbit</span>
+                  <span>Harmonic</span>
+                  <span>High Spin</span>
+                </div>
+              </div>
+
+              {/* Parameter 3: Damping Factor Gamma */}
+              <div>
+                <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                  <span>Vorticity Damping (γ):</span>
+                  <span className="font-mono text-cyan-400">{vortexDamping.toFixed(3)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.01"
+                  max="0.25"
+                  step="0.01"
+                  value={vortexDamping}
+                  onChange={(e) => setVortexDamping(Number(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded appearance-none cursor-pointer accent-cyan-500"
+                />
+                <div className="flex justify-between text-[9px] text-zinc-500 font-mono mt-1">
+                  <span>Undamped Spiral</span>
+                  <span>Equilibrium Attractor</span>
+                </div>
+              </div>
+
+              {/* Parameter 4: Forecast Horizon & Bond Drag Coupling */}
+              <div>
+                <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                  <span>Projection Horizon:</span>
+                  <span className="font-mono text-amber-400">+{vortexHorizon} Days</span>
+                </div>
+                <div className="flex gap-1 mb-1.5">
+                  {[15, 30, 45, 60, 90].map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => setVortexHorizon(h)}
+                      className={cn(
+                        "flex-1 py-1 text-[10px] font-mono font-bold rounded border transition-all",
+                        vortexHorizon === h
+                          ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
+                          : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      )}
+                    >
+                      {h}d
+                    </button>
+                  ))}
+                </div>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-mono text-zinc-400 select-none">
+                  <input
+                    type="checkbox"
+                    checked={vortexCouplingBond}
+                    onChange={(e) => setVortexCouplingBond(e.target.checked)}
+                    className="accent-fuchsia-500 rounded"
+                  />
+                  <span>10Y Bond Coupling ({bond10YYield.toFixed(2)}% Yield Drag)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Interactive Regime Mode Selector */}
+            <div className="flex items-center gap-1.5 bg-zinc-900/50 p-1.5 rounded-xl border border-zinc-800/80 overflow-x-auto text-xs font-mono">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-2 shrink-0">Vortex Dynamics:</span>
+              {[
+                { id: 'spiral_attractor', label: 'Spiral Attractor (Mean-Reverting)' },
+                { id: 'trend_vortex', label: 'Directional Trend Spiral' },
+                { id: 'turbulent_breakout', label: 'Turbulent Breakout Cone' },
+                { id: 'bond_coupled', label: 'Macro Bond-Coupled Orbit' }
+              ].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setVortexRegime(m.id as VortexRegime)}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0",
+                    vortexRegime === m.id
+                      ? "bg-zinc-800 text-emerald-400 border border-emerald-500/40 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Real-Time Quantitative HUD & Target Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+              {/* Card 1: Signal & Vorticity */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-[10px] text-zinc-500 uppercase font-bold">
+                  <span>Vortex Signal</span>
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded text-[9px] font-black",
+                    vortexResult.metrics.crossStatus === 'GOLDEN_CROSS' ? "bg-emerald-500/20 text-emerald-400" :
+                    vortexResult.metrics.crossStatus === 'DEATH_CROSS' ? "bg-rose-500/20 text-rose-400" : "bg-zinc-800 text-zinc-300"
+                  )}>
+                    {vortexResult.metrics.crossStatus.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="my-1.5">
+                  <div className={cn(
+                    "text-base font-black truncate",
+                    vortexResult.metrics.signal.includes('BULLISH') ? "text-emerald-400" :
+                    vortexResult.metrics.signal.includes('BEARISH') ? "text-rose-400" : "text-amber-400"
+                  )}>
+                    {vortexResult.metrics.signal.replace(/_/g, ' ')}
+                  </div>
+                  <div className="text-[11px] text-zinc-400 flex items-center justify-between mt-1">
+                    <span>VI+: <strong className="text-emerald-400">{vortexResult.metrics.viPlus.toFixed(3)}</strong></span>
+                    <span>VI-: <strong className="text-rose-400">{vortexResult.metrics.viMinus.toFixed(3)}</strong></span>
+                    <span>ΔVI: <strong className="text-zinc-100">{vortexResult.metrics.deltaVI >= 0 ? '+' : ''}{vortexResult.metrics.deltaVI.toFixed(3)}</strong></span>
+                  </div>
+                </div>
+                <div className="text-[10px] text-zinc-500 flex justify-between pt-1 border-t border-zinc-800/60">
+                  <span>Confidence: {vortexResult.metrics.signalConfidence}%</span>
+                  <span>Ratio: {vortexResult.metrics.vortexRatio.toFixed(2)}x</span>
+                </div>
+              </div>
+
+              {/* Card 2: Dynamic Attractor Center */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div className="text-[10px] text-zinc-500 uppercase font-bold">Equilibrium Attractor (P_eq)</div>
+                <div className="my-1.5">
+                  <div className="text-xl font-black text-teal-400">${vortexResult.metrics.attractorPrice.toFixed(2)}</div>
+                  <div className="text-[11px] text-zinc-400 mt-0.5">
+                    Live Distance: <strong className={stock.price >= vortexResult.metrics.attractorPrice ? "text-emerald-400" : "text-rose-400"}>
+                      {stock.price >= vortexResult.metrics.attractorPrice ? '+' : ''}
+                      {(((stock.price - vortexResult.metrics.attractorPrice) / vortexResult.metrics.attractorPrice) * 100).toFixed(2)}%
+                    </strong>
+                  </div>
+                </div>
+                <div className="text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/60">
+                  Bond Drag Anchor: {vortexCouplingBond ? `${bond10YYield.toFixed(2)}% 10Y Yield` : 'Uncoupled'}
+                </div>
+              </div>
+
+              {/* Card 3: Projected Spiral Target */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div className="text-[10px] text-zinc-500 uppercase font-bold">T+{vortexHorizon}D Vortex Target</div>
+                <div className="my-1.5">
+                  <div className="text-xl font-black text-zinc-100">${vortexResult.metrics.targetHorizonPrice.toFixed(2)}</div>
+                  <div className={cn("text-[11px] font-bold mt-0.5", vortexResult.metrics.expectedReturnPct >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                    {vortexResult.metrics.expectedReturnPct >= 0 ? '+' : ''}{vortexResult.metrics.expectedReturnPct.toFixed(2)}% Expected Path
+                  </div>
+                </div>
+                <div className="text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/60">
+                  Cone: ${vortexResult.metrics.targetLowerPrice.toFixed(2)} - ${vortexResult.metrics.targetUpperPrice.toFixed(2)}
+                </div>
+              </div>
+
+              {/* Card 4: Dynamical Momentum & Circulation */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div className="text-[10px] text-zinc-500 uppercase font-bold">Fluid Vorticity Metrics</div>
+                <div className="my-1.5">
+                  <div className="flex items-center justify-between text-xs text-zinc-300">
+                    <span>Angular Momentum (L_z):</span>
+                    <strong className="text-cyan-400">{vortexResult.metrics.angularMomentum}</strong>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-zinc-300 mt-1">
+                    <span>Circulation (Γ):</span>
+                    <strong className="text-teal-400">{vortexResult.metrics.circulation}</strong>
+                  </div>
+                </div>
+                <div className="text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/60 flex justify-between">
+                  <span>Current Phase Angle: {vortexResult.timeline[0]?.phaseAngleDeg || 0}°</span>
+                  <span>Vorticity: {vortexResult.metrics.vorticityScore}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive View Switcher Bar */}
+            <div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-mono">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Visualization View:</span>
+                <div className="flex items-center gap-1 bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
+                  <button
+                    onClick={() => setVortexActiveView('projection')}
+                    className={cn(
+                      "px-3 py-1 rounded-md text-xs font-bold transition-all",
+                      vortexActiveView === 'projection' ? "bg-emerald-600 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    Forward Spiral Cone
+                  </button>
+                  <button
+                    onClick={() => setVortexActiveView('phase_plane')}
+                    className={cn(
+                      "px-3 py-1 rounded-md text-xs font-bold transition-all",
+                      vortexActiveView === 'phase_plane' ? "bg-emerald-600 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    2D Phase-Plane Orbit
+                  </button>
+                  <button
+                    onClick={() => setVortexActiveView('oscillator')}
+                    className={cn(
+                      "px-3 py-1 rounded-md text-xs font-bold transition-all",
+                      vortexActiveView === 'oscillator' ? "bg-emerald-600 text-white shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    Vortex Indicator (VI+/VI-)
+                  </button>
+                </div>
+              </div>
+              <span className="text-[11px] font-mono text-zinc-500 hidden sm:inline">
+                Real-Time Quantum Dynamic Fluid Equations
+              </span>
+            </div>
+
+            {/* View 1: Forward Spiral Cone Projection Chart */}
+            {vortexActiveView === 'projection' && (
+              <div className="h-80 w-full bg-zinc-900/40 rounded-xl p-3 border border-zinc-800">
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-teal-500/30" /> Vortex Spiral Cone
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-0.5 bg-emerald-400" /> Mean Spiral Trajectory
+                    </span>
+                    <span className="flex items-center gap-1 text-cyan-400">
+                      <span className="w-2.5 h-0.5 bg-cyan-400" /> Attractor Equilibrium ($P_{`{eq}`})
+                    </span>
+                    <span className="flex items-center gap-1 text-zinc-500">
+                      <span className="w-2.5 h-0.5 bg-zinc-600" /> Particle Streamlines
+                    </span>
+                  </div>
+                  <span>Horizon: +{vortexHorizon} Trading Days</span>
+                </div>
+
+                <ResponsiveContainer width="100%" height="90%">
+                  <ComposedChart data={vortexResult.timeline}>
+                    <defs>
+                      <linearGradient id="vortexConeGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.25}/>
+                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.02}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                    <XAxis dataKey="date" stroke="#71717a" fontSize={10} fontFamily="monospace" tickFormatter={d => d.slice(5)} />
+                    <YAxis domain={['auto', 'auto']} stroke="#71717a" fontSize={10} fontFamily="monospace" orientation="right" tickFormatter={v => `$${v}`} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#09090b', 
+                        borderColor: '#27272a', 
+                        borderRadius: '0.5rem', 
+                        fontSize: '10px', 
+                        fontFamily: 'monospace' 
+                      }} 
+                    />
+                    {/* Spiral Envelope */}
+                    <Area type="monotone" dataKey="upperSpiral" stroke="#14b8a6" strokeWidth={1} strokeDasharray="3 3" fill="url(#vortexConeGrad)" />
+                    <Area type="monotone" dataKey="lowerSpiral" stroke="#14b8a6" strokeWidth={1} strokeDasharray="3 3" fill="transparent" />
+
+                    {/* Attractor equilibrium */}
+                    <Line type="monotone" dataKey="attractorPrice" stroke="#06b6d4" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+
+                    {/* Mean Spiral Path */}
+                    <Line type="monotone" dataKey="meanSpiral" stroke="#10b981" strokeWidth={2.5} dot={false} />
+
+                    {/* Stochastic Streamlines */}
+                    <Line type="monotone" dataKey="streamline1" stroke="#a1a1aa" strokeWidth={1} opacity={0.35} dot={false} />
+                    <Line type="monotone" dataKey="streamline2" stroke="#60a5fa" strokeWidth={1} opacity={0.35} dot={false} />
+                    <Line type="monotone" dataKey="streamline3" stroke="#f472b6" strokeWidth={1} opacity={0.35} dot={false} />
+                    <Line type="monotone" dataKey="streamline4" stroke="#fbbf24" strokeWidth={1} opacity={0.35} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* View 2: 2D Phase-Plane Vortex Orbit (Limit Cycle Portrait) */}
+            {vortexActiveView === 'phase_plane' && (
+              <div className="h-80 w-full bg-zinc-900/40 rounded-xl p-3 border border-zinc-800">
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mb-2">
+                  <div className="flex items-center gap-3">
+                    <span>X: Price Displacement ΔP (%)</span>
+                    <span>Y: Velocity Momentum ΔP/Δt (%)</span>
+                    <span className="text-teal-400">Limit Cycle Orbit Trajectory</span>
+                  </div>
+                  <span>Phase Space (Hamiltonian Vorticity)</span>
+                </div>
+
+                <ResponsiveContainer width="100%" height="90%">
+                  <ComposedChart data={vortexResult.phasePlaneOrbit}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                    <XAxis 
+                      dataKey="displacement" 
+                      stroke="#71717a" 
+                      fontSize={10} 
+                      fontFamily="monospace" 
+                      tickFormatter={v => `${v}%`} 
+                    />
+                    <YAxis 
+                      dataKey="momentum" 
+                      stroke="#71717a" 
+                      fontSize={10} 
+                      fontFamily="monospace" 
+                      tickFormatter={v => `${v}%`} 
+                    />
+                    <ReferenceLine x={0} stroke="#52525b" strokeDasharray="2 2" />
+                    <ReferenceLine y={0} stroke="#52525b" strokeDasharray="2 2" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#09090b', 
+                        borderColor: '#27272a', 
+                        borderRadius: '0.5rem', 
+                        fontSize: '10px', 
+                        fontFamily: 'monospace' 
+                      }} 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="momentum" 
+                      stroke="#14b8a6" 
+                      strokeWidth={2} 
+                      dot={{ r: 3, fill: '#14b8a6' }} 
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* View 3: Vortex Indicator (VI+/VI-) Oscillator */}
+            {vortexActiveView === 'oscillator' && (
+              <div className="h-80 w-full bg-zinc-900/40 rounded-xl p-3 border border-zinc-800">
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="w-2.5 h-0.5 bg-emerald-400" /> VI+ (Positive Trend Movement)
+                    </span>
+                    <span className="text-rose-400 flex items-center gap-1">
+                      <span className="w-2.5 h-0.5 bg-rose-400" /> VI- (Negative Trend Movement)
+                    </span>
+                    <span className="text-zinc-500">Parity Threshold: 1.0</span>
+                  </div>
+                  <span>Etienne Botes & Douglas Siepman Formulation</span>
+                </div>
+
+                <ResponsiveContainer width="100%" height="90%">
+                  <ComposedChart data={vortexResult.indicatorHistory}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                    <XAxis dataKey="date" stroke="#71717a" fontSize={10} fontFamily="monospace" tickFormatter={d => d.slice(5)} />
+                    <YAxis domain={['auto', 'auto']} stroke="#71717a" fontSize={10} fontFamily="monospace" orientation="right" />
+                    <ReferenceLine y={1.0} stroke="#71717a" strokeDasharray="3 3" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#09090b', 
+                        borderColor: '#27272a', 
+                        borderRadius: '0.5rem', 
+                        fontSize: '10px', 
+                        fontFamily: 'monospace' 
+                      }} 
+                    />
+                    <Line type="monotone" dataKey="viPlus" stroke="#10b981" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="viMinus" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Mathematical Framework Reference Note */}
+            <div className="bg-zinc-900/40 p-3 rounded-xl border border-zinc-850 text-xs font-mono text-zinc-400 leading-relaxed">
+              <span className="font-bold text-zinc-300 block mb-1">Non-Linear Phase-Space Vortex Equation:</span>
+              <p className="text-[11px]">
+                Continuous dynamical system: P(t) = P_eq + (P_0 - P_eq) · e^(-γ·t) · cos(ω·t + φ_0) + ΔVI · σ · √(t) · α, where P_eq is the dynamic attractor centered on exponential moving averages and live 10-Year Treasury Yield drag ({bond10YYield.toFixed(2)}%), ω is the angular vortex frequency ({vortexOmega.toFixed(2)}x), and γ is the spiral damping rate ({vortexDamping.toFixed(3)}).
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Tab 1: Monte Carlo 30-Day Simulation Cone */}
         {activeProjTab === 'montecarlo' && (
@@ -1180,6 +1757,144 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
                   {(mcResult.metrics.kellyCriterion * 100).toFixed(1)}%
                 </div>
                 <span className="text-[9px] text-zinc-500">Optimal bankroll allocation</span>
+              </div>
+            </div>
+
+            {/* User-Configurable Volatility Threshold & Automated Push Notifications */}
+            <div className="p-4 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                    <Sliders size={13} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                      Volatility Breach Threshold & Push Alerts
+                    </h4>
+                    <p className="text-[10px] text-zinc-400">
+                      Configure threshold for automated desktop/mobile push alerts when {stock.ticker} volatility escalates.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      const next = !pushAlertsEnabled;
+                      setPushAlertsEnabled(next);
+                      localStorage.setItem('quant_volatility_push_enabled', next.toString());
+                      if (next && 'Notification' in window && Notification.permission !== 'granted') {
+                        try {
+                          await Notification.requestPermission();
+                        } catch (e) {
+                          console.warn(e);
+                        }
+                      }
+                    }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all border",
+                      pushAlertsEnabled 
+                        ? "bg-rose-500/15 text-rose-300 border-rose-500/30" 
+                        : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                    )}
+                  >
+                    {pushAlertsEnabled ? <BellRing size={12} /> : <BellOff size={12} />}
+                    <span>{pushAlertsEnabled ? "Push: ON" : "Push: OFF"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setTestSent(true);
+                      setTimeout(() => setTestSent(false), 3000);
+                      if ('Notification' in window && Notification.permission === 'granted') {
+                        new window.Notification(`Volatility Alert: ${stock.ticker}`, {
+                          body: `${stock.ticker} volatility (${stock.volatilityM.toFixed(1)}%) breached ${volThreshold.toFixed(1)}% threshold limit.`,
+                          icon: '/logo.svg'
+                        });
+                      }
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-all"
+                  >
+                    <Send size={11} />
+                    <span>{testSent ? "Alert Sent!" : "Test Push"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Threshold Slider and Presets */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <div className="sm:col-span-8 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-400">
+                      Live Volatility: <span className="font-bold text-zinc-200">{stock.volatilityM.toFixed(1)}%</span>
+                    </span>
+                    <span className="text-zinc-400">
+                      Alert Limit: <span className="font-bold text-amber-300">{volThreshold.toFixed(1)}%</span>
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="5"
+                    max="100"
+                    step="0.5"
+                    value={volThreshold}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setVolThreshold(val);
+                      localStorage.setItem('quant_volatility_threshold', val.toString());
+                    }}
+                    className="w-full accent-rose-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+                  />
+
+                  {/* Status Indicator */}
+                  <div className={cn(
+                    "px-2.5 py-1.5 rounded-lg border flex items-center justify-between text-[10px]",
+                    stock.volatilityM >= volThreshold
+                      ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                      : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                  )}>
+                    <span className="flex items-center gap-1.5">
+                      {stock.volatilityM >= volThreshold ? (
+                        <>
+                          <AlertTriangle size={12} className="text-rose-400 animate-pulse" />
+                          <span>Breach Detected: Exceeds {volThreshold.toFixed(1)}% threshold!</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={12} className="text-emerald-400" />
+                          <span>Safe: Inside normal range (&lt; {volThreshold.toFixed(1)}%)</span>
+                        </>
+                      )}
+                    </span>
+                    <span className="font-mono">{((stock.volatilityM / volThreshold) * 100).toFixed(0)}% of ceiling</span>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-4 space-y-1.5">
+                  <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">
+                    Presets:
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[15, 25, 35, 50].map((val) => (
+                      <button
+                        key={val}
+                        onClick={() => {
+                          setVolThreshold(val);
+                          localStorage.setItem('quant_volatility_threshold', val.toString());
+                        }}
+                        className={cn(
+                          "py-1 px-1.5 rounded text-[10px] font-bold transition-all border text-center",
+                          volThreshold === val
+                            ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                            : "bg-zinc-950 text-zinc-400 border-zinc-800 hover:bg-zinc-900"
+                        )}
+                      >
+                        {val}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

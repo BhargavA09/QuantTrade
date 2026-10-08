@@ -65,7 +65,7 @@ async function fetchCoinbaseSpot(cryptoPair: string): Promise<{ price: number; t
 }
 
 /**
- * Fetch quote from Yahoo v8 chart endpoint with desktop browser headers
+ * Fetch quote from Yahoo v8 chart endpoint with desktop browser headers and query1/query2 failover
  */
 async function fetchYahooChartQuote(symbol: string): Promise<{
   price: number;
@@ -77,53 +77,73 @@ async function fetchYahooChartQuote(symbol: string): Promise<{
   previousClose: number;
   volume: number;
 } | null> {
-  try {
-    if (Date.now() < providerCooldowns.yahoo) return null;
+  const hosts = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
+  const encoded = encodeURIComponent(symbol.toUpperCase());
 
-    const encoded = encodeURIComponent(symbol.toUpperCase());
-    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=1d`, {
-      headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(3500)
-    });
+  for (const host of hosts) {
+    try {
+      if (Date.now() < providerCooldowns.yahoo) continue;
 
-    if (res.status === 429) {
-      providerCooldowns.yahoo = Date.now() + 45000;
-      return null;
+      const res = await fetch(`https://${host}/v8/finance/chart/${encoded}?interval=1d&range=1d`, {
+        headers: { 
+          'User-Agent': USER_AGENT, 
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        signal: AbortSignal.timeout(3500)
+      });
+
+      if (res.status === 429) {
+        providerCooldowns.yahoo = Date.now() + 30000;
+        continue;
+      }
+
+      if (!res.ok) continue;
+      const json = await res.json();
+      const meta = json?.chart?.result?.[0]?.meta;
+      if (!meta) continue;
+
+      // Extract actual arithmetic market data from Yahoo / Nasdaq
+      const rawPrice = Number(meta.regularMarketPrice || meta.chartPreviousClose || 0);
+      if (rawPrice <= 0 || isNaN(rawPrice)) continue;
+
+      const previousClose = Number(meta.chartPreviousClose || meta.previousClose || rawPrice);
+      // Actual arithmetic change: (Price - PreviousClose)
+      const change = Number((meta.regularMarketChange !== undefined 
+        ? meta.regularMarketChange 
+        : (rawPrice - previousClose)).toFixed(rawPrice < 2 ? 4 : 2));
+
+      // Actual arithmetic percentage change: ((Price - PreviousClose) / PreviousClose) * 100
+      const changePercent = Number((meta.regularMarketChangePercent !== undefined 
+        ? meta.regularMarketChangePercent 
+        : (previousClose !== 0 ? ((change / previousClose) * 100) : 0)).toFixed(2));
+
+      const high = Number((meta.regularMarketDayHigh || Math.max(rawPrice, previousClose)).toFixed(rawPrice < 2 ? 4 : 2));
+      const low = Number((meta.regularMarketDayLow || Math.min(rawPrice, previousClose)).toFixed(rawPrice < 2 ? 4 : 2));
+      const open = Number((meta.regularMarketOpen || previousClose).toFixed(rawPrice < 2 ? 4 : 2));
+      const volume = Number(meta.regularMarketVolume || 12000000);
+
+      return {
+        price: rawPrice,
+        change,
+        changePercent,
+        high,
+        low,
+        open,
+        previousClose,
+        volume
+      };
+    } catch {
+      // Try next host
     }
-
-    if (!res.ok) return null;
-    const json = await res.json();
-    const meta = json?.chart?.result?.[0]?.meta;
-    if (!meta) return null;
-
-    const rawPrice = meta.regularMarketPrice || meta.chartPreviousClose || 0;
-    if (rawPrice <= 0) return null;
-
-    const previousClose = meta.chartPreviousClose || meta.previousClose || rawPrice;
-    const change = meta.regularMarketChange !== undefined ? meta.regularMarketChange : (rawPrice - previousClose);
-    const changePercent = meta.regularMarketChangePercent !== undefined 
-      ? meta.regularMarketChangePercent 
-      : (previousClose !== 0 ? (change / previousClose) * 100 : 0);
-
-    return {
-      price: rawPrice,
-      change,
-      changePercent,
-      high: meta.regularMarketDayHigh || Math.max(rawPrice, previousClose),
-      low: meta.regularMarketDayLow || Math.min(rawPrice, previousClose),
-      open: meta.regularMarketOpen || previousClose,
-      previousClose,
-      volume: meta.regularMarketVolume || 12000000
-    };
-  } catch (err) {
-    return null;
   }
+  return null;
 }
 
 /**
  * Live Preventions Pipeline
- * Enforces data integrity, filters synthetic/environment forward-date anomalies,
- * guards against single-tick spike corruptions, and ensures strict OHLC geometry.
+ * Enforces actual arithmetic data integrity, guards against NaN/negative prices,
+ * and maintains strict OHLC geometry without distorting real live market prices.
  */
 export function applyDataQualityPreventions(
   symbol: string,
@@ -145,71 +165,36 @@ export function applyDataQualityPreventions(
 
   const baseline = BASELINE_MARKET_PRICES[upper];
   let price = rawCandidate.price;
-  let change = rawCandidate.change || 0;
-  let changePercent = rawCandidate.changePercent || 0;
   let previousClose = rawCandidate.previousClose || price;
 
-  // 1. ANOMALY CHECK: Environment Forward-Date Inflation Prevention
-  // In simulated/sandbox containers where system clock is forward-dated (e.g. 2026),
-  // Yahoo returns synthetic forward prices (e.g. NVDA at $237 instead of real $137).
-  // If a verified baseline exists and candidate drifts by > 20%, calibrate back to real anchor
-  // while strictly preserving real market percentage momentum.
-  let isCalibrated = false;
-  let scaleFactor = 1.0;
-  if (baseline && baseline.price > 0 && rawCandidate.price > 0) {
-    const driftRatio = price / baseline.price;
-    if (driftRatio > 1.20 || driftRatio < 0.70) {
-      preventionApplied = true;
-      isCalibrated = true;
-      scaleFactor = baseline.price / rawCandidate.price;
-      preventionNotes.push(`Calibrated from environment forward-bias (raw: $${price.toFixed(2)} -> anchor: $${baseline.price.toFixed(2)})`);
-      
-      const safePct = Math.abs(changePercent) > 15 ? 0.85 : changePercent;
-      price = Number((baseline.price * (1 + safePct / 100)).toFixed(baseline.price < 2 ? 4 : 2));
-      previousClose = baseline.price;
-      change = Number((price - previousClose).toFixed(baseline.price < 2 ? 4 : 2));
-      changePercent = safePct;
-    }
-  }
-
-  // 2. SPIKE PREVENTION: Outlier single-tick jump guard
-  // If price jumped > 18% for an equity or > 35% for crypto within the last 60s without market news,
-  // clamp it to previousQuote to prevent visual UI flashing and corrupted indicator calculations.
-  if (previousQuote && previousQuote.price > 0) {
-    const isCrypto = upper.includes('-USD') || upper.includes('BTC') || upper.includes('ETH');
-    const maxAllowedJump = isCrypto ? 0.35 : 0.18;
-    const jump = Math.abs((price - previousQuote.price) / previousQuote.price);
-    
-    if (jump > maxAllowedJump) {
-      preventionApplied = true;
-      preventionNotes.push(`Suppressed single-tick outlier spike of ${(jump * 100).toFixed(1)}%`);
-      // Smooth toward previous quote with controlled momentum step
-      const step = (price - previousQuote.price) > 0 ? (maxAllowedJump * 0.4) : (-maxAllowedJump * 0.4);
-      price = Number((previousQuote.price * (1 + step)).toFixed(2));
-      change = Number((price - previousQuote.previousClose).toFixed(2));
-      changePercent = Number(((change / previousQuote.previousClose) * 100).toFixed(2));
-    }
-  }
-
-  // 3. ZERO / NAN / NEGATIVE SANITY CHECK
+  // 1. ZERO / NAN / NEGATIVE SANITY CHECK
   if (isNaN(price) || price <= 0) {
     preventionApplied = true;
     preventionNotes.push(`Sanitized non-positive or NaN price reading`);
-    price = baseline?.price || previousQuote?.price || 100.0;
-    change = 0;
-    changePercent = 0;
-    previousClose = price;
+    price = previousQuote?.price || baseline?.price || 100.0;
+    previousClose = previousQuote?.previousClose || price;
   }
 
-  // 4. OHLC INTEGRITY ENFORCEMENT
+  // 2. ACTUAL ARITHMETIC CHANGE CALCULATIONS
+  // Ensure exact arithmetic consistency: Change = Price - PreviousClose
+  let change = rawCandidate.change !== undefined 
+    ? rawCandidate.change 
+    : (price - previousClose);
+  change = Number(change.toFixed(price < 2 ? 4 : 2));
+
+  let changePercent = previousClose > 0 
+    ? Number((((price - previousClose) / previousClose) * 100).toFixed(2))
+    : 0;
+
+  // 3. OHLC INTEGRITY ENFORCEMENT
   // Guarantee High >= max(Open, Close) and Low <= min(Open, Close) and Low > 0
   let rawOpen = rawCandidate.open && rawCandidate.open > 0 ? rawCandidate.open : previousClose;
   let rawHigh = rawCandidate.high && rawCandidate.high > 0 ? rawCandidate.high : price;
   let rawLow = rawCandidate.low && rawCandidate.low > 0 ? rawCandidate.low : price;
 
-  let open = isCalibrated ? Number((rawOpen * scaleFactor).toFixed(price < 2 ? 4 : 2)) : rawOpen;
-  let high = isCalibrated ? Number((rawHigh * scaleFactor).toFixed(price < 2 ? 4 : 2)) : rawHigh;
-  let low = isCalibrated ? Number((rawLow * scaleFactor).toFixed(price < 2 ? 4 : 2)) : rawLow;
+  let open = Number(rawOpen.toFixed(price < 2 ? 4 : 2));
+  let high = Number(rawHigh.toFixed(price < 2 ? 4 : 2));
+  let low = Number(rawLow.toFixed(price < 2 ? 4 : 2));
 
   // Re-verify mathematical geometry
   high = Math.max(high, price, open);
@@ -354,18 +339,21 @@ export function generateLiveMicroTick(symbol: string): MultiSourceQuote | null {
   const existing = liveQuotes.get(symbol);
   if (!existing) return null;
 
-  const baseline = BASELINE_MARKET_PRICES[symbol]?.price || existing.previousClose || existing.price;
   const isCrypto = symbol.includes('-USD') || symbol.includes('BTC') || symbol.includes('ETH');
   
-  // Natural volatility per tick: ~0.03% to 0.08%
-  const vol = isCrypto ? 0.0008 : 0.0003;
-  const rand = (Math.random() - 0.495); // Slight upward bias
-  const meanReversion = (baseline - existing.price) * 0.02; // Gentle pull toward anchor
-  const delta = (existing.price * rand * vol) + meanReversion;
+  // Natural micro-volatility per tick: ~0.01% to 0.03% around actual market price
+  const vol = isCrypto ? 0.0005 : 0.00015;
+  const rand = (Math.random() - 0.495); // Organic microstructure oscillation
+  const delta = (existing.price * rand * vol);
 
   const newPrice = Number((existing.price + delta).toFixed(existing.price < 2 ? 4 : 2));
+  // Exact arithmetic change: newPrice - previousClose
   const newChange = Number((newPrice - existing.previousClose).toFixed(existing.price < 2 ? 4 : 2));
-  const newChangePct = Number(((newChange / existing.previousClose) * 100).toFixed(2));
+  // Exact arithmetic change percentage: ((newPrice - previousClose) / previousClose) * 100
+  const newChangePct = existing.previousClose > 0
+    ? Number((((newPrice - existing.previousClose) / existing.previousClose) * 100).toFixed(2))
+    : 0;
+
   const newHigh = Math.max(existing.high, newPrice);
   const newLow = Math.min(existing.low, newPrice);
   const tickVolume = existing.volume + Math.floor(Math.random() * 5000);
