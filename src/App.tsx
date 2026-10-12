@@ -217,6 +217,10 @@ import StockSelectorModal from './components/StockSelectorModal';
 import AdaptiveTraderLab from './components/AdaptiveTraderLab';
 import AboutMePage from './components/AboutMePage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
+import GlobalNewsScan3D from './components/GlobalNewsScan3D';
+import AmbientSpatial3D from './components/AmbientSpatial3D';
+import Quick3DNavigationDock from './components/Quick3DNavigationDock';
+import Interactive3DTourModal from './components/Interactive3DTourModal';
 
 const fallbackStockData: StockData = {
   ticker: 'SPY',
@@ -526,8 +530,9 @@ export default function App() {
     }
   }, [portfolioData]);
 
-  const [activeTab, setActiveTab] = useState<'finviz' | 'summary' | 'dashboard' | 'projection' | 'traderai' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading' | 'markets' | 'portfolio' | 'montecarlo' | 'options' | 'fairvalue' | 'quantlab' | 'neural' | 'advancedchart' | 'aiscan' | 'quant' | 'sentiment' | 'technical' | 'yieldcurve' | 'about' | 'privacy'>('finviz');
+  const [activeTab, setActiveTab] = useState<'finviz' | 'summary' | 'dashboard' | 'projection' | 'traderai' | 'global' | 'logistics' | 'risk' | 'fundamentals' | 'daytrading' | 'markets' | 'portfolio' | 'montecarlo' | 'options' | 'fairvalue' | 'quantlab' | 'neural' | 'advancedchart' | 'aiscan' | 'quant' | 'sentiment' | 'technical' | 'yieldcurve' | 'newsscan3d' | 'about' | 'privacy'>('finviz');
   const [showGithubGuide, setShowGithubGuide] = useState(false);
+  const [isTourModalOpen, setIsTourModalOpen] = useState(false);
 
   const [portfolioStats, setPortfolioStats] = useState(() => portfolioManager.getStats());
   const [tradeHistory, setTradeHistory] = useState(() => portfolioManager.getHistory());
@@ -629,6 +634,17 @@ export default function App() {
       setActiveStrategyConfig(portfolioManager.getActiveStrategy());
       setBotActive(portfolioManager.isBotActive());
     });
+  }, []);
+
+  useEffect(() => {
+    const handleNavToQuantLab = (e: any) => {
+      if (e.detail?.ticker) {
+        setActiveTicker(e.detail.ticker);
+      }
+      setActiveTab('quantlab');
+    };
+    window.addEventListener('navigate-to-quantlab', handleNavToQuantLab);
+    return () => window.removeEventListener('navigate-to-quantlab', handleNavToQuantLab);
   }, []);
 
   const [globalHftEvents, setGlobalHftEvents] = useState(() => [
@@ -1495,6 +1511,7 @@ export default function App() {
     // Process active ticker history and indicators
     const history = activeData.history?.slice(-days) || [];
     const filtered = activeData.filtered ? activeData.filtered.slice(-days) : [];
+    const highFrequency = activeData.highFrequency ? activeData.highFrequency.slice(-days) : [];
     const rsi = activeData.neuralFeatures?.rsi ? activeData.neuralFeatures.rsi.slice(-days) : [];
     const macd = activeData.neuralFeatures?.macd ? activeData.neuralFeatures.macd.slice(-days) : [];
     const sma20 = activeData.neuralFeatures?.sma20 ? activeData.neuralFeatures.sma20.slice(-days) : [];
@@ -1505,6 +1522,7 @@ export default function App() {
       dateMap[h.date][`${activeTicker}_price`] = h.price;
       
       if (filtered[idx]) dateMap[h.date][`filtered`] = filtered[idx];
+      if (highFrequency[idx]) dateMap[h.date][`highFrequency`] = highFrequency[idx];
       if (rsi[idx] !== undefined && rsi[idx] !== null) dateMap[h.date][`rsi`] = rsi[idx];
       if (macd[idx] !== undefined && macd[idx] !== null) dateMap[h.date][`macd`] = macd[idx];
       if (sma20[idx] !== undefined && sma20[idx] !== null) dateMap[h.date][`sma20`] = sma20[idx];
@@ -1868,12 +1886,15 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col min-h-screen"
+          className="flex flex-col min-h-screen relative overflow-x-hidden"
         >
+          {/* Hardware-Accelerated Interactive 3D Spatial Background */}
+          <AmbientSpatial3D />
+
           <StockTicker />
           {/* Background Glow */}
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[100px] rounded-full" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[100px] rounded-full" />
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[100px] rounded-full pointer-events-none" />
 
           {/* Header */}
           <header className="px-6 pt-8 pb-4 sticky top-0 bg-zinc-950/80 backdrop-blur-lg z-[100]">
@@ -1999,6 +2020,18 @@ export default function App() {
                   <span className="hidden sm:inline">Sentiment</span>
                 </button>
                 <button 
+                  onClick={() => setActiveTab('newsscan3d')}
+                  className={cn(
+                    "text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 px-3 py-1 rounded-xl border group", 
+                    activeTab === 'newsscan3d' 
+                      ? "bg-cyan-600 text-white border-cyan-500 shadow-md shadow-cyan-500/20" 
+                      : "text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/10"
+                  )}
+                >
+                  <Globe size={14} className={cn("transition-transform group-hover:scale-110", activeTab === 'newsscan3d' && "fill-cyan-400/20")} />
+                  <span className="hidden sm:inline">3D News Scan</span>
+                </button>
+                <button 
                   onClick={() => setActiveTab('quantlab')}
                   className={cn(
                     "text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 px-3 py-1 rounded-xl border group", 
@@ -2054,6 +2087,14 @@ export default function App() {
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-[10px] font-bold text-zinc-400 uppercase">System Active</span>
                 </div>
+                <button 
+                  onClick={() => setIsTourModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/60 transition-all flex items-center gap-1.5 text-[11px] font-bold shadow-lg shadow-cyan-500/10 group"
+                  title="3D Interactive Guide & System Overview"
+                >
+                  <Sparkles size={14} className="text-cyan-400 group-hover:rotate-12 transition-transform" />
+                  <span className="hidden sm:inline">3D Guide</span>
+                </button>
                 <button 
                   onClick={() => setShowGithubGuide(true)}
                   className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center hover:bg-zinc-800 transition-all group"
@@ -2329,10 +2370,10 @@ export default function App() {
         <AnimatePresence mode="wait">
           <motion.div 
             key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
+            initial={{ opacity: 0, y: 14, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -14, scale: 0.99 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="space-y-6"
           >
             {activeTab === 'finviz' && (
@@ -3354,6 +3395,29 @@ export default function App() {
 
                   <GlobalMarketOverview />
 
+                  {/* 3D Global News Scan & Shock Engine Launch Card */}
+                  <div className="bg-gradient-to-r from-purple-950/40 via-cyan-950/40 to-zinc-900 border border-cyan-500/30 p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                        <Globe size={13} />
+                        Worldwide 3D Intelligence Grid
+                      </span>
+                      <h3 className="text-lg font-black text-white mt-1">
+                        3D Global News Scan & Market Projection Shock Engine
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Interactive 3D WebGL Earth sphere tracking breaking events and forward market projection line impacts.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('newsscan3d')}
+                      className="px-5 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-cyan-600/20 flex items-center gap-2 shrink-0 cursor-pointer"
+                    >
+                      <span>Open Interactive 3D Scanner</span>
+                      <ArrowUpRight size={14} />
+                    </button>
+                  </div>
+
                   {/* Automated Learning Model Status */}
                   <div className="glass-card p-4 bg-emerald-500/5 border-emerald-500/20">
                     <div className="flex items-center justify-between mb-3">
@@ -4028,7 +4092,10 @@ export default function App() {
 
                   {/* Predictive Backtesting */}
                   {data.backtest && (
-                    <PredictiveBacktest backtest={data.backtest} />
+                    <PredictiveBacktest 
+                      backtest={data.backtest} 
+                      onOpenHFTBacktest={() => setActiveTab('quantlab')}
+                    />
                   )}
 
                   {/* Main Chart */}
@@ -4140,8 +4207,8 @@ export default function App() {
                               <div className="relative z-10">
                                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Technical Indicators</p>
                                 <div className="space-y-2">
-                                  {['SMA 20', 'EMA 12', 'RSI 14', 'MACD', 'STOCH', 'ATR'].map(ind => {
-                                    const id = ind.toLowerCase().replace(' ', '');
+                                  {['SMA 20', 'EMA 12', 'RSI 14', 'MACD', 'STOCH', 'ATR', 'HFT High-Freq'].map(ind => {
+                                    const id = ind.toLowerCase().replace(' ', '').replace('-', '');
                                     const isSelected = selectedIndicators.includes(id);
                                     return (
                                       <button
@@ -4321,9 +4388,20 @@ export default function App() {
                             stroke="#10b981" 
                             strokeWidth={3} 
                             dot={false} 
-                            name="Fourier Filtered"
+                            name="Fourier Low-Pass"
                             connectNulls
                           />
+                          {selectedIndicators.includes('hfthighfreq') && (
+                            <Line 
+                              type="monotone" 
+                              dataKey="highFrequency" 
+                              stroke="#ec4899" 
+                              strokeWidth={2} 
+                              dot={false} 
+                              name="HFT High-Freq"
+                              connectNulls
+                            />
+                          )}
                           {selectedIndicators.includes('sma20') && (
                             <Line 
                               type="monotone" 
@@ -5498,12 +5576,29 @@ export default function App() {
                 />
               )}
 
+              {activeTab === 'newsscan3d' && (
+                <GlobalNewsScan3D 
+                  data={data || Object.values(allData)[0] || fallbackStockData}
+                  allData={allData}
+                  onApplyShockToStrategy={(shockEvent) => {
+                    const topSymbol = shockEvent.impactedTickers[0]?.symbol || 'SPY';
+                    setActiveTicker(topSymbol);
+                  }}
+                />
+              )}
+
               {/* Removed redundant global tab section */}
             </motion.div>
           </AnimatePresence>
         </main>
 
-        {/* Floating Interactive Elements */}
+        {/* Floating Interactive 3D Dock & Actions */}
+        <Quick3DNavigationDock
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          onOpenSearch={() => setIsStockSelectorOpen(true)}
+        />
+
         <QuickActions onAction={handleQuickAction} />
         
         <NavigationMenu 
@@ -5514,6 +5609,12 @@ export default function App() {
         />
       </motion.div>
       )}
+
+      <Interactive3DTourModal
+        isOpen={isTourModalOpen}
+        onClose={() => setIsTourModalOpen(false)}
+        onNavigateToTab={setActiveTab}
+      />
 
       <GitHubDeploymentGuideModal
         isOpen={showGithubGuide}

@@ -45,11 +45,23 @@ import {
   Volume2,
   CheckCircle2,
   AlertTriangle,
-  Send
+  Send,
+  Waves,
+  Radio,
+  ArrowRight
 } from 'lucide-react';
 import { FINVIZ_STOCKS, FinvizStock } from '../../data/finvizData';
 import { runMonteCarlo } from '../../utils/simulations';
 import { runQuantVortexProjection, VortexCandle, VortexRegime } from '../../utils/vortexEngine';
+import { 
+  fourierLowPass, 
+  fourierHighPass, 
+  fourierBandPass, 
+  computeFourierSpectrum, 
+  computeHighFrequencyAnalysis,
+  HighFrequencyMetrics,
+  SpectralPeak
+} from '../../services/api/signalProcessing';
 import { cn } from '../../utils/cn';
 
 interface FinvizChartWithProjectionsProps {
@@ -60,6 +72,7 @@ interface FinvizChartWithProjectionsProps {
   allData?: Record<string, any>;
   lastUpdate?: any;
   fetchData?: (ticker: string) => Promise<void>;
+  onOpenHFTBacktest?: (ticker?: string) => void;
 }
 
 type ProjectionTab = 'vortex' | 'montecarlo' | 'fuzzylogic' | 'fairvalue' | 'fourier' | 'risk';
@@ -71,7 +84,8 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
   isWatchlisted = false,
   allData,
   lastUpdate,
-  fetchData
+  fetchData,
+  onOpenHFTBacktest
 }) => {
   const [chartType, setChartType] = useState<'candlestick' | 'area'>('area');
   const [showSMA20, setShowSMA20] = useState(true);
@@ -107,6 +121,13 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
     }
   });
   const [testSent, setTestSent] = useState(false);
+
+  // Signal Filtering & High-Frequency Suite State
+  const [filterMode, setFilterMode] = useState<'high_pass' | 'low_pass' | 'band_pass' | 'spectrum'>('high_pass');
+  const [fourierCutoff, setFourierCutoff] = useState<number>(0.15);
+  const [bandLowCutoff, setBandLowCutoff] = useState<number>(0.05);
+  const [bandHighCutoff, setBandHighCutoff] = useState<number>(0.25);
+  const [hfDisplayView, setHfDisplayView] = useState<'zscore_oscillations' | 'price_overlay' | 'spectrum_density'>('zscore_oscillations');
 
   // Trigger historical candle fetch on selection
   React.useEffect(() => {
@@ -291,6 +312,50 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
     }
     return data;
   }, [stock, allData, ticker]);
+
+  // High-Frequency Signal Analysis and Fourier Spectrum Decomposition
+  const hfAnalysis = useMemo(() => {
+    const rawPrices = historicalData.map(h => h.close);
+    if (rawPrices.length === 0) return null;
+    return computeHighFrequencyAnalysis(rawPrices, fourierCutoff);
+  }, [historicalData, fourierCutoff]);
+
+  const fourierSpectrum = useMemo(() => {
+    const rawPrices = historicalData.map(h => h.close);
+    if (rawPrices.length === 0) return [];
+    return computeFourierSpectrum(rawPrices);
+  }, [historicalData]);
+
+  const bandPassData = useMemo(() => {
+    const rawPrices = historicalData.map(h => h.close);
+    if (rawPrices.length === 0) return [];
+    return fourierBandPass(rawPrices, bandLowCutoff, bandHighCutoff);
+  }, [historicalData, bandLowCutoff, bandHighCutoff]);
+
+  const hfTimelineData = useMemo(() => {
+    if (!hfAnalysis) return [];
+    return historicalData.map((h, i) => {
+      const hfResidual = hfAnalysis.highPass[i] ?? 0;
+      const zScore = hfAnalysis.zScores[i] ?? 0;
+      const lowPass = hfAnalysis.lowPass[i] ?? h.close;
+      const bp = bandPassData[i] ?? 0;
+      const hfPrice = hfAnalysis.highPassPriceOverlay[i] ?? h.close;
+      return {
+        date: h.date,
+        rawPrice: h.close,
+        lowPass,
+        highPassPrice: hfPrice,
+        hfResidual,
+        zScore,
+        upperBand2: 1.8,
+        lowerBand2: -1.8,
+        zeroLine: 0,
+        bandPass: Number(bp.toFixed(2)),
+        isScalpBuy: zScore <= -1.8,
+        isScalpSell: zScore >= 1.8
+      };
+    });
+  }, [historicalData, hfAnalysis, bandPassData]);
 
   // Run Real Monte Carlo Simulation for next 30 days conditioned on live volatility & bond risk-free rate
   const mcResult = useMemo(() => {
@@ -959,11 +1024,12 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
             <button
               onClick={() => setActiveProjTab('fourier')}
               className={cn(
-                "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all",
+                "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center gap-1.5",
                 activeProjTab === 'fourier' ? "bg-emerald-600 text-white" : "text-zinc-400 hover:text-zinc-200"
               )}
             >
-              Fourier Cycles
+              <Waves size={13} />
+              Signal & High-Freq
             </button>
             <button
               onClick={() => setActiveProjTab('risk')}
@@ -1691,34 +1757,367 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
           </div>
         )}
 
-        {/* Tab 4: Fourier Harmonic Frequency Decomposition */}
+        {/* Tab 4: Interactive Fourier Signal Filtering & High-Frequency (HFT) Decomposition Lab */}
         {activeProjTab === 'fourier' && (
-          <div className="space-y-3 font-mono text-xs">
-            <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
-              <h3 className="text-xs font-bold text-zinc-200 uppercase mb-2 flex items-center gap-1.5">
-                <Activity size={14} className="text-emerald-400" /> Fourier Cycle Harmonics
-              </h3>
-              <p className="text-zinc-400 text-[11px] mb-3">
-                Discrete Fourier Transform decomposes the price signal into cyclical sinusoids, isolating dominant multi-week trading frequencies.
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
-                  <span className="text-[9px] text-zinc-500 uppercase">Primary Cycle</span>
-                  <div className="text-sm font-bold text-zinc-200 mt-0.5">28.4 Days</div>
+          <div className="space-y-4 font-mono text-xs">
+            {/* Header & Status Banner */}
+            <div className="bg-gradient-to-r from-zinc-900/90 via-zinc-900/60 to-zinc-950 p-4 rounded-xl border border-zinc-800">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-zinc-800/70">
+                <div>
+                  <h3 className="text-xs font-bold text-zinc-100 uppercase flex items-center gap-2">
+                    <Waves size={15} className="text-pink-400" />
+                    Fourier Signal Filtering & High-Frequency (HFT) Decomposition
+                  </h3>
+                  <p className="text-[11px] text-zinc-400 font-sans mt-0.5">
+                    Decompose price signals into underlying low-frequency macro trends vs high-frequency microstructure volatility, rapid oscillations & scalp opportunities.
+                  </p>
                 </div>
-                <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
-                  <span className="text-[9px] text-zinc-500 uppercase">Secondary Cycle</span>
-                  <div className="text-sm font-bold text-zinc-200 mt-0.5">14.2 Days</div>
-                </div>
-                <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
-                  <span className="text-[9px] text-zinc-500 uppercase">Phase Alignment</span>
-                  <div className="text-sm font-bold text-emerald-400 mt-0.5">+68° (Ascending)</div>
-                </div>
-                <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800">
-                  <span className="text-[9px] text-zinc-500 uppercase">Next Predicted Crest</span>
-                  <div className="text-sm font-bold text-zinc-200 mt-0.5">+6 Trading Days</div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={cn(
+                    "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                    hfAnalysis?.regime === 'Microstructure Turbulence'
+                      ? "bg-rose-500/15 text-rose-300 border-rose-500/30 animate-pulse"
+                      : hfAnalysis?.regime === 'Mean-Reverting Noise'
+                      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                      : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                  )}>
+                    {hfAnalysis?.regime || 'Processing'}
+                  </span>
+
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-800/70 text-zinc-300 border border-zinc-700">
+                    HF Energy: {hfAnalysis?.hfEnergyPercent ?? 0}%
+                  </span>
                 </div>
               </div>
+
+              {/* Filter Mode Buttons & Cutoff Controls */}
+              <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                {/* Mode Selector */}
+                <div className="lg:col-span-6 space-y-1.5">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                    Signal Filter Algorithm:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'high_pass', label: 'High-Freq (HFT)', icon: Zap, color: 'text-pink-400 border-pink-500/40 bg-pink-500/15' },
+                      { id: 'low_pass', label: 'Low-Pass (Trend)', icon: Activity, color: 'text-emerald-400 border-emerald-500/40 bg-emerald-500/15' },
+                      { id: 'band_pass', label: 'Band-Pass (Cycle)', icon: Radio, color: 'text-cyan-400 border-cyan-500/40 bg-cyan-500/15' },
+                      { id: 'spectrum', label: 'FFT Spectrum', icon: Waves, color: 'text-amber-400 border-amber-500/40 bg-amber-500/15' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setFilterMode(tab.id as any);
+                          if (tab.id === 'spectrum') setHfDisplayView('spectrum_density');
+                          else if (tab.id === 'high_pass') setHfDisplayView('zscore_oscillations');
+                          else setHfDisplayView('price_overlay');
+                        }}
+                        className={cn(
+                          "py-1.5 px-2 rounded-lg text-[10px] font-bold uppercase transition-all border flex items-center justify-center gap-1.5 text-center",
+                          filterMode === tab.id
+                            ? tab.color
+                            : "bg-zinc-950 text-zinc-400 border-zinc-800 hover:bg-zinc-900 hover:text-zinc-200"
+                        )}
+                      >
+                        <tab.icon size={11} />
+                        <span>{tab.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cutoff Frequency Slider */}
+                <div className="lg:col-span-6 bg-zinc-950/80 p-3 rounded-xl border border-zinc-850 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-400 flex items-center gap-1 font-bold">
+                      <Sliders size={12} className="text-pink-400" />
+                      Cutoff Frequency:
+                      <span className="text-pink-300 font-mono ml-1">f_c = {fourierCutoff.toFixed(2)}</span>
+                    </span>
+                    <span className="text-zinc-400">
+                      Cycle Period: <span className="font-bold text-amber-300 font-mono">T ≈ {(1 / fourierCutoff).toFixed(1)} Days</span>
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="0.03"
+                    max="0.45"
+                    step="0.01"
+                    value={fourierCutoff}
+                    onChange={(e) => setFourierCutoff(parseFloat(e.target.value))}
+                    className="w-full accent-pink-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+                  />
+
+                  {/* Presets */}
+                  <div className="flex items-center justify-between text-[9px] gap-1">
+                    <span className="text-zinc-500 uppercase tracking-wider font-bold">Presets:</span>
+                    {[
+                      { label: 'Ultra-HFT', f: 0.35, t: '2.9d' },
+                      { label: 'Microstructure', f: 0.20, t: '5.0d' },
+                      { label: 'Swing Cycles', f: 0.10, t: '10.0d' },
+                      { label: 'Macro Trend', f: 0.04, t: '25.0d' }
+                    ].map(p => (
+                      <button
+                        key={p.label}
+                        onClick={() => setFourierCutoff(p.f)}
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[9px] font-bold border transition-all",
+                          Math.abs(fourierCutoff - p.f) < 0.01
+                            ? "bg-pink-500/20 text-pink-300 border-pink-500/40"
+                            : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200"
+                        )}
+                      >
+                        {p.label} ({p.t})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* View Sub-Toggle (Z-score vs Price Overlay vs Spectrum) */}
+              <div className="mt-3 pt-3 border-t border-zinc-800/70 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                  Display Perspective:
+                </span>
+                <div className="flex bg-zinc-950 p-1 rounded-lg border border-zinc-800">
+                  {[
+                    { id: 'zscore_oscillations', label: 'High-Freq Z-Score & Scalp Bands' },
+                    { id: 'price_overlay', label: 'Price vs Filter Overlay' },
+                    { id: 'spectrum_density', label: 'Power Spectrum (PSD)' }
+                  ].map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => setHfDisplayView(v.id as any)}
+                      className={cn(
+                        "px-2.5 py-1 text-[10px] font-bold uppercase rounded transition-all",
+                        hfDisplayView === v.id ? "bg-zinc-800 text-pink-300 shadow" : "text-zinc-500 hover:text-zinc-300"
+                      )}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Signal Visualizer Chart */}
+            <div className="bg-zinc-950/70 p-4 rounded-xl border border-zinc-800">
+              <div className="flex items-center justify-between mb-3 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-pink-400 animate-ping" />
+                  <span className="font-bold text-zinc-200 uppercase tracking-wider">
+                    {hfDisplayView === 'zscore_oscillations' 
+                      ? `${stock.ticker} High-Frequency Residual & Micro-Scalp Channels (±1.8σ)`
+                      : hfDisplayView === 'price_overlay'
+                      ? `${stock.ticker} Raw Price vs ${filterMode === 'high_pass' ? 'High-Frequency Wave' : filterMode === 'low_pass' ? 'Low-Pass Trend' : 'Band-Pass Harmonics'}`
+                      : `${stock.ticker} FFT Power Spectral Density Decomposition`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] font-bold">
+                  {hfDisplayView === 'zscore_oscillations' && (
+                    <>
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> Long Scalp Zone (&lt; -1.8σ)
+                      </span>
+                      <span className="flex items-center gap-1 text-rose-400">
+                        <span className="w-2 h-2 rounded-full bg-rose-500" /> Short Scalp Zone (&gt; +1.8σ)
+                      </span>
+                    </>
+                  )}
+                  {hfDisplayView === 'price_overlay' && (
+                    <>
+                      <span className="flex items-center gap-1 text-zinc-400">
+                        <span className="w-2 h-0.5 bg-zinc-500" /> Raw Close
+                      </span>
+                      <span className="flex items-center gap-1 text-pink-400">
+                        <span className="w-2 h-0.5 bg-pink-400" /> Filtered Signal
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Chart Rendering */}
+              <div className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  {hfDisplayView === 'zscore_oscillations' ? (
+                    <ComposedChart data={hfTimelineData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.4} />
+                      <XAxis dataKey="date" stroke="#52525b" fontSize={10} minTickGap={30} />
+                      <YAxis stroke="#52525b" fontSize={10} domain={[-3.5, 3.5]} tickFormatter={(v) => `${v}σ`} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '11px' }}
+                        formatter={(val: any, name: string) => [
+                          name === 'zScore' ? `${Number(val).toFixed(2)}σ` : val,
+                          name === 'zScore' ? 'High-Freq Z-Score' : name
+                        ]}
+                      />
+                      <ReferenceLine y={0} stroke="#3f3f46" strokeDasharray="2 2" />
+                      <ReferenceLine y={1.8} stroke="#f43f5e" strokeDasharray="3 3" label={{ value: '+1.8σ Overbought', fill: '#f43f5e', fontSize: 9, position: 'right' }} />
+                      <ReferenceLine y={-1.8} stroke="#10b981" strokeDasharray="3 3" label={{ value: '-1.8σ Oversold', fill: '#10b981', fontSize: 9, position: 'right' }} />
+                      
+                      <Area
+                        type="monotone"
+                        dataKey="zScore"
+                        stroke="#ec4899"
+                        strokeWidth={2}
+                        fill="#ec4899"
+                        fillOpacity={0.15}
+                        name="zScore"
+                      />
+                    </ComposedChart>
+                  ) : hfDisplayView === 'price_overlay' ? (
+                    <ComposedChart data={hfTimelineData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.4} />
+                      <XAxis dataKey="date" stroke="#52525b" fontSize={10} minTickGap={30} />
+                      <YAxis stroke="#52525b" fontSize={10} domain={['auto', 'auto']} tickFormatter={(v) => `$${v}`} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '11px' }}
+                        formatter={(val: any) => [`$${Number(val).toFixed(2)}`, 'Price']}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="rawPrice"
+                        stroke="#71717a"
+                        strokeWidth={1.5}
+                        dot={false}
+                        name="Raw Price"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={filterMode === 'high_pass' ? 'highPassPrice' : filterMode === 'low_pass' ? 'lowPass' : 'bandPass'}
+                        stroke={filterMode === 'high_pass' ? '#ec4899' : filterMode === 'low_pass' ? '#10b981' : '#06b6d4'}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name="Filtered Signal"
+                      />
+                    </ComposedChart>
+                  ) : (
+                    <ComposedChart data={fourierSpectrum.slice(0, 24)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.4} />
+                      <XAxis dataKey="period" stroke="#52525b" fontSize={10} tickFormatter={(v) => `${v}d`} />
+                      <YAxis stroke="#52525b" fontSize={10} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '11px' }}
+                        formatter={(val: any, name: string) => [Number(val).toFixed(2), name === 'power' ? 'Spectral Power' : name]}
+                        labelFormatter={(label) => `Cycle Period: ${label} Days`}
+                      />
+                      <Bar 
+                        dataKey="power" 
+                        fill="#ec4899"
+                        radius={[4, 4, 0, 0]}
+                        name="Spectral Power"
+                      />
+                    </ComposedChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* High-Frequency Quantitative Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800">
+                <span className="text-[10px] text-zinc-500 uppercase flex items-center gap-1 font-bold">
+                  <Zap size={11} className="text-pink-400" />
+                  HF Energy Ratio
+                </span>
+                <div className="text-lg font-black text-pink-400 mt-1">
+                  {hfAnalysis?.hfEnergyPercent ?? 0}%
+                </div>
+                <span className="text-[9px] text-zinc-500">Share of price variance</span>
+              </div>
+
+              <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800">
+                <span className="text-[10px] text-zinc-500 uppercase flex items-center gap-1 font-bold">
+                  <Activity size={11} className="text-cyan-400" />
+                  Current HF Z-Score
+                </span>
+                <div className={cn(
+                  "text-lg font-black mt-1 font-mono",
+                  (hfAnalysis?.currentZScore ?? 0) <= -1.8 
+                    ? "text-emerald-400" 
+                    : (hfAnalysis?.currentZScore ?? 0) >= 1.8 
+                    ? "text-rose-400" 
+                    : "text-zinc-200"
+                )}>
+                  {(hfAnalysis?.currentZScore ?? 0) > 0 ? '+' : ''}{(hfAnalysis?.currentZScore ?? 0).toFixed(2)}σ
+                </div>
+                <span className="text-[9px] text-zinc-500">Normalized deviation</span>
+              </div>
+
+              <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800">
+                <span className="text-[10px] text-zinc-500 uppercase flex items-center gap-1 font-bold">
+                  <Radio size={11} className="text-amber-400" />
+                  Dominant HF Cycle
+                </span>
+                <div className="text-lg font-black text-amber-300 mt-1">
+                  {hfAnalysis?.dominantHfPeriod.toFixed(1) ?? '2.0'} Days
+                </div>
+                <span className="text-[9px] text-zinc-500">Micro-oscillation period</span>
+              </div>
+
+              <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800">
+                <span className="text-[10px] text-zinc-500 uppercase flex items-center gap-1 font-bold">
+                  <CheckCircle2 size={11} className="text-emerald-400" />
+                  HFT Scalp Signal
+                </span>
+                <div className="mt-1">
+                  {(hfAnalysis?.currentZScore ?? 0) <= -1.8 ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      LONG SCALP (Oversold)
+                    </span>
+                  ) : (hfAnalysis?.currentZScore ?? 0) >= 1.8 ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                      SHORT SCALP (Overbought)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-800 text-zinc-400 border border-zinc-700">
+                      NEUTRAL NOISE BAND
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] text-zinc-500 mt-1 block">Autonomous HFT trigger</span>
+              </div>
+            </div>
+
+            {/* Quantitative Mathematical Context Card */}
+            <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-850 text-zinc-400 text-[11px] leading-relaxed space-y-1.5 font-sans">
+              <div className="flex items-center gap-2 text-zinc-200 font-bold font-mono text-xs">
+                <span>Discrete Fourier Frequency Theorem:</span>
+                <span className="text-pink-400">S(t) = S_LP(t) + S_HF(t)</span>
+              </div>
+              <p>
+                By applying a discrete Fourier high-pass filter with cutoff <span className="text-pink-300 font-mono">f_c = {fourierCutoff.toFixed(2)}</span>, institutional algorithms eliminate long-term macro drift to isolate the stationary high-frequency residual <span className="text-pink-300 font-mono">S_HF(t)</span>. The standardized Z-score <span className="text-pink-300 font-mono">Z = (S_HF - μ) / σ_HF</span> reliably identifies micro-structural exhaustion points for high-frequency algorithmic scalping.
+              </p>
+            </div>
+
+            {/* Launch HFT Backtest Engine on this Fourier strategy */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/30 flex-wrap gap-2">
+              <div>
+                <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                  <Zap size={13} className="text-purple-400" />
+                  Test Fourier High-Frequency Strategy on Historical Data
+                </span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">
+                  Simulate sub-millisecond fills, slippage, and user-defined timeframes in the HFT Backtest Engine
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  if (onOpenHFTBacktest) {
+                    onOpenHFTBacktest(ticker);
+                  } else {
+                    window.dispatchEvent(new CustomEvent('navigate-to-quantlab', { detail: { ticker, strategy: 'hft_fourier_residual' } }));
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg shadow-purple-500/20 active:scale-95"
+              >
+                <Zap size={12} className="fill-current" />
+                Launch HFT Backtest
+                <ArrowRight size={12} />
+              </button>
             </div>
           </div>
         )}

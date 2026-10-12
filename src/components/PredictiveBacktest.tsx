@@ -1,5 +1,5 @@
 import React from 'react';
-import { History } from 'lucide-react';
+import { History, Zap, ArrowRight } from 'lucide-react';
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line } from 'recharts';
 import { twMerge } from 'tailwind-merge';
 import { clsx, type ClassValue } from 'clsx';
@@ -11,9 +11,10 @@ function cn(...inputs: ClassValue[]) {
 
 interface PredictiveBacktestProps {
   backtest: any;
+  onOpenHFTBacktest?: () => void;
 }
 
-const PredictiveBacktest = React.memo(({ backtest }: PredictiveBacktestProps) => {
+const PredictiveBacktest = React.memo(({ backtest, onOpenHFTBacktest }: PredictiveBacktestProps) => {
   if (!backtest || !backtest.results) return null;
 
   const totalProfit = backtest.results.reduce((acc: number, curr: any, idx: number, arr: any[]) => {
@@ -47,8 +48,20 @@ const PredictiveBacktest = React.memo(({ backtest }: PredictiveBacktestProps) =>
           <History size={14} className="text-purple-400" />
           Predictive Backtesting (10D)
         </h3>
-        <div className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-[10px] font-bold text-purple-400 uppercase">
-          AI Simulation
+        <div className="flex items-center gap-2">
+          {onOpenHFTBacktest && (
+            <button
+              onClick={onOpenHFTBacktest}
+              className="px-2 py-0.5 rounded bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-[9px] font-black text-purple-300 uppercase tracking-wider transition-all flex items-center gap-1 active:scale-95"
+            >
+              <Zap size={10} className="fill-current text-purple-400" />
+              Launch HFT Engine
+              <ArrowRight size={10} />
+            </button>
+          )}
+          <div className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-[10px] font-bold text-purple-400 uppercase">
+            AI Simulation
+          </div>
         </div>
       </div>
 

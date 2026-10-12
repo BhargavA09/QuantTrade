@@ -33,6 +33,18 @@ export interface StockData {
   dividendYield?: number;
   history: { date: string; price: number; volume: number; open?: number; high?: number; low?: number; close?: number }[];
   filtered: number[];
+  highFrequency?: number[];
+  highFrequencyResidual?: number[];
+  highFrequencyZScores?: number[];
+  hfMetrics?: {
+    hfVariance: number;
+    totalVariance: number;
+    hfEnergyPercent: number;
+    currentZScore: number;
+    dominantHfPeriod: number;
+    regime: string;
+    microBurstSignals?: { index: number; type: string; zScore: number; price: number }[];
+  };
   simulations: number[][];
   neuralFeatures?: { 
     rsi: (number | null)[]; 

@@ -5,7 +5,12 @@
 
 import { defaultApiClient } from "./client";
 import { resolveTickerSymbol } from "./symbols";
-import { generateMockHistory, fourierLowPass, computeNeuralFeatures } from "./signalProcessing";
+import { 
+  generateMockHistory, 
+  fourierLowPass, 
+  computeNeuralFeatures,
+  computeHighFrequencyAnalysis 
+} from "./signalProcessing";
 import { fetchSentiment } from "./analysisService";
 import { neuralBrain } from "../NeuralBrain";
 import { runMonteCarlo } from "../../utils/simulations";
@@ -204,8 +209,9 @@ export const fetchForecast = async (
       price: t.meanSpiral
     }));
 
-    // 9. Fourier Low-Pass Smoothing
+    // 9. Fourier Signal Decomposition: Low-Pass Baseline & High-Frequency Residual
     const filtered = fourierLowPass(prices, 0.15);
+    const hfAnalysis = computeHighFrequencyAnalysis(prices, 0.15);
 
     // 10. Out-of-Sample Historical Backtesting
     const backtestDays = 10;
@@ -239,6 +245,18 @@ export const fetchForecast = async (
       profile: extraData.profile,
       news: extraData.news,
       filtered: filtered.map(p => parseFloat(p.toFixed(2))),
+      highFrequency: hfAnalysis.highPassPriceOverlay,
+      highFrequencyResidual: hfAnalysis.highPass,
+      highFrequencyZScores: hfAnalysis.zScores,
+      hfMetrics: {
+        hfVariance: hfAnalysis.hfVariance,
+        totalVariance: hfAnalysis.totalVariance,
+        hfEnergyPercent: hfAnalysis.hfEnergyPercent,
+        currentZScore: hfAnalysis.currentZScore,
+        dominantHfPeriod: hfAnalysis.dominantHfPeriod,
+        regime: hfAnalysis.regime,
+        microBurstSignals: hfAnalysis.microBurstSignals
+      },
       neuralFeatures,
       ...mcResults,
       forecast: gbmForecast,

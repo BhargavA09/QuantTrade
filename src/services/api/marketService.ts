@@ -5,7 +5,15 @@
 
 import { defaultApiClient } from "./client";
 import { resolveTickerSymbol } from "./symbols";
-import { MarketOverviewResponse, MarketAssetQuote } from "./types";
+import { 
+  MarketOverviewResponse, 
+  MarketAssetQuote, 
+  DataValidityAuditResult, 
+  MicroCalibrationSnapshot,
+  StanfordMedallionPipelineReport,
+  GlobalNewsScanResponse,
+  GlobalNewsEvent
+} from "./types";
 import { EXPANDED_STOCK_DATABASE } from "../../data/expandedStockDatabase";
 
 const ACCURATE_REFERENCE_PRICES: Record<string, { price: number; name: string; sector: string; cap: string }> = {
@@ -216,3 +224,68 @@ export const fetchMarketOverview = async (): Promise<MarketOverviewResponse> => 
     return fallback;
   });
 };
+
+/**
+ * Fetch Deep Data Validity & Provenance Audit for a ticker
+ */
+export const fetchDataValidityAudit = async (ticker: string): Promise<DataValidityAuditResult> => {
+  const sym = encodeURIComponent(ticker.trim().toUpperCase());
+  return defaultApiClient.fetchWithRetry<DataValidityAuditResult>(`/api/market/validate-source/${sym}`);
+};
+
+/**
+ * Fetch Microsecond Calibration Telemetry Snapshot
+ */
+export const fetchMicroCalibrationSnapshot = async (ticker: string): Promise<MicroCalibrationSnapshot> => {
+  const sym = encodeURIComponent(ticker.trim().toUpperCase());
+  return defaultApiClient.fetchWithRetry<MicroCalibrationSnapshot>(`/api/market/micro-calibration-snapshot/${sym}`);
+};
+
+/**
+ * Fetch Batch Data Validity Audit across major tickers
+ */
+export const fetchBatchDataValidity = async (tickers?: string[]): Promise<{ audits: DataValidityAuditResult[]; auditedAt: string }> => {
+  const query = tickers && tickers.length > 0 ? `?tickers=${encodeURIComponent(tickers.join(','))}` : '';
+  return defaultApiClient.fetchWithRetry<{ audits: DataValidityAuditResult[]; auditedAt: string }>(`/api/market/batch-validity${query}`);
+};
+
+/**
+ * Fetch Stanford Data Engineering Medallion Pipeline & Lineage
+ */
+export const fetchStanfordDataPipeline = async (ticker: string): Promise<StanfordMedallionPipelineReport> => {
+  const sym = encodeURIComponent(ticker.trim().toUpperCase());
+  return defaultApiClient.fetchWithRetry<StanfordMedallionPipelineReport>(`/api/market/stanford-pipeline/${sym}`);
+};
+
+/**
+ * Fetch Stanford Data Governance Assessment
+ */
+export const fetchStanfordGovernance = async (ticker?: string): Promise<any> => {
+  const query = ticker ? `?ticker=${encodeURIComponent(ticker.trim().toUpperCase())}` : '';
+  return defaultApiClient.fetchWithRetry<any>(`/api/market/stanford-governance${query}`);
+};
+
+/**
+ * Fetch Worldwide News Scan & Market Projection Shock Engine
+ */
+export const fetchGlobalNewsScan = async (): Promise<GlobalNewsScanResponse> => {
+  return defaultApiClient.fetchWithRetry<GlobalNewsScanResponse>('/api/market/global-news-scan');
+};
+
+/**
+ * Trigger Real-time AI Analysis on custom breaking global news headline
+ */
+export const analyzeCustomNewsShock = async (params: {
+  headline: string;
+  summary?: string;
+  region?: string;
+  category?: string;
+}): Promise<{ success: boolean; event: GlobalNewsEvent }> => {
+  return defaultApiClient.post<{ success: boolean; event: GlobalNewsEvent }>(
+    '/api/market/global-news-scan/analyze',
+    params
+  );
+};
+
+
+

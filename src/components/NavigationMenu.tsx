@@ -74,6 +74,7 @@ const NavigationMenu: React.FC<NavigationMenuProps> = ({ isOpen, onClose, active
     {
       title: "Economics & Systems",
       items: [
+        { id: 'newsscan3d', label: '3D News & Market Impact', description: 'Interactive 3D globe radar & forward shock projection lines', icon: Globe, color: 'text-cyan-400' },
         { id: 'logistics', label: 'Supply Chain', description: 'Trade flows & logistics monitoring', icon: Ship, color: 'text-emerald-400' },
         { id: 'global', label: 'Macro Economics', description: 'World economy simulation & trends', icon: Globe, color: 'text-blue-400' },
         { id: 'yieldcurve', label: 'Yield Curve', description: 'Treasury yields & economic indicators', icon: Activity, color: 'text-amber-400' },

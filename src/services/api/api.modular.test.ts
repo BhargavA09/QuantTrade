@@ -3,6 +3,8 @@ import {
   resolveTickerSymbol, 
   COMMON_TICKER_MAP,
   fourierLowPass, 
+  fourierHighPass,
+  computeHighFrequencyAnalysis,
   generateMockHistory, 
   computeNeuralFeatures,
   ApiClient,
@@ -51,6 +53,27 @@ describe('Modular API Architecture', () => {
       expect(filtered.length).toBe(prices.length);
       expect(filtered[0]).toBeTypeOf('number');
       expect(Number.isFinite(filtered[0])).toBe(true);
+    });
+
+    it('executes Fourier High-Pass filter and extracts high-frequency residuals', () => {
+      const prices = [100, 105, 95, 110, 90, 115, 85, 120, 80, 125];
+      const hf = fourierHighPass(prices, 0.15);
+      expect(hf.length).toBe(prices.length);
+      expect(hf[0]).toBeTypeOf('number');
+      // High-frequency components oscillate around 0
+      const sum = hf.reduce((a, b) => a + b, 0);
+      expect(Math.abs(sum / hf.length)).toBeLessThan(15);
+    });
+
+    it('performs full high-frequency signal decomposition and microburst analysis', () => {
+      const prices = Array.from({ length: 40 }, (_, i) => 150 + i * 0.5 + (i % 2 === 0 ? 3 : -3));
+      const analysis = computeHighFrequencyAnalysis(prices, 0.15);
+      expect(analysis.highPass.length).toBe(prices.length);
+      expect(analysis.lowPass.length).toBe(prices.length);
+      expect(analysis.zScores.length).toBe(prices.length);
+      expect(analysis.hfEnergyPercent).toBeGreaterThan(0);
+      expect(analysis.hfEnergyPercent).toBeLessThanOrEqual(100);
+      expect(typeof analysis.regime).toBe('string');
     });
 
     it('computes neural network indicators when sample size is sufficient', () => {

@@ -191,6 +191,21 @@ export class ApiClient {
   }
 
   /**
+   * Helper to perform POST requests with JSON payload.
+   */
+  public async post<T = any>(url: string, body?: any, options: RequestOptions = {}): Promise<T> {
+    return this.fetchWithRetry<T>(url, {
+      ...options,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  }
+
+  /**
    * Safely parses JSON string, removing markdown wrappers and handling malformed strings.
    */
   public safeJsonParse<T = any>(text: string | undefined, fallback: T): T {
