@@ -8,6 +8,7 @@ import {
   executeStanfordDataPipeline
 } from "../services/multiSourceMarketEngine";
 import { BASELINE_MARKET_PRICES } from "../services/marketDefaults";
+import { globalNewsScannerService } from "../services/autonomousNewsScanner";
 
 const sentimentAnalyzer = new Sentiment();
 
@@ -32,12 +33,12 @@ marketRouter.get(["/globalstate", "/global-state"], async (req, res) => {
       indices: indexData,
       globalSimulation: { 
         status: vixQuote.price > 25 ? "Volatile" : "Stable", 
-        news: [
-          { title: "Global trade volume shows resilience amid supply chain shifts.", impact: "Positive", severity: "medium", sentiment: "positive" },
-          { title: "New shipping regulations to impact maritime logistics costs.", impact: "Neutral", severity: "low", sentiment: "neutral" },
-          { title: `US 10-Year Treasury Yield at ${tnxQuote.price.toFixed(2)}% updates market sentiment.`, impact: "Neutral", severity: "high", sentiment: "neutral" },
-          { title: `Gold performs at $${goldQuote.price.toFixed(0)} as investors seek risk hedge.`, impact: "Positive", severity: "medium", sentiment: "positive" }
-        ], 
+        news: globalNewsScannerService.getActiveEvents().events.slice(0, 10).map(e => ({
+          title: `[${e.city.toUpperCase()}] ${e.headline} — Impact: ${e.impactedTickers.slice(0, 3).map(t => `${t.symbol} (${t.expectedMovePct >= 0 ? '+' : ''}${t.expectedMovePct}%)`).join(', ')}`,
+          impact: e.sentiment === 'bullish' ? 'Positive' : e.sentiment === 'bearish' ? 'Negative' : 'Neutral',
+          severity: e.severity,
+          sentiment: e.sentiment === 'bullish' ? 'positive' : e.sentiment === 'bearish' ? 'negative' : 'neutral'
+        })), 
         volumeIndex: 104.5,
         importExport: { us: 102.1, china: 105.4, eu: 98.7, india: 108.2, japan: 99.5, brazil: 101.8 }
       },
@@ -304,190 +305,56 @@ marketRouter.get("/stanford-governance", async (req, res) => {
 });
 
 // 11. Real-Time Worldwide News Scan & Market Projection Shock Engine
+// 11. Real-Time Autonomous Worldwide News Scan & Market Shock Transmission Engine
 marketRouter.get("/global-news-scan", (req, res) => {
-  const newsEvents = [
-    {
-      id: "scan-news-01",
-      headline: "Taiwan Foundry Clusters Ramp Advanced 2nm Packaging Lines Ahead of AI Server Surge",
-      summary: "Leading wafer fabrication hubs in Hsinchu & Tainan confirm 28% yield acceleration for next-gen hyperscaler accelerator chips, reducing co-packaged optics latency.",
-      timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
-      source: "Taipei Tech Digest / Nikkei Asia",
-      city: "Taipei",
-      country: "Taiwan",
-      region: "Asia-Pacific",
-      lat: 25.033,
-      lng: 121.5654,
-      category: "Semiconductors & AI",
-      severity: "critical",
-      sentiment: "bullish",
-      sentimentScore: 0.88,
-      impactedTickers: [
-        { symbol: "NVDA", name: "NVIDIA Corp.", expectedMovePct: 4.2, baselineTarget: 138.5, shockedTarget: 144.3, transmissionReason: "Primary beneficiary of advanced packaging allocation and accelerator substrate throughput." },
-        { symbol: "AMD", name: "Advanced Micro Devices", expectedMovePct: 3.1, baselineTarget: 156.2, shockedTarget: 161.0, transmissionReason: "Accelerated server GPU foundry slots improve data center delivery cadence." },
-        { symbol: "TSM", name: "Taiwan Semiconductor", expectedMovePct: 4.8, baselineTarget: 188.0, shockedTarget: 197.0, transmissionReason: "Margin expansion on high-ASP 2nm and CoWoS packaging volume." },
-        { symbol: "QQQ", name: "Invesco QQQ ETF", expectedMovePct: 1.6, baselineTarget: 492.0, shockedTarget: 499.8, transmissionReason: "Tech index beta driver via heavy semiconductor weighting." }
-      ],
-      projectionLineShift: {
-        baselineSlope: 0.04,
-        shockedSlope: 0.12,
-        volatilityMultiplier: 1.25,
-        horizonDays: 30,
-        recoveryHalfLifeDays: 14
-      },
-      connectedHub: { name: "Silicon Valley / San Francisco", lat: 37.7749, lng: -122.4194 }
-    },
-    {
-      id: "scan-news-02",
-      headline: "Federal Reserve Signals Liquidity Neutrality as Core PCE Moderates to Target",
-      summary: "FOMC policy committee notes real rates restrictiveness is balanced, opening door for measured term structure steepening and bank balance sheet expansion.",
-      timestamp: new Date(Date.now() - 34 * 60000).toISOString(),
-      source: "Federal Reserve Board / Bloomberg Wall St",
-      city: "Washington, D.C.",
-      country: "United States",
-      region: "North America",
-      lat: 38.9072,
-      lng: -77.0369,
-      category: "Central Banks & Rates",
-      severity: "high",
-      sentiment: "bullish",
-      sentimentScore: 0.65,
-      impactedTickers: [
-        { symbol: "SPY", name: "S&P 500 ETF", expectedMovePct: 1.8, baselineTarget: 586.4, shockedTarget: 597.0, transmissionReason: "Discount rate relief on equity risk premium boosts terminal valuation multiples." },
-        { symbol: "^TNX", name: "10-Year Treasury Yield", expectedMovePct: -2.9, baselineTarget: 4.22, shockedTarget: 4.10, transmissionReason: "Benchmark sovereign yield declines as inflation risk premium compresses." },
-        { symbol: "TLT", name: "20+ Year Treasury Bond ETF", expectedMovePct: 2.4, baselineTarget: 94.2, shockedTarget: 96.5, transmissionReason: "Duration rally on falling long-term discount rates." },
-        { symbol: "AAPL", name: "Apple Inc.", expectedMovePct: 1.5, baselineTarget: 234.8, shockedTarget: 238.3, transmissionReason: "Mega-cap liquidity anchor re-rates higher with lower cost of capital." }
-      ],
-      projectionLineShift: {
-        baselineSlope: 0.02,
-        shockedSlope: 0.07,
-        volatilityMultiplier: 0.88,
-        horizonDays: 45,
-        recoveryHalfLifeDays: 28
-      },
-      connectedHub: { name: "Wall Street / New York", lat: 40.7128, lng: -74.006 }
-    },
-    {
-      id: "scan-news-03",
-      headline: "Strait of Hormuz & Red Sea Maritime Transit Protocols Tighten Amid Regional Flare-Up",
-      summary: "Major tanker operators redirect VLCC carriers around Cape of Good Hope, adding 12 sailing days and spiking war-risk insurance premiums across Rotterdam-Singapore lanes.",
-      timestamp: new Date(Date.now() - 52 * 60000).toISOString(),
-      source: "Lloyd's List Intelligence / Maritime Executive",
-      city: "Dubai",
-      country: "United Arab Emirates",
-      region: "Middle East",
-      lat: 25.2048,
-      lng: 55.2708,
-      category: "Energy & Commodities",
-      severity: "critical",
-      sentiment: "bearish",
-      sentimentScore: -0.74,
-      impactedTickers: [
-        { symbol: "CL=F", name: "Crude Oil (WTI)", expectedMovePct: 4.6, baselineTarget: 78.4, shockedTarget: 82.0, transmissionReason: "Transit risk premium and bunker fuel tanker dislocation constrict physical barrels." },
-        { symbol: "GC=F", name: "Gold Futures", expectedMovePct: 2.1, baselineTarget: 2650.0, shockedTarget: 2705.0, transmissionReason: "Geopolitical safe-haven bids surge on geopolitical supply shock." },
-        { symbol: "XOM", name: "ExxonMobil Corp.", expectedMovePct: 3.2, baselineTarget: 118.0, shockedTarget: 121.8, transmissionReason: "Upstream exploration cash flow margins expand with higher crack spreads." },
-        { symbol: "AAL", name: "American Airlines", expectedMovePct: -3.8, baselineTarget: 12.8, shockedTarget: 12.3, transmissionReason: "Jet fuel operating cost escalation compresses airline operating margins." }
-      ],
-      projectionLineShift: {
-        baselineSlope: -0.01,
-        shockedSlope: -0.08,
-        volatilityMultiplier: 1.65,
-        horizonDays: 20,
-        recoveryHalfLifeDays: 10
-      },
-      connectedHub: { name: "London / Canary Wharf", lat: 51.5074, lng: -0.1278 }
-    },
-    {
-      id: "scan-news-04",
-      headline: "European Central Bank Holds Rates in Frankfurt Amid German Manufacturing Modernization Push",
-      summary: "ECB Governing Council signals steady policy trajectory while EU industrial subsidies pivot toward high-efficiency robotics and clean grid electrification.",
-      timestamp: new Date(Date.now() - 95 * 60000).toISOString(),
-      source: "Reuters Frankfurt / Financial Times",
-      city: "Frankfurt",
-      country: "Germany",
-      region: "Europe",
-      lat: 50.1109,
-      lng: 8.6821,
-      category: "Central Banks & Rates",
-      severity: "medium",
-      sentiment: "neutral",
-      sentimentScore: 0.15,
-      impactedTickers: [
-        { symbol: "EURUSD=X", name: "Euro / US Dollar", expectedMovePct: 0.4, baselineTarget: 1.085, shockedTarget: 1.089, transmissionReason: "Rate differential stabilization keeps currency pair anchored within range." },
-        { symbol: "^GDAXI", name: "DAX Index", expectedMovePct: 1.1, baselineTarget: 19420.0, shockedTarget: 19630.0, transmissionReason: "Industrial capital expenditure subsidies boost German export heavyweights." }
-      ],
-      projectionLineShift: {
-        baselineSlope: 0.01,
-        shockedSlope: 0.03,
-        volatilityMultiplier: 0.95,
-        horizonDays: 30,
-        recoveryHalfLifeDays: 20
-      },
-      connectedHub: { name: "Zurich / European Banking Hub", lat: 47.3769, lng: 8.5417 }
-    },
-    {
-      id: "scan-news-05",
-      headline: "Bank of Japan Affirms Carry Trade Monitoring as Tokyo Inflation Hits 2.8% Target",
-      summary: "Governor Ueda states domestic wage-price virtuous circle is entrenching, prompting global macro hedge funds to assess Yen unwinding risk parameters.",
-      timestamp: new Date(Date.now() - 130 * 60000).toISOString(),
-      source: "Nikkei / Bank of Japan Quarterly",
-      city: "Tokyo",
-      country: "Japan",
-      region: "Asia-Pacific",
-      lat: 35.6762,
-      lng: 139.6503,
-      category: "Currencies & Debt",
-      severity: "high",
-      sentiment: "bearish",
-      sentimentScore: -0.42,
-      impactedTickers: [
-        { symbol: "JPY=X", name: "USD / Japanese Yen", expectedMovePct: -1.8, baselineTarget: 152.4, shockedTarget: 149.6, transmissionReason: "Yen appreciation forces cross-asset carry trade hedging." },
-        { symbol: "^N225", name: "Nikkei 225 Index", expectedMovePct: -1.5, baselineTarget: 38940.0, shockedTarget: 38350.0, transmissionReason: "Stronger Yen dampens multinational exporter earnings translation." },
-        { symbol: "TSLA", name: "Tesla Inc.", expectedMovePct: -1.2, baselineTarget: 248.5, shockedTarget: 245.5, transmissionReason: "High-beta growth assets face minor portfolio de-risking during FX adjustments." }
-      ],
-      projectionLineShift: {
-        baselineSlope: -0.02,
-        shockedSlope: -0.05,
-        volatilityMultiplier: 1.35,
-        horizonDays: 14,
-        recoveryHalfLifeDays: 7
-      },
-      connectedHub: { name: "Singapore / ASEAN Hub", lat: 1.3521, lng: 103.8198 }
-    },
-    {
-      id: "scan-news-06",
-      headline: "Brazil & Chile Finalize Critical Minerals Rail Corridor Connecting Pacific Lithium to Atlantic Ports",
-      summary: "South American mining corridor fast-tracks brine processing logistics, cutting shipping turnarounds to EV battery gigafactories by 40%.",
-      timestamp: new Date(Date.now() - 180 * 60000).toISOString(),
-      source: "Valor Econômico / Mining Journal",
-      city: "São Paulo",
-      country: "Brazil",
-      region: "Latin America",
-      lat: -23.5505,
-      lng: -46.6333,
-      category: "Supply Chain & Shipping",
-      severity: "medium",
-      sentiment: "bullish",
-      sentimentScore: 0.62,
-      impactedTickers: [
-        { symbol: "TSLA", name: "Tesla Inc.", expectedMovePct: 2.8, baselineTarget: 248.5, shockedTarget: 255.4, transmissionReason: "Cathode cost compression and supply chain resilience boost EV gross margins." },
-        { symbol: "VALE", name: "Vale S.A.", expectedMovePct: 3.5, baselineTarget: 10.4, shockedTarget: 10.8, transmissionReason: "Logistics infrastructure integration increases regional freight throughput." }
-      ],
-      projectionLineShift: {
-        baselineSlope: 0.03,
-        shockedSlope: 0.06,
-        volatilityMultiplier: 1.05,
-        horizonDays: 60,
-        recoveryHalfLifeDays: 30
-      },
-      connectedHub: { name: "Houston / Gulf Port", lat: 29.7604, lng: -95.3698 }
-    }
-  ];
+  try {
+    const data = globalNewsScannerService.getActiveEvents();
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to retrieve scanned global news events" });
+  }
+});
 
-  res.json({
-    scanTimestamp: new Date().toISOString(),
-    totalActiveScannedNews: newsEvents.length,
-    monitoringStations: ["Wall Street", "Silicon Valley", "London", "Frankfurt", "Tokyo", "Taipei", "Dubai", "São Paulo", "Singapore"],
-    events: newsEvents
+// Trigger Instant Model-Driven Deep Scan for specific sector/region
+marketRouter.post("/global-news-scan/instant-scan", async (req, res) => {
+  try {
+    const { topic, region } = req.body || {};
+    const newEvent = await globalNewsScannerService.triggerAiDeepScan(topic, region);
+    res.json({
+      success: true,
+      event: newEvent,
+      message: `Model successfully scanned global financial telemetry for ${topic || region || 'High-Impact World Events'}.`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to trigger instant AI news scan" });
+  }
+});
+
+// Server-Sent Events (SSE) stream for constant real-time news push
+marketRouter.get("/global-news-scan/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  // Send current state immediately
+  const initial = globalNewsScannerService.getActiveEvents();
+  res.write(`data: ${JSON.stringify({ type: 'INIT', data: initial })}\n\n`);
+
+  // Subscribe to newly discovered events from autonomous scanner
+  const unsubscribe = globalNewsScannerService.subscribe((newEvent) => {
+    res.write(`data: ${JSON.stringify({ type: 'NEW_EVENT', data: newEvent })}\n\n`);
+  });
+
+  // Heartbeat ping every 15s to keep connection alive
+  const pingInterval = setInterval(() => {
+    res.write(`data: ${JSON.stringify({ type: 'HEARTBEAT', timestamp: new Date().toISOString() })}\n\n`);
+  }, 15000);
+
+  req.on("close", () => {
+    clearInterval(pingInterval);
+    unsubscribe();
+    res.end();
   });
 });
 

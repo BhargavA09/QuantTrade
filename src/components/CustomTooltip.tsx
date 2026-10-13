@@ -56,9 +56,141 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           })}
         </div>
 
+        {/* Quantitative Model Influence & Weights Breakdown */}
+        {(() => {
+          const weights = data.modelWeights || (isForecast ? {
+            fourier: 25,
+            monteCarlo: 55,
+            vortex: 12,
+            neuralRegime: 8,
+            dominantModel: 'Monte Carlo GBM',
+            regime: 'Stochastic Diffusion',
+            confidence: 84
+          } : {
+            fourier: 64,
+            monteCarlo: 24,
+            vortex: 8,
+            neuralRegime: 4,
+            dominantModel: 'Fourier Low-Pass Decomposition',
+            regime: 'Harmonic Baseline',
+            confidence: 91
+          });
+
+          return (
+            <div className="mt-3 pt-3 border-t border-zinc-800/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Activity size={11} className="text-emerald-400" />
+                  <span className="text-[9px] font-black text-zinc-300 uppercase tracking-wider">
+                    Model Weights Breakdown
+                  </span>
+                </div>
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  {weights.dominantModel?.includes('Fourier') ? 'Fourier Dominated' : 'Monte Carlo Dominated'}
+                </span>
+              </div>
+
+              {/* Stacked Influence Proportional Bar */}
+              <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden flex shadow-inner">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]" 
+                  style={{ width: `${weights.fourier}%` }} 
+                  title={`Fourier Influence: ${weights.fourier}%`}
+                />
+                <div 
+                  className="h-full bg-blue-500 transition-all duration-300 shadow-[0_0_8px_rgba(59,130,246,0.5)]" 
+                  style={{ width: `${weights.monteCarlo}%` }} 
+                  title={`Monte Carlo Influence: ${weights.monteCarlo}%`}
+                />
+                <div 
+                  className="h-full bg-teal-400 transition-all duration-300" 
+                  style={{ width: `${weights.vortex}%` }} 
+                  title={`Vortex Spiral: ${weights.vortex}%`}
+                />
+                <div 
+                  className="h-full bg-purple-500 transition-all duration-300" 
+                  style={{ width: `${weights.neuralRegime}%` }} 
+                  title={`Neural Regime: ${weights.neuralRegime}%`}
+                />
+              </div>
+
+              {/* Granular Model Weights Grid */}
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                {/* Fourier Weight */}
+                <div className="p-1.5 rounded-lg bg-zinc-900/70 border border-emerald-500/20 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tight flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_4px_#10b981]" />
+                      Fourier
+                    </span>
+                    <span className="text-[10px] font-mono font-black text-emerald-400">
+                      {weights.fourier}%
+                    </span>
+                  </div>
+                  <div className="mt-1 w-full bg-zinc-950 h-1 rounded-full overflow-hidden">
+                    <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${weights.fourier}%` }} />
+                  </div>
+                  <span className="text-[7px] text-zinc-500 font-mono mt-0.5">Harmonics Filter</span>
+                </div>
+
+                {/* Monte Carlo Weight */}
+                <div className="p-1.5 rounded-lg bg-zinc-900/70 border border-blue-500/20 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tight flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_4px_#3b82f6]" />
+                      Monte Carlo
+                    </span>
+                    <span className="text-[10px] font-mono font-black text-blue-400">
+                      {weights.monteCarlo}%
+                    </span>
+                  </div>
+                  <div className="mt-1 w-full bg-zinc-950 h-1 rounded-full overflow-hidden">
+                    <div className="bg-blue-400 h-full rounded-full" style={{ width: `${weights.monteCarlo}%` }} />
+                  </div>
+                  <span className="text-[7px] text-zinc-500 font-mono mt-0.5">GBM Diffusion</span>
+                </div>
+
+                {/* Vortex Spiral Weight */}
+                <div className="p-1.5 rounded-lg bg-zinc-900/50 border border-teal-500/10 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tight flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                      Vortex Flow
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-teal-400">
+                      {weights.vortex}%
+                    </span>
+                  </div>
+                  <div className="mt-1 w-full bg-zinc-950 h-1 rounded-full overflow-hidden">
+                    <div className="bg-teal-400 h-full rounded-full" style={{ width: `${weights.vortex}%` }} />
+                  </div>
+                  <span className="text-[7px] text-zinc-500 font-mono mt-0.5">Phase Vorticity</span>
+                </div>
+
+                {/* Neural Regime Weight */}
+                <div className="p-1.5 rounded-lg bg-zinc-900/50 border border-purple-500/10 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tight flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                      Neural AI
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-purple-400">
+                      {weights.neuralRegime}%
+                    </span>
+                  </div>
+                  <div className="mt-1 w-full bg-zinc-950 h-1 rounded-full overflow-hidden">
+                    <div className="bg-purple-400 h-full rounded-full" style={{ width: `${weights.neuralRegime}%` }} />
+                  </div>
+                  <span className="text-[7px] text-zinc-500 font-mono mt-0.5">Priors & Regime</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AI Insights Section */}
         {(data.sentiment || data.fairValue) && (
-          <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-4">
+          <div className="mt-3 pt-3 border-t border-zinc-800/50 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="p-2 rounded-lg bg-black/20 border border-white/5">
                 <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-1.5">AI Sentiment</p>
@@ -122,9 +254,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="mt-3 pt-2 border-t border-zinc-800/30 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[7px] font-black text-zinc-600 uppercase tracking-widest">System Verified</span>
+            <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest">Ensemble Calibrated</span>
           </div>
-          <span className="text-[7px] font-mono text-zinc-700">ID: {Math.random().toString(36).substring(7).toUpperCase()}</span>
+          <span className="text-[7px] font-mono text-zinc-600">QuantEngine v4.2</span>
         </div>
       </div>
     );

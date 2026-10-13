@@ -318,55 +318,120 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
 
       {/* 3. Main Dashboard Workspace Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        {activeTab === 'home' && (
-          <FinvizHome
-            onSelectTicker={handleSelectTicker}
-            onNavigateToMap={() => setActiveTab('map')}
-            onNavigateToScreener={() => setActiveTab('screener')}
-            allData={allData}
-          />
-        )}
+        <AnimatePresence mode="wait">
+          {activeTab === 'home' && (
+            <motion.div
+              key="finviz-home"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizHome
+                onSelectTicker={handleSelectTicker}
+                onNavigateToMap={() => setActiveTab('map')}
+                onNavigateToScreener={() => setActiveTab('screener')}
+                allData={allData}
+              />
+            </motion.div>
+          )}
 
-        {activeTab === 'screener' && (
-          <FinvizScreener onSelectTicker={handleSelectTicker} allData={allData} />
-        )}
+          {activeTab === 'screener' && (
+            <motion.div
+              key="finviz-screener"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizScreener onSelectTicker={handleSelectTicker} allData={allData} />
+            </motion.div>
+          )}
 
-        {activeTab === 'map' && (
-          <FinvizMap onSelectTicker={handleSelectTicker} allData={allData} />
-        )}
+          {activeTab === 'map' && (
+            <motion.div
+              key="finviz-map"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizMap onSelectTicker={handleSelectTicker} allData={allData} />
+            </motion.div>
+          )}
 
-        {activeTab === 'groups' && (
-          <FinvizGroups allData={allData} />
-        )}
+          {activeTab === 'groups' && (
+            <motion.div
+              key="finviz-groups"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizGroups allData={allData} />
+            </motion.div>
+          )}
 
-        {activeTab === 'futures' && (
-          <FinvizFutures 
-            allData={allData} 
-            onSelectTicker={handleSelectTicker} 
-            lastUpdate={lastUpdate} 
-          />
-        )}
+          {activeTab === 'futures' && (
+            <motion.div
+              key="finviz-futures"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizFutures 
+                allData={allData} 
+                onSelectTicker={handleSelectTicker} 
+                lastUpdate={lastUpdate} 
+              />
+            </motion.div>
+          )}
 
-        {activeTab === 'forex' && (
-          <FinvizForex 
-            allData={allData} 
-            onSelectTicker={handleSelectTicker} 
-          />
-        )}
+          {activeTab === 'forex' && (
+            <motion.div
+              key="finviz-forex"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizForex 
+                allData={allData} 
+                onSelectTicker={handleSelectTicker} 
+              />
+            </motion.div>
+          )}
 
-        {activeTab === 'chart' && (
-          <FinvizChartWithProjections
-            ticker={selectedTicker}
-            onSelectTicker={handleSelectTicker}
-            onAddWatchlist={onToggleWatchlist}
-            isWatchlisted={watchlist.includes(selectedTicker)}
-            allData={allData}
-            lastUpdate={lastUpdate}
-            fetchData={fetchData}
-          />
-        )}
+          {activeTab === 'chart' && (
+            <motion.div
+              key={`finviz-chart-${selectedTicker}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizChartWithProjections
+                ticker={selectedTicker}
+                onSelectTicker={handleSelectTicker}
+                onAddWatchlist={onToggleWatchlist}
+                isWatchlisted={watchlist.includes(selectedTicker)}
+                allData={allData}
+                lastUpdate={lastUpdate}
+                fetchData={fetchData}
+                onBack={() => setActiveTab('home')}
+              />
+            </motion.div>
+          )}
 
-        {activeTab === 'news' && (
+          {activeTab === 'news' && (
+            <motion.div
+              key="finviz-news"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
           <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center gap-2">
@@ -406,8 +471,10 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
               ))}
             </div>
           </div>
-        )}
-      </main>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </main>
 
       {/* 4. Finviz-Style Footer */}
       <footer className="bg-zinc-950 border-t border-zinc-800/80 py-4 mt-8 text-center text-xs font-mono text-zinc-500">

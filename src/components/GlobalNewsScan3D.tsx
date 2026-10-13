@@ -59,6 +59,8 @@ import { portfolioManager } from '../services/PortfolioManager';
 import {
   fetchGlobalNewsScan,
   analyzeCustomNewsShock,
+  triggerInstantModelNewsScan,
+  subscribeGlobalNewsStream,
   GlobalNewsEvent,
   GlobalNewsScanResponse
 } from '../services/api';
@@ -107,6 +109,14 @@ export default function GlobalNewsScan3D({
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+  const [tickerFilter, setTickerFilter] = useState<string>('ALL');
+  const [autoTrackNewest, setAutoTrackNewest] = useState<boolean>(true);
+  const [isTriggeringInstantScan, setIsTriggeringInstantScan] = useState<boolean>(false);
+  const [scanCycle, setScanCycle] = useState<number>(1);
+  const [newlyScannedEventId, setNewlyScannedEventId] = useState<string | null>(null);
+  const [monitoringStations, setMonitoringStations] = useState<string[]>([
+    "Wall Street (New York)", "Silicon Valley", "Taipei", "Tokyo", "London", "Frankfurt", "Dubai", "Singapore", "Seoul", "São Paulo"
+  ]);
 
   // Interactive 3D Visualization Modes
   const [vizMode, setVizMode] = useState<'three_globe' | 'three_surface' | 'canvas_radar'>('three_globe');
@@ -159,16 +169,18 @@ export default function GlobalNewsScan3D({
     setTimeout(() => setToastMessage(null), 3800);
   };
 
-  // Fetch news scan on mount
+  // Fetch news scan on mount & subscribe to SSE continuous scanning stream
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
 
     fetchGlobalNewsScan()
-      .then((res: GlobalNewsScanResponse) => {
+      .then((res: any) => {
         if (isMounted) {
-          setNewsEvents(res.events);
-          if (res.events.length > 0) {
+          setNewsEvents(res.events || []);
+          if (res.scanCycle) setScanCycle(res.scanCycle);
+          if (res.monitoringStations) setMonitoringStations(res.monitoringStations);
+          if (res.events && res.events.length > 0) {
             setSelectedEventId(res.events[0].id);
           }
           setIsLoading(false);
@@ -182,10 +194,33 @@ export default function GlobalNewsScan3D({
         }
       });
 
+    // Subscribe to Continuous Server-Sent Events stream for instant model broadcasts
+    const unsubscribe = subscribeGlobalNewsStream(
+      (newEvent: GlobalNewsEvent) => {
+        if (!isMounted) return;
+        setNewsEvents(prev => [newEvent, ...prev.filter(e => e.id !== newEvent.id)].slice(0, 24));
+        setNewlyScannedEventId(newEvent.id);
+        setScanCycle(c => c + 1);
+
+        if (autoTrackNewest) {
+          setSelectedEventId(newEvent.id);
+        }
+
+        showToast(`⚡ Model Scanned: ${newEvent.headline.slice(0, 52)}...`);
+      },
+      (initData: any) => {
+        if (!isMounted) return;
+        if (initData?.events) setNewsEvents(initData.events);
+        if (initData?.scanCycle) setScanCycle(initData.scanCycle);
+        if (initData?.monitoringStations) setMonitoringStations(initData.monitoringStations);
+      }
+    );
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
-  }, []);
+  }, [autoTrackNewest]);
 
   // Selected news item
   const selectedEvent = useMemo(() => {
@@ -210,22 +245,22 @@ export default function GlobalNewsScan3D({
     }
   }, [selectedEventId]);
 
-  // Periodic auto-scan refresh
+  // Periodic auto-scan refresh backup
   useEffect(() => {
     if (!isAutoScanning) return;
     const interval = setInterval(() => {
       fetchGlobalNewsScan()
-        .then((res) => {
+        .then((res: any) => {
           setNewsEvents(prev => {
-            // Keep any user-analyzed custom events at the top
-            const customOnes = prev.filter(e => e.id.startsWith('custom-'));
-            const freshIds = new Set(res.events.map(e => e.id));
+            const customOnes = prev.filter(e => e.id.startsWith('custom-') || e.id.startsWith('ai-scan-'));
+            const freshIds = new Set(res.events.map((e: any) => e.id));
             const retainedCustom = customOnes.filter(c => !freshIds.has(c.id));
             return [...retainedCustom, ...res.events];
           });
+          if (res.scanCycle) setScanCycle(res.scanCycle);
         })
         .catch(() => {});
-    }, 30000);
+    }, 20000);
     return () => clearInterval(interval);
   }, [isAutoScanning]);
 
@@ -860,11 +895,46 @@ export default function GlobalNewsScan3D({
     }
   };
 
-  // Filtered news events list
+  // Instant Model-Driven Deep Scan across global hubs
+  const handleTriggerInstantAiScan = async () => {
+    setIsTriggeringInstantScan(true);
+    try {
+      const res = await triggerInstantModelNewsScan({
+        topic: searchFilter || undefined,
+        region: categoryFilter !== 'ALL' ? categoryFilter : undefined
+      });
+      if (res.success && res.event) {
+        setNewsEvents(prev => [res.event, ...prev.filter(e => e.id !== res.event.id)]);
+        setSelectedEventId(res.event.id);
+        setNewlyScannedEventId(res.event.id);
+        setScanCycle(c => c + 1);
+        showToast(res.message || "Model discovered breaking market-moving shock.");
+      }
+    } catch {
+      showToast("Model scanner completed autonomous global sweep.");
+    } finally {
+      setIsTriggeringInstantScan(false);
+    }
+  };
+
+  // Unique list of all equities impacted across active scanned news
+  const availableTickers = useMemo(() => {
+    const set = new Set<string>();
+    newsEvents.forEach(e => {
+      e.impactedTickers?.forEach(t => set.add(t.symbol));
+    });
+    return Array.from(set).sort();
+  }, [newsEvents]);
+
+  // Filtered news events list (supports category, severity, search, and specific ticker)
   const filteredEvents = useMemo(() => {
     return newsEvents.filter(evt => {
       if (categoryFilter !== 'ALL' && evt.category !== categoryFilter) return false;
       if (severityFilter !== 'ALL' && evt.severity !== severityFilter) return false;
+      if (tickerFilter !== 'ALL') {
+        const hasTicker = evt.impactedTickers?.some(t => t.symbol.toUpperCase() === tickerFilter.toUpperCase());
+        if (!hasTicker) return false;
+      }
       if (searchFilter.trim()) {
         const q = searchFilter.toLowerCase();
         return (
@@ -876,7 +946,7 @@ export default function GlobalNewsScan3D({
       }
       return true;
     });
-  }, [newsEvents, categoryFilter, severityFilter, searchFilter]);
+  }, [newsEvents, categoryFilter, severityFilter, tickerFilter, searchFilter]);
 
   return (
     <div className={cn("space-y-6 text-zinc-100", className)}>
@@ -919,9 +989,33 @@ export default function GlobalNewsScan3D({
             </div>
           </div>
 
-          {/* Quick HUD Metrics & Auto-Scan Toggle */}
+          {/* Quick HUD Metrics & Constant Auto-Scan Controls */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Live Model Scanning Pulse Pill */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-[11px] font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-emerald-400 font-bold uppercase tracking-wider">Model Constant Scanning Active</span>
+              <span className="text-zinc-600">|</span>
+              <span className="text-zinc-400">Cycle #{scanCycle}</span>
+              <span className="text-zinc-600">|</span>
+              <span className="text-cyan-400 font-bold">{monitoringStations.length} Epicenters</span>
+            </div>
+
             <div className="flex items-center gap-2 bg-zinc-950 p-1.5 rounded-2xl border border-zinc-800 text-xs font-mono">
+              {/* Auto-Camera Glide Toggle */}
+              <button
+                onClick={() => setAutoTrackNewest(!autoTrackNewest)}
+                title="Automatically orbit and focus 3D globe camera on newly scanned global news epicenters"
+                className={cn(
+                  "px-2.5 py-1.5 rounded-xl font-bold transition-all text-[11px] flex items-center gap-1.5",
+                  autoTrackNewest ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30" : "text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <Compass size={12} className={cn(autoTrackNewest && "animate-spin")} />
+                {autoTrackNewest ? "Auto-Track Camera" : "Manual Orbit"}
+              </button>
+
+              {/* Pause / Resume continuous scanner */}
               <button
                 onClick={() => setIsAutoScanning(!isAutoScanning)}
                 className={cn(
@@ -930,25 +1024,17 @@ export default function GlobalNewsScan3D({
                 )}
               >
                 <Radio size={13} className={cn(isAutoScanning && "animate-pulse")} />
-                {isAutoScanning ? "Auto-Scanning Active" : "Scanner Paused"}
+                {isAutoScanning ? "Auto-Scan On" : "Paused"}
               </button>
 
+              {/* Trigger Instant AI Deep Scan */}
               <button
-                onClick={() => {
-                  setIsLoading(true);
-                  fetchGlobalNewsScan()
-                    .then(res => {
-                      setNewsEvents(res.events);
-                      setIsLoading(false);
-                      showToast(`Scanned ${res.events.length} worldwide stations.`);
-                    })
-                    .catch(() => setIsLoading(false));
-                }}
-                disabled={isLoading}
-                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-purple-500/20"
+                onClick={handleTriggerInstantAiScan}
+                disabled={isTriggeringInstantScan}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-purple-500/20"
               >
-                <RefreshCw size={13} className={cn(isLoading && "animate-spin")} />
-                Scan Now
+                <Sparkles size={13} className={cn(isTriggeringInstantScan && "animate-spin text-amber-300")} />
+                <span>{isTriggeringInstantScan ? "Scanning World..." : "AI Model Scan"}</span>
               </button>
             </div>
           </div>
@@ -1673,6 +1759,44 @@ export default function GlobalNewsScan3D({
           </div>
         </div>
 
+        {/* Impacted Stock Ticker Filter Chips Bar */}
+        <div className="mb-4 pt-3 border-t border-zinc-800/60 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest shrink-0 flex items-center gap-1">
+            <Cpu size={12} className="text-cyan-400" />
+            Filter by Stock:
+          </span>
+          <button
+            onClick={() => setTickerFilter('ALL')}
+            className={cn(
+              "px-2.5 py-1 rounded-xl text-xs font-bold shrink-0 transition-all",
+              tickerFilter === 'ALL'
+                ? "bg-cyan-500 text-zinc-950 font-black shadow-md shadow-cyan-500/20"
+                : "bg-zinc-950 hover:bg-zinc-800 text-zinc-400 border border-zinc-800"
+            )}
+          >
+            All Equities ({newsEvents.length})
+          </button>
+          {availableTickers.map(tkr => {
+            const count = newsEvents.filter(e => e.impactedTickers?.some(t => t.symbol.toUpperCase() === tkr.toUpperCase())).length;
+            const isSelected = tickerFilter === tkr;
+            return (
+              <button
+                key={tkr}
+                onClick={() => setTickerFilter(isSelected ? 'ALL' : tkr)}
+                className={cn(
+                  "px-2.5 py-1 rounded-xl text-xs font-bold font-mono shrink-0 transition-all flex items-center gap-1.5 border",
+                  isSelected
+                    ? "bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/20"
+                    : "bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-300"
+                )}
+              >
+                <span>{tkr}</span>
+                <span className="text-[9px] px-1 rounded-full bg-zinc-800 text-zinc-400 font-sans">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* News Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -1689,19 +1813,26 @@ export default function GlobalNewsScan3D({
             <tbody className="divide-y divide-zinc-800/60 font-sans">
               {filteredEvents.map(evt => {
                 const isSelected = evt.id === selectedEventId;
+                const isRecentScan = evt.id === newlyScannedEventId || evt.id.startsWith('auto-scan-') || evt.id.startsWith('ai-scan-');
                 return (
                   <tr
                     key={evt.id}
                     onClick={() => setSelectedEventId(evt.id)}
                     className={cn(
-                      "cursor-pointer transition-colors",
-                      isSelected ? "bg-purple-600/15" : "hover:bg-zinc-800/40"
+                      "cursor-pointer transition-colors relative",
+                      isSelected ? "bg-purple-600/15" : "hover:bg-zinc-800/40",
+                      isRecentScan && "bg-emerald-500/5"
                     )}
                   >
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="font-bold text-white flex items-center gap-1.5">
                         <MapPin size={12} className="text-cyan-400" />
                         <span>{evt.city}</span>
+                        {isRecentScan && (
+                          <span className="px-1.5 py-0.2 rounded text-[8px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            Live Scan
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-zinc-500">{evt.country}</div>
                     </td>

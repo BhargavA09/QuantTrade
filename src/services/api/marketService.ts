@@ -287,5 +287,50 @@ export const analyzeCustomNewsShock = async (params: {
   );
 };
 
+/**
+ * Trigger Instant AI Model Deep Scan across global epicenters
+ */
+export const triggerInstantModelNewsScan = async (params?: {
+  topic?: string;
+  region?: string;
+}): Promise<{ success: boolean; event: GlobalNewsEvent; message: string }> => {
+  return defaultApiClient.post<{ success: boolean; event: GlobalNewsEvent; message: string }>(
+    '/api/market/global-news-scan/instant-scan',
+    params || {}
+  );
+};
 
+/**
+ * Connect to continuous Server-Sent Events stream for real-time global news scanning
+ */
+export const subscribeGlobalNewsStream = (
+  onNewEvent: (event: GlobalNewsEvent) => void,
+  onInit?: (data: GlobalNewsScanResponse) => void
+): (() => void) => {
+  try {
+    const eventSource = new EventSource('/api/market/global-news-scan/stream');
 
+    eventSource.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload.type === 'INIT' && onInit) {
+          onInit(payload.data);
+        } else if (payload.type === 'NEW_EVENT' && onNewEvent) {
+          onNewEvent(payload.data);
+        }
+      } catch (err) {
+        console.warn("Error parsing news SSE payload:", err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      // Browser handles auto-reconnect
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  } catch {
+    return () => {};
+  }
+};

@@ -12,28 +12,55 @@ interface TickerItem {
   changePercent: number;
 }
 
+const DEFAULT_TICKERS: TickerItem[] = [
+  { ticker: 'SPY', name: 'S&P 500 ETF', price: 586.20, changePercent: 0.65 },
+  { ticker: 'QQQ', name: 'Nasdaq 100 ETF', price: 494.50, changePercent: 1.00 },
+  { ticker: 'NVDA', name: 'NVIDIA Corp', price: 138.40, changePercent: 2.82 },
+  { ticker: 'AAPL', name: 'Apple Inc', price: 228.50, changePercent: 1.02 },
+  { ticker: 'MSFT', name: 'Microsoft Corp', price: 422.30, changePercent: 0.74 },
+  { ticker: 'BTC-USD', name: 'Bitcoin USD', price: 66200.00, changePercent: 2.24 },
+  { ticker: 'ETH-USD', name: 'Ethereum USD', price: 2640.00, changePercent: 2.92 },
+  { ticker: 'GC=F', name: 'Gold Futures', price: 2685.40, changePercent: 0.48 }
+];
+
+const sanitizeNum = (val: any, fallback = 0): number => {
+  if (typeof val === 'number' && !isNaN(val) && isFinite(val)) return val;
+  const num = parseFloat(val);
+  return isNaN(num) || !isFinite(num) ? fallback : num;
+};
+
 export const StockTicker: React.FC = () => {
-  const [stocks, setStocks] = useState<TickerItem[]>([]);
+  const [stocks, setStocks] = useState<TickerItem[]>(DEFAULT_TICKERS);
   const tickers = useMemo(() => stocks.map(s => s.ticker), [stocks]);
   const { lastUpdate, connectionState } = useWebSocket(tickers);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchTickerData = async () => {
       try {
         const result = await fetchMarketOverview();
+        if (!isMounted || !result) return;
         
         // Take a few from each category to show in the ticker
-        const allStocks: TickerItem[] = [];
-        if (result.us) allStocks.push(...result.us.slice(0, 3));
-        if (result.crypto) allStocks.push(...result.crypto.slice(0, 3));
-        if (result.commodities) allStocks.push(...result.commodities.slice(0, 3));
+        const allStocks: any[] = [];
+        if (Array.isArray(result.us)) allStocks.push(...result.us.slice(0, 3));
+        if (Array.isArray(result.crypto)) allStocks.push(...result.crypto.slice(0, 3));
+        if (Array.isArray(result.commodities)) allStocks.push(...result.commodities.slice(0, 3));
         
-        setStocks(allStocks.map(s => ({
-          ticker: s.ticker,
-          name: s.name,
-          price: s.price,
-          changePercent: s.changePercent
-        })));
+        if (allStocks.length > 0) {
+          const parsed = allStocks
+            .filter(s => s && s.ticker)
+            .map(s => ({
+              ticker: String(s.ticker),
+              name: String(s.name || s.ticker),
+              price: sanitizeNum(s.price ?? s.currentPrice ?? s.close, 100),
+              changePercent: sanitizeNum(s.changePercent ?? s.change_percent, 0)
+            }));
+          
+          if (parsed.length > 0) {
+            setStocks(parsed);
+          }
+        }
       } catch (error) {
         console.warn("Failed to fetch ticker data:", error);
       }
@@ -41,17 +68,31 @@ export const StockTicker: React.FC = () => {
 
     fetchTickerData();
     const interval = setInterval(fetchTickerData, 60000); // Refresh list every minute
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Update prices in real-time if we get a WebSocket update
   useEffect(() => {
-    if (lastUpdate) {
-      setStocks(prev => prev.map(s => 
-        s.ticker === lastUpdate.ticker 
-          ? { ...s, price: lastUpdate.price, changePercent: lastUpdate.changePercent }
-          : s
-      ));
+    if (lastUpdate && lastUpdate.ticker) {
+      setStocks(prev => prev.map(s => {
+        if (s.ticker === lastUpdate.ticker) {
+          const updatedPrice = typeof lastUpdate.price === 'number' && !isNaN(lastUpdate.price) 
+            ? lastUpdate.price 
+            : s.price;
+          const updatedChange = typeof lastUpdate.changePercent === 'number' && !isNaN(lastUpdate.changePercent) 
+            ? lastUpdate.changePercent 
+            : s.changePercent;
+          return {
+            ...s,
+            price: sanitizeNum(updatedPrice, s.price),
+            changePercent: sanitizeNum(updatedChange, s.changePercent)
+          };
+        }
+        return s;
+      }));
     }
   }, [lastUpdate]);
 
@@ -78,24 +119,31 @@ export const StockTicker: React.FC = () => {
           ease: "linear" 
         }}
       >
-        {displayStocks.map((stock, i) => (
-          <div key={i} className="flex items-center gap-2 group cursor-default">
-            <span className="text-[10px] font-black text-zinc-100 uppercase tracking-tight">
-              {stock.ticker.replace('^', '')}
-            </span>
-            <span className="text-[10px] font-mono text-zinc-400">
-              {stock.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            <div className={cn(
-              "flex items-center gap-0.5 text-[9px] font-bold font-mono",
-              stock.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
-            )}>
-              {stock.changePercent >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-              {Math.abs(stock.changePercent).toFixed(2)}%
+        {displayStocks.map((stock, i) => {
+          if (!stock) return null;
+          const price = sanitizeNum(stock.price, 0);
+          const changePercent = sanitizeNum(stock.changePercent, 0);
+          const isUp = changePercent >= 0;
+
+          return (
+            <div key={`${stock.ticker || i}-${i}`} className="flex items-center gap-2 group cursor-default">
+              <span className="text-[10px] font-black text-zinc-100 uppercase tracking-tight">
+                {(stock.ticker || '').replace('^', '')}
+              </span>
+              <span className="text-[10px] font-mono text-zinc-400">
+                {price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <div className={cn(
+                "flex items-center gap-0.5 text-[9px] font-bold font-mono",
+                isUp ? "text-emerald-400" : "text-rose-400"
+              )}>
+                {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                {Math.abs(changePercent).toFixed(2)}%
+              </div>
+              <span className="text-zinc-800 mx-1">•</span>
             </div>
-            <span className="text-zinc-800 mx-1">•</span>
-          </div>
-        ))}
+          );
+        })}
       </motion.div>
     </div>
   );

@@ -383,6 +383,8 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
                 return (
                   <motion.div
                     key={`${item.ticker}-${idx}`}
+                    layoutId={`stock-card-${item.ticker}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     onClick={() => onSelectTicker(item.ticker)}
@@ -408,20 +410,36 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
                     </div>
                     <div className="flex justify-between items-start mb-2 pr-12">
                       <div>
-                        <h3 className="text-sm font-black text-zinc-100 uppercase tracking-tight">{item.ticker.replace('^', '')}</h3>
-                        <p className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]">{item.name}</p>
+                        <motion.h3 
+                          layoutId={`stock-ticker-${item.ticker}`}
+                          className="text-sm font-black text-zinc-100 uppercase tracking-tight"
+                        >
+                          {item.ticker.replace('^', '')}
+                        </motion.h3>
+                        <motion.p 
+                          layoutId={`stock-name-${item.ticker}`}
+                          className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]"
+                        >
+                          {item.name}
+                        </motion.p>
                       </div>
-                      <div className={cn(
-                        "px-2 py-1 rounded-lg text-[10px] font-black",
-                        item.changePercent >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
-                      )}>
-                        {item.changePercent >= 0 ? '+' : ''}{item.changePercent.toFixed(2)}%
-                      </div>
+                      <motion.div 
+                        layoutId={`stock-change-${item.ticker}`}
+                        className={cn(
+                          "px-2 py-1 rounded-lg text-[10px] font-black",
+                          (item.changePercent ?? 0) >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                        )}
+                      >
+                        {(item.changePercent ?? 0) >= 0 ? '+' : ''}{(typeof item.changePercent === 'number' ? item.changePercent : 0).toFixed(2)}%
+                      </motion.div>
                     </div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xl font-mono font-bold text-zinc-100">
-                        {item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
+                      <motion.span 
+                        layoutId={`stock-price-${item.ticker}`}
+                        className="text-xl font-mono font-bold text-zinc-100"
+                      >
+                        {(typeof item.price === 'number' && !isNaN(item.price) ? item.price : Number(item.price) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </motion.span>
                     </div>
                   </motion.div>
                 );
@@ -446,31 +464,43 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
                 {(marketData?.us || []).slice(4, 10).map((item: any, idx: number) => {
                   const isStarred = watchlist.includes(item.ticker);
                   return (
-                    <div
+                    <motion.div
                       key={`${item.ticker}-${idx}`}
+                      layoutId={`stock-card-${item.ticker}`}
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
                       onClick={() => onSelectTicker(item.ticker)}
                       className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/30 transition-colors group cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 group-hover:bg-emerald-500 group-hover:text-zinc-950 transition-colors">
+                        <motion.div 
+                          layoutId={`stock-avatar-${item.ticker}`}
+                          className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 group-hover:bg-emerald-500 group-hover:text-zinc-950 transition-colors"
+                        >
                           {item.ticker.substring(0, 2)}
-                        </div>
+                        </motion.div>
                         <div className="text-left">
-                          <div className="text-sm font-bold text-zinc-100">{item.ticker}</div>
-                          <div className="text-[10px] text-zinc-500">{item.name}</div>
+                          <motion.div layoutId={`stock-ticker-${item.ticker}`} className="text-sm font-bold text-zinc-100">
+                            {item.ticker}
+                          </motion.div>
+                          <motion.div layoutId={`stock-name-${item.ticker}`} className="text-[10px] text-zinc-500">
+                            {item.name}
+                          </motion.div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-sm font-mono font-bold text-zinc-100">
-                            {item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </div>
-                          <div className={cn(
-                            "text-[10px] font-bold",
-                            item.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
-                          )}>
-                            {item.changePercent >= 0 ? '+' : ''}{item.changePercent.toFixed(2)}%
-                          </div>
+                          <motion.div layoutId={`stock-price-${item.ticker}`} className="text-sm font-mono font-bold text-zinc-100">
+                            ${(typeof item.price === 'number' && !isNaN(item.price) ? item.price : Number(item.price) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </motion.div>
+                          <motion.div 
+                            layoutId={`stock-change-${item.ticker}`}
+                            className={cn(
+                              "text-[10px] font-bold",
+                              (item.changePercent ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                            )}
+                          >
+                            {(item.changePercent ?? 0) >= 0 ? '+' : ''}{(typeof item.changePercent === 'number' ? item.changePercent : 0).toFixed(2)}%
+                          </motion.div>
                         </div>
                         <button
                           type="button"
@@ -486,7 +516,7 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
                           <Star size={15} className={isStarred ? "fill-amber-400" : ""} />
                         </button>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -601,7 +631,8 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
               return (
                 <motion.div
                   key={ticker}
-                  layout
+                  layoutId={`stock-card-${ticker}`}
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
@@ -612,16 +643,25 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
                   {/* Top Bar: Symbol Avatar, Name, and Star Button */}
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700/60 flex items-center justify-center font-black text-xs text-white group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0">
+                      <motion.div 
+                        layoutId={`stock-avatar-${ticker}`}
+                        className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700/60 flex items-center justify-center font-black text-xs text-white group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0"
+                      >
                         {ticker.replace(/[^A-Z]/g, '').substring(0, 2) || ticker.substring(0, 2)}
-                      </div>
+                      </motion.div>
                       <div className="min-w-0">
-                        <h4 className="text-sm font-black text-white tracking-tight flex items-center gap-1.5">
+                        <motion.h4 
+                          layoutId={`stock-ticker-${ticker}`}
+                          className="text-sm font-black text-white tracking-tight flex items-center gap-1.5"
+                        >
                           {ticker}
-                        </h4>
-                        <p className="text-[11px] text-zinc-400 font-medium truncate max-w-[130px]">
+                        </motion.h4>
+                        <motion.p 
+                          layoutId={`stock-name-${ticker}`}
+                          className="text-[11px] text-zinc-400 font-medium truncate max-w-[130px]"
+                        >
                           {displayName}
-                        </p>
+                        </motion.p>
                       </div>
                     </div>
 
@@ -640,23 +680,29 @@ export const FinanceHome: React.FC<FinanceHomeProps> = ({
                   {/* Middle: Real-time Price and Change Badge */}
                   <div className="flex items-baseline justify-between gap-2 mb-3">
                     <div>
-                      <span className="text-xl font-mono font-bold text-white tracking-tight">
+                      <motion.span 
+                        layoutId={`stock-price-${ticker}`}
+                        className="text-xl font-mono font-bold text-white tracking-tight"
+                      >
                         {price != null 
                           ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
                           : '---'}
-                      </span>
+                      </motion.span>
                     </div>
 
                     {changePercent != null && (
-                      <div className={cn(
-                        "px-2 py-0.5 rounded-lg text-[10px] font-black flex items-center gap-1",
-                        isPositive 
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" 
-                          : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
-                      )}>
+                      <motion.div 
+                        layoutId={`stock-change-${ticker}`}
+                        className={cn(
+                          "px-2 py-0.5 rounded-lg text-[10px] font-black flex items-center gap-1",
+                          isPositive 
+                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" 
+                            : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
+                        )}
+                      >
                         {isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                         {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
-                      </div>
+                      </motion.div>
                     )}
                   </div>
 

@@ -10,9 +10,17 @@ interface LivePriceBadgeProps {
   changePercent: number;
   isConnected: boolean;
   connectionState?: ConnectionState;
+  layoutIdTicker?: string;
 }
 
-export const LivePriceBadge: React.FC<LivePriceBadgeProps> = ({ price, change, changePercent, isConnected, connectionState = isConnected ? 'connected' : 'disconnected' }) => {
+export const LivePriceBadge: React.FC<LivePriceBadgeProps> = ({ 
+  price, 
+  change, 
+  changePercent, 
+  isConnected, 
+  connectionState = isConnected ? 'connected' : 'disconnected',
+  layoutIdTicker
+}) => {
   const getStatusColor = () => {
     switch (connectionState) {
       case 'connected': return 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
@@ -62,31 +70,43 @@ export const LivePriceBadge: React.FC<LivePriceBadgeProps> = ({ price, change, c
       
       <div className="w-px h-4 bg-zinc-800" />
       
-      <div className="flex items-baseline gap-2">
-        <AnimatePresence mode="wait">
-          <motion.span 
-            key={price}
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 5 }}
-            className={cn(
-              "text-lg font-mono font-black tracking-tighter transition-colors",
-              connectionState === 'disconnected' ? "text-zinc-500" : "text-white"
-            )}
+      {(() => {
+        const safePrice = typeof price === 'number' && !isNaN(price) ? price : 0;
+        const safeChange = typeof change === 'number' && !isNaN(change) ? change : 0;
+        const safeChangePercent = typeof changePercent === 'number' && !isNaN(changePercent) ? changePercent : 0;
+
+        return (
+          <motion.div 
+            layoutId={layoutIdTicker ? `stock-price-${layoutIdTicker}` : undefined}
+            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            className="flex items-baseline gap-2"
           >
-            ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </motion.span>
-        </AnimatePresence>
-        
-        <div className={cn(
-          "flex items-center gap-0.5 text-[10px] font-bold font-mono transition-colors",
-          connectionState === 'disconnected' ? "text-zinc-600" : (change >= 0 ? "text-emerald-400" : "text-rose-400")
-        )}>
-          {change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-          <span>{change >= 0 ? '+' : ''}{change.toFixed(2)}</span>
-          <span className="opacity-60">({changePercent.toFixed(2)}%)</span>
-        </div>
-      </div>
+            <AnimatePresence mode="wait">
+              <motion.span 
+                key={safePrice}
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                className={cn(
+                  "text-lg font-mono font-black tracking-tighter transition-colors",
+                  connectionState === 'disconnected' ? "text-zinc-500" : "text-white"
+                )}
+              >
+                ${safePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </motion.span>
+            </AnimatePresence>
+            
+            <div className={cn(
+              "flex items-center gap-0.5 text-[10px] font-bold font-mono transition-colors",
+              connectionState === 'disconnected' ? "text-zinc-600" : (safeChange >= 0 ? "text-emerald-400" : "text-rose-400")
+            )}>
+              {safeChange >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              <span>{safeChange >= 0 ? '+' : ''}{safeChange.toFixed(2)}</span>
+              <span className="opacity-60">({safeChangePercent.toFixed(2)}%)</span>
+            </div>
+          </motion.div>
+        );
+      })()}
 
       <div className="hidden lg:flex items-center gap-1 pl-2 border-l border-zinc-800 text-[10px] font-mono text-zinc-400">
         <ShieldCheck size={12} className="text-emerald-400" />

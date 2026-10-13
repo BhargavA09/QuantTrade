@@ -117,30 +117,48 @@ export const FinvizHome: React.FC<FinvizHomeProps> = ({
           <span className="text-[10px] font-mono text-zinc-500">Continuous open-source feed</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-          {indices.map((idx) => (
-            <div 
-              key={idx.sym}
-              onClick={() => onSelectTicker(idx.sym)}
-              className="bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer rounded-xl p-2.5 flex flex-col justify-between shadow-lg"
-            >
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="font-black text-zinc-200 truncate">{idx.name}</span>
-              </div>
-              <div className="mt-1.5 flex flex-col font-mono">
-                <span className="text-sm font-bold text-zinc-100">{idx.val}</span>
-                <span className={cn("text-[10px] font-bold flex items-center gap-0.5", idx.up ? "text-emerald-400" : "text-rose-400")}>
-                  {idx.up ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                  {idx.pct}
-                </span>
-              </div>
-              <div className="mt-1.5 h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
-                <div 
-                  className={cn("h-full rounded-full transition-all duration-500", idx.up ? "bg-emerald-500" : "bg-rose-500")}
-                  style={{ width: idx.up ? '75%' : '35%' }}
-                />
-              </div>
-            </div>
-          ))}
+          {indices.map((idx) => {
+            const symClean = idx.sym.replace('^', '');
+            return (
+              <motion.div 
+                key={idx.sym}
+                layoutId={`finviz-stock-card-${symClean}`}
+                transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                onClick={() => onSelectTicker(symClean)}
+                className="bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer rounded-xl p-2.5 flex flex-col justify-between shadow-lg"
+              >
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <motion.span 
+                    layoutId={`finviz-name-${symClean}`}
+                    className="font-black text-zinc-200 truncate"
+                  >
+                    {idx.name}
+                  </motion.span>
+                </div>
+                <div className="mt-1.5 flex flex-col font-mono">
+                  <motion.span 
+                    layoutId={`finviz-price-${symClean}`}
+                    className="text-sm font-bold text-zinc-100"
+                  >
+                    {idx.val}
+                  </motion.span>
+                  <motion.span 
+                    layoutId={`finviz-change-${symClean}`}
+                    className={cn("text-[10px] font-bold flex items-center gap-0.5", idx.up ? "text-emerald-400" : "text-rose-400")}
+                  >
+                    {idx.up ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                    {idx.pct}
+                  </motion.span>
+                </div>
+                <div className="mt-1.5 h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
+                  <div 
+                    className={cn("h-full rounded-full transition-all duration-500", idx.up ? "bg-emerald-500" : "bg-rose-500")}
+                    style={{ width: idx.up ? '75%' : '35%' }}
+                  />
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
 
@@ -228,25 +246,36 @@ export const FinvizHome: React.FC<FinvizHomeProps> = ({
             </div>
 
             {/* Mini Treemap Mosaic */}
-            <div className="grid grid-cols-4 gap-1.5 h-44 cursor-pointer" onClick={onNavigateToMap}>
+            <div className="grid grid-cols-4 gap-1.5 h-44">
               {stocks.slice(0, 8).map((stock) => {
                 const isGreen = stock.change >= 0;
                 return (
-                  <div
+                  <motion.div
                     key={stock.ticker}
+                    layoutId={`finviz-stock-card-${stock.ticker}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    onClick={() => onSelectTicker(stock.ticker)}
                     className={cn(
-                      "p-2 rounded-lg flex flex-col justify-between transition-all hover:scale-105 border",
+                      "p-2 rounded-lg flex flex-col justify-between transition-all hover:scale-105 border cursor-pointer",
                       isGreen 
                         ? stock.change >= 2.0 ? "bg-[#00a854] text-white border-emerald-400/40" : "bg-[#108548] text-white border-emerald-500/30"
                         : "bg-[#a31d27] text-white border-rose-500/30",
                       stock.marketCap > 1000000000000 ? "col-span-2 row-span-2" : "col-span-1"
                     )}
                   >
-                    <span className="font-mono font-black text-xs">{stock.ticker}</span>
-                    <span className="font-mono font-bold text-[10px]">
+                    <motion.span 
+                      layoutId={`finviz-ticker-${stock.ticker}`}
+                      className="font-mono font-black text-xs"
+                    >
+                      {stock.ticker}
+                    </motion.span>
+                    <motion.span 
+                      layoutId={`finviz-change-${stock.ticker}`}
+                      className="font-mono font-bold text-[10px]"
+                    >
                       {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(1)}%
-                    </span>
-                  </div>
+                    </motion.span>
+                  </motion.div>
                 );
               })}
             </div>
@@ -296,19 +325,45 @@ export const FinvizHome: React.FC<FinvizHomeProps> = ({
                     <tr 
                       key={stock.ticker}
                       onClick={() => onSelectTicker(stock.ticker)}
-                      className="hover:bg-zinc-900/60 cursor-pointer"
+                      className="hover:bg-zinc-900/60 cursor-pointer group"
                     >
-                      <td className="py-2 font-bold text-emerald-400">{stock.ticker}</td>
-                      <td className="py-2 text-zinc-300 truncate max-w-[110px]">{stock.name}</td>
-                      <td className="py-2 text-right text-zinc-100 font-bold">${stock.price.toFixed(2)}</td>
+                      <td className="py-2 font-bold text-emerald-400">
+                        <motion.span 
+                          layoutId={`finviz-ticker-${stock.ticker}`}
+                          className="inline-block"
+                        >
+                          {stock.ticker}
+                        </motion.span>
+                      </td>
+                      <td className="py-2 text-zinc-300 truncate max-w-[110px]">
+                        <motion.span 
+                          layoutId={`finviz-name-${stock.ticker}`}
+                          className="inline-block truncate"
+                        >
+                          {stock.name}
+                        </motion.span>
+                      </td>
+                      <td className="py-2 text-right text-zinc-100 font-bold">
+                        <motion.span 
+                          layoutId={`finviz-price-${stock.ticker}`}
+                          className="inline-block"
+                        >
+                          ${stock.price.toFixed(2)}
+                        </motion.span>
+                      </td>
                       <td className={cn(
                         "py-2 text-right font-bold",
                         stock.change >= 0 ? "text-emerald-400" : "text-rose-400"
                       )}>
-                        {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%
+                        <motion.span 
+                          layoutId={`finviz-change-${stock.ticker}`}
+                          className="inline-block"
+                        >
+                          {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%
+                        </motion.span>
                       </td>
                       <td className="py-2 text-right">
-                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30 group-hover:bg-emerald-500/20 transition-colors">
                           PROJ
                         </span>
                       </td>
