@@ -1,27 +1,39 @@
 {
-  "name": "Quant Trade",
+  "id": "/",
+  "name": "QuantTrade Pro - Quantitative Trading & Analysis",
   "short_name": "QuantTrade",
-  "description": "Professional quantitative trading and market analysis platform.",
+  "description": "Institutional-grade quantitative trading platform with Monte Carlo forecasting, Fourier cycle filtering, and live market intelligence.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#09090b",
   "theme_color": "#10b981",
+  "categories": ["finance", "business", "productivity"],
   "icons": [
-    {
-      "src": "/logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
     {
       "src": "/logo-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/logo-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ]
 }

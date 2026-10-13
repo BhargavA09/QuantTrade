@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -15,7 +15,12 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Flame,
-  ArrowUpDown
+  ArrowUpDown,
+  Users,
+  Coins,
+  Radio,
+  Play,
+  Pause
 } from 'lucide-react';
 import { FinvizTickerTape } from './FinvizTickerTape';
 import { FinvizHome } from './FinvizHome';
@@ -24,11 +29,14 @@ import { FinvizMap } from './FinvizMap';
 import { FinvizGroups } from './FinvizGroups';
 import { FinvizFutures } from './FinvizFutures';
 import { FinvizForex } from './FinvizForex';
+import { FinvizInsiders } from './FinvizInsiders';
+import { FinvizCrypto } from './FinvizCrypto';
 import { FinvizChartWithProjections } from './FinvizChartWithProjections';
 import { FINVIZ_NEWS, FINVIZ_STOCKS } from '../../data/finvizData';
+import { subscribeFinvizStream, StreamEvent } from '../../services/api/finvizService';
 import { cn } from '../../utils/cn';
 
-export type FinvizTab = 'home' | 'news' | 'screener' | 'map' | 'groups' | 'futures' | 'forex' | 'chart';
+export type FinvizTab = 'home' | 'news' | 'screener' | 'map' | 'groups' | 'futures' | 'forex' | 'insiders' | 'crypto' | 'chart';
 
 interface FinvizDashboardProps {
   initialTicker?: string;
@@ -54,6 +62,41 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [suggestions, setSuggestions] = useState<typeof FINVIZ_STOCKS>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Real-time live streaming state from Python backend
+  const [streamActive, setStreamActive] = useState<boolean>(true);
+  const [streamConnected, setStreamConnected] = useState<boolean>(false);
+  const [tickCount, setTickCount] = useState<number>(0);
+  const [lastTick, setLastTick] = useState<{ ticker: string; price: number; changePercent: number } | null>(null);
+
+  // Subscribe to Python Server-Sent Events (SSE) Live Stream
+  useEffect(() => {
+    if (!streamActive) {
+      setStreamConnected(false);
+      return;
+    }
+
+    const unsubscribe = subscribeFinvizStream(
+      (event: StreamEvent) => {
+        setStreamConnected(true);
+        if (event.type === 'PRICE_TICK' && event.ticker) {
+          setTickCount(c => c + 1);
+          setLastTick({
+            ticker: event.ticker,
+            price: event.price || 0,
+            changePercent: event.changePercent || 0
+          });
+        }
+      },
+      (err) => {
+        setStreamConnected(false);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [streamActive]);
 
   const handleSelectTicker = (ticker: string) => {
     const upper = ticker.toUpperCase();

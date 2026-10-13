@@ -46,6 +46,7 @@ try:
     from supply_chain import SupplyChainEngine
     from options_pricing import BlackScholesEngine
     from backtest_engine import BacktestEngine
+    from finviz_engine import finviz_engine
 except ImportError:
     # If run directly from backend folder
     sys.path.insert(0, os.path.join(BASE_DIR, "python"))
@@ -54,6 +55,7 @@ except ImportError:
     from supply_chain import SupplyChainEngine
     from options_pricing import BlackScholesEngine
     from backtest_engine import BacktestEngine
+    from finviz_engine import finviz_engine
 
 # Baseline Market Prices for instant ultra-low latency response
 BASELINE_MARKET_PRICES = {
@@ -255,9 +257,87 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
                     "black_scholes_greeks",
                     "supply_chain_telemetry",
                     "autonomous_news_scanner",
-                    "event_driven_backtester"
+                    "event_driven_backtester",
+                    "finviz_quant_live_stream"
                 ]
             })
+
+        # -----------------------------------------------------------------
+        # Finviz.com Comprehensive Python Backend Suite & Live Streaming
+        # -----------------------------------------------------------------
+        # Finviz Live Stream (Server-Sent Events)
+        if path in ["/api/finviz/stream", "/finviz/stream"]:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                # Send initial full market snapshot
+                init_msg = json.dumps({
+                    "type": "SNAPSHOT",
+                    "data": finviz_engine.get_overview(),
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                })
+                self.wfile.write(f"data: {init_msg}\n\n".encode("utf-8"))
+                self.wfile.flush()
+
+                # Stream continuous ticks and live market pulses
+                for _ in range(400):
+                    time.sleep(1.2)
+                    tick = finviz_engine.generate_stream_tick()
+                    msg = json.dumps(tick)
+                    self.wfile.write(f"data: {msg}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, Exception):
+                pass
+            return
+
+        # Finviz Overview & Live Signals
+        if path in ["/api/finviz/overview", "/api/finviz/home"]:
+            return self._send_json(finviz_engine.get_overview())
+
+        # Finviz Screener with Multi-Parameter Quantitative Filters
+        if path in ["/api/finviz/screener"]:
+            return self._send_json(finviz_engine.get_screener(query))
+
+        # Finviz Maps / Hierarchical Treemaps (S&P 500, World, Crypto)
+        if path in ["/api/finviz/map", "/api/finviz/treemap"]:
+            universe = query.get("universe", ["sp500"])[0]
+            timeframe = query.get("timeframe", ["1D"])[0]
+            return self._send_json(finviz_engine.get_treemap(universe, timeframe))
+
+        # Finviz Groups & Sector Analysis
+        if path in ["/api/finviz/groups", "/api/finviz/sectors"]:
+            timeframe = query.get("timeframe", ["1D"])[0]
+            return self._send_json(finviz_engine.get_groups(timeframe))
+
+        # Finviz SEC Form 4 Insider Trading
+        if path in ["/api/finviz/insiders", "/api/finviz/insider-trading"]:
+            return self._send_json(finviz_engine.get_insiders())
+
+        # Finviz Financial News Wire & Live RSS
+        if path in ["/api/finviz/news"]:
+            category = query.get("category", ["all"])[0]
+            return self._send_json({"news": finviz_engine.get_news(category)})
+
+        # Finviz Futures Matrix
+        if path in ["/api/finviz/futures"]:
+            return self._send_json(finviz_engine.get_futures())
+
+        # Finviz Forex Matrix
+        if path in ["/api/finviz/forex"]:
+            return self._send_json(finviz_engine.get_forex())
+
+        # Finviz Crypto Market
+        if path in ["/api/finviz/crypto"]:
+            return self._send_json(finviz_engine.get_crypto())
+
+        # Finviz Individual Stock 6x12 Metric Fundamental & Valuation Matrix
+        if path.startswith("/api/finviz/ticker/"):
+            ticker = path.split("/")[-1].upper()
+            return self._send_json(finviz_engine.get_ticker_detail(ticker))
 
         # 2. Stock Quote
         if path.startswith("/api/stock/quote/"):
