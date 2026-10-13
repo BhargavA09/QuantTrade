@@ -3698,7 +3698,13 @@ export default function App() {
                     <div className="space-y-8">
                       {/* Live Shipping Map */}
                       <div>
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Live Simulation Shipping Map</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Open API Global Supply Chain & Maritime Fleet Intelligence</h3>
+                          <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                            OpenStreetMap & OpenSeaMap Integrated
+                          </span>
+                        </div>
                         <ShippingMap 
                           lanes={globalState?.logistics?.shipping as any} 
                           vessels={globalState?.logistics?.ships as any} 

@@ -282,6 +282,9 @@ export interface GlobalNewsEvent {
     volatilityMultiplier: number;
     horizonDays: number;
     recoveryHalfLifeDays: number;
+    meanReversionSpeed?: number;
+    liquidityAbsorption?: number;
+    jumpIntensity?: number;
   };
   connectedHub: {
     name: string;

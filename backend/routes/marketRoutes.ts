@@ -14,7 +14,7 @@ const sentimentAnalyzer = new Sentiment();
 export const marketRouter = Router();
 
 // 1. Global Macro State & Logistics Simulation
-marketRouter.get("/globalstate", async (req, res) => {
+marketRouter.get(["/globalstate", "/global-state"], async (req, res) => {
   try {
     const indices = ['^GSPC', '^IXIC', '^VIX', '^TNX'];
     const indexData = await Promise.all(
@@ -43,14 +43,19 @@ marketRouter.get("/globalstate", async (req, res) => {
       },
       logistics: { 
         shipping: [
-          { lane: "Suez Canal", status: "Fluid", delayDays: 0.5, congestionLevel: 0.2, volume: 1.2 },
-          { lane: "Panama Canal", status: "Restricted", delayDays: 4.2, congestionLevel: 0.8, volume: 0.7 },
-          { lane: "Malacca Strait", status: "Congested", delayDays: 1.5, congestionLevel: 0.5, volume: 1.5 }
+          { lane: "Suez Canal", status: "Fluid", delayDays: 0.8, congestionLevel: 28, volume: 1.2, lat: 30.5852, lng: 32.2654 },
+          { lane: "Panama Canal", status: "Restricted", delayDays: 4.2, congestionLevel: 78, volume: 0.7, lat: 9.1012, lng: -79.5932 },
+          { lane: "Strait of Malacca", status: "Heavy Traffic", delayDays: 1.5, congestionLevel: 62, volume: 1.5, lat: 2.2000, lng: 102.2000 },
+          { lane: "Strait of Hormuz", status: "Elevated Risk", delayDays: 1.2, congestionLevel: 54, volume: 1.4, lat: 26.5667, lng: 56.2500 },
+          { lane: "Bab-el-Mandeb", status: "High Risk Diverted", delayDays: 9.5, congestionLevel: 88, volume: 0.4, lat: 12.5833, lng: 43.3333 },
+          { lane: "English Channel", status: "Fluid", delayDays: 0.4, congestionLevel: 32, volume: 1.1, lat: 50.4000, lng: -0.8000 }
         ], 
         ships: [
-          { name: "Ever Given II", type: "Container", origin: "Shanghai", destination: "Rotterdam", status: "In Transit", progress: 65, lat: 12.5, lng: 45.2 },
-          { name: "Ocean Titan", type: "Tanker", origin: "Ras Tanura", destination: "Houston", status: "In Transit", progress: 42, lat: 25.1, lng: -60.5 },
-          { name: "Global Bulk", type: "Bulk Carrier", origin: "Santos", destination: "Qingdao", status: "In Transit", progress: 88, lat: -15.2, lng: 115.4 }
+          { name: "Ever Given II", type: "Container", origin: "Shanghai", destination: "Rotterdam", status: "In Transit", progress: 65, lat: 12.5, lng: 45.2, cargo: "Consumer Electronics & Auto Parts" },
+          { name: "Ocean Titan", type: "Tanker", origin: "Ras Tanura", destination: "Houston", status: "In Transit", progress: 42, lat: 25.1, lng: -60.5, cargo: "Saudi Arab Light Crude (2M Bbls)" },
+          { name: "Global Bulk", type: "Bulk Carrier", origin: "Santos", destination: "Qingdao", status: "In Transit", progress: 88, lat: -15.2, lng: 115.4, cargo: "Brazilian Soybeans & Iron Ore" },
+          { name: "Pacific Pioneer", type: "Gas Carrier", origin: "Gladstone", destination: "Tokyo Bay", status: "In Transit", progress: 72, lat: 18.4, lng: 132.8, cargo: "Liquefied Natural Gas (LNG)" },
+          { name: "Nordic Voyager", type: "Container", origin: "Hamburg", destination: "New York", status: "In Transit", progress: 51, lat: 46.2, lng: -38.4, cargo: "Industrial Machinery & Chem" }
         ]
       },
       resources: { 
@@ -599,7 +604,10 @@ marketRouter.post("/global-news-scan/analyze", (req, res) => {
         shockedSlope: Number((0.02 + moveSign * 0.08).toFixed(3)),
         volatilityMultiplier: Number((1.1 + Math.abs(normalizedSentimentScore) * 0.5).toFixed(2)),
         horizonDays: 30,
-        recoveryHalfLifeDays: 14
+        recoveryHalfLifeDays: Math.abs(normalizedSentimentScore) > 0.6 ? 21 : 14,
+        meanReversionSpeed: Number((0.12 + (1 - Math.abs(normalizedSentimentScore)) * 0.08).toFixed(2)),
+        liquidityAbsorption: 0.72,
+        jumpIntensity: Number((0.10 + Math.abs(normalizedSentimentScore) * 0.15).toFixed(2))
       },
       connectedHub: hub
     };
@@ -613,5 +621,628 @@ marketRouter.post("/global-news-scan/analyze", (req, res) => {
   }
 });
 
+// 7. Global Supply Chain & Maritime Intelligence Open API
+marketRouter.get("/supply-chain", async (req, res) => {
+  try {
+    const timestamp = new Date().toISOString();
 
+    const chokepoints = [
+      {
+        id: "suez",
+        name: "Suez Canal",
+        lat: 30.5852,
+        lng: 32.2654,
+        status: "Fluid",
+        congestionLevel: 28,
+        delayDays: 0.8,
+        dailyVessels: 48,
+        keyCommodities: ["Crude Oil", "Refined Products", "Consumer Goods", "Automotive"],
+        securityRisk: "Elevated",
+        divertedTrafficPct: 42,
+        description: "Vital 193 km waterway linking Mediterranean & Red Sea. Elevated security risks in southern approaches have diverted significant Asia-Europe container traffic around Africa."
+      },
+      {
+        id: "panama",
+        name: "Panama Canal (Miraflores)",
+        lat: 9.1012,
+        lng: -79.5932,
+        status: "Restricted",
+        congestionLevel: 78,
+        delayDays: 4.2,
+        dailyVessels: 29,
+        keyCommodities: ["LNG", "LPG", "Grains", "Container Freight"],
+        securityRisk: "Low",
+        divertedTrafficPct: 18,
+        description: "Freshwater lock-based transits rebounding after historic drought restrictions. Neo-panamax daily reservation slots improving to 32/day."
+      },
+      {
+        id: "malacca",
+        name: "Strait of Malacca",
+        lat: 2.2000,
+        lng: 102.2000,
+        status: "Heavy Traffic",
+        congestionLevel: 62,
+        delayDays: 1.5,
+        dailyVessels: 215,
+        keyCommodities: ["Crude Oil", "Semiconductors", "Manufactured Goods", "Palm Oil"],
+        securityRisk: "Low",
+        divertedTrafficPct: 0,
+        description: "Primary maritime highway connecting Indian Ocean and Pacific. Accounts for ~25% of all global seaborne trade and 80% of China's crude imports."
+      },
+      {
+        id: "hormuz",
+        name: "Strait of Hormuz",
+        lat: 26.5667,
+        lng: 56.2500,
+        status: "Elevated Risk",
+        congestionLevel: 54,
+        delayDays: 1.2,
+        dailyVessels: 110,
+        keyCommodities: ["Crude Oil", "Condensate", "LNG", "Chemicals"],
+        securityRisk: "High",
+        divertedTrafficPct: 5,
+        description: "The world's most critical oil transit chokepoint (~21 million barrels/day, ~20% of global petroleum consumption). Continuous electronic surveillance and geopolitical tension."
+      },
+      {
+        id: "bab_el_mandeb",
+        name: "Bab-el-Mandeb Strait",
+        lat: 12.5833,
+        lng: 43.3333,
+        status: "High Risk Diverted",
+        congestionLevel: 88,
+        delayDays: 9.5,
+        dailyVessels: 22,
+        keyCommodities: ["Petroleum", "Fertilizers", "Dry Bulk"],
+        securityRisk: "Severe",
+        divertedTrafficPct: 68,
+        description: "Narrow gate between Horn of Africa and Arabian Peninsula. Over 65% of container tonnage diverted via Cape of Good Hope, adding 10-14 days and $1.5M fuel per round-trip voyage."
+      },
+      {
+        id: "english_channel",
+        name: "English Channel (Dover Strait)",
+        lat: 50.4000,
+        lng: -0.8000,
+        status: "Fluid",
+        congestionLevel: 32,
+        delayDays: 0.4,
+        dailyVessels: 420,
+        keyCommodities: ["Machinery", "Agri-Foods", "Pharmaceuticals", "Vehicles"],
+        securityRisk: "Low",
+        divertedTrafficPct: 0,
+        description: "Busiest shipping lane in the world by daily vessel count. Strict traffic separation scheme operating normally."
+      },
+      {
+        id: "gibraltar",
+        name: "Strait of Gibraltar",
+        lat: 35.9667,
+        lng: -5.6000,
+        status: "Fluid",
+        congestionLevel: 25,
+        delayDays: 0.3,
+        dailyVessels: 290,
+        keyCommodities: ["Crude Oil", "Liquefied Gas", "Container Freight"],
+        securityRisk: "Low",
+        divertedTrafficPct: 0,
+        description: "Atlantic entrance to the Mediterranean Sea. High-speed container services and bunker operations running at full capacity."
+      },
+      {
+        id: "bosporus",
+        name: "Bosporus Strait",
+        lat: 41.1167,
+        lng: 29.0833,
+        status: "Moderate Delay",
+        congestionLevel: 58,
+        delayDays: 2.1,
+        dailyVessels: 125,
+        keyCommodities: ["Wheat", "Sunseed Oil", "Black Sea Crude", "Steel"],
+        securityRisk: "Moderate",
+        divertedTrafficPct: 12,
+        description: "Strategic link between Black Sea and Sea of Marmara. Pilotage queues for bulk grain carriers and Russian refined oil tankers."
+      },
+      {
+        id: "cape_good_hope",
+        name: "Cape of Good Hope Route",
+        lat: -34.3568,
+        lng: 18.4740,
+        status: "Surge Volume",
+        congestionLevel: 74,
+        delayDays: 0.0,
+        dailyVessels: 180,
+        keyCommodities: ["Asia-Europe Container Fleets", "VLCC Crude"],
+        securityRisk: "Low (Weather Hazards)",
+        divertedTrafficPct: 100,
+        description: "Primary detour route around South Africa for vessels avoiding the southern Red Sea. Deep water bunker ports at Durban, Port Louis, and Walvis Bay at capacity."
+      },
+      {
+        id: "taiwan_strait",
+        name: "Taiwan Strait",
+        lat: 24.5000,
+        lng: 119.8000,
+        status: "High Traffic",
+        congestionLevel: 65,
+        delayDays: 0.8,
+        dailyVessels: 340,
+        keyCommodities: ["Advanced Semiconductors", "Electronics", "Solar Panels", "LNG"],
+        securityRisk: "Moderate",
+        divertedTrafficPct: 0,
+        description: "Critical maritime corridor for 88% of the world's largest container ships and high-end semiconductor supply chain shipments."
+      }
+    ];
 
+    const ports = [
+      {
+        id: "port_shanghai",
+        name: "Port of Shanghai (Yangshan Deepwater)",
+        code: "CNSHA",
+        country: "China",
+        lat: 31.2304,
+        lng: 121.4737,
+        throughputTeu: "49.1M TEU/yr",
+        berthWaitHours: 18,
+        congestionLevel: 42,
+        status: "Optimal",
+        topExports: ["Consumer Electronics", "EVs", "Solar Modules"],
+        topImports: ["Iron Ore", "Semiconductors", "Crude Oil"]
+      },
+      {
+        id: "port_singapore",
+        name: "Port of Singapore (Tuas Mega Port)",
+        code: "SGSIN",
+        country: "Singapore",
+        lat: 1.2902,
+        lng: 103.8519,
+        throughputTeu: "39.0M TEU/yr",
+        berthWaitHours: 24,
+        congestionLevel: 58,
+        status: "Heavy Transshipment",
+        topExports: ["Refined Petroleum", "Electronics", "Chemicals"],
+        topImports: ["Crude Oil", "Machinery", "Food Stuffs"]
+      },
+      {
+        id: "port_rotterdam",
+        name: "Port of Rotterdam (Maasvlakte II)",
+        code: "NLRTM",
+        country: "Netherlands",
+        lat: 51.9244,
+        lng: 4.4777,
+        throughputTeu: "14.5M TEU/yr",
+        berthWaitHours: 36,
+        congestionLevel: 64,
+        status: "Delay from Red Sea Detours",
+        topExports: ["Chemicals", "Refined Fuels", "Capital Goods"],
+        topImports: ["Crude Oil", "LNG", "Consumer Goods from Asia"]
+      },
+      {
+        id: "port_los_angeles",
+        name: "Port of Los Angeles / Long Beach",
+        code: "USLAX",
+        country: "United States",
+        lat: 33.7431,
+        lng: -118.2673,
+        throughputTeu: "19.2M TEU/yr",
+        berthWaitHours: 22,
+        congestionLevel: 48,
+        status: "Fluid Inflow",
+        topExports: ["Wastepaper", "Soybeans", "Chemicals"],
+        topImports: ["Electronics", "Apparel", "Auto Parts", "Toys"]
+      },
+      {
+        id: "port_jebel_ali",
+        name: "Jebel Ali Port (Dubai)",
+        code: "AEJEA",
+        country: "UAE",
+        lat: 25.0113,
+        lng: 55.0617,
+        throughputTeu: "14.0M TEU/yr",
+        berthWaitHours: 16,
+        congestionLevel: 38,
+        status: "High Efficiency",
+        topExports: ["Aluminum", "Polyethylene", "Re-exports"],
+        topImports: ["Machinery", "Vehicles", "Gold", "Food"]
+      },
+      {
+        id: "port_busan",
+        name: "Port of Busan",
+        code: "KRPUS",
+        country: "South Korea",
+        lat: 35.1028,
+        lng: 129.0403,
+        throughputTeu: "22.8M TEU/yr",
+        berthWaitHours: 19,
+        congestionLevel: 45,
+        status: "Stable",
+        topExports: ["Automobiles", "Memory Chips", "Steel"],
+        topImports: ["Petroleum", "Raw Materials", "Components"]
+      },
+      {
+        id: "port_houston",
+        name: "Port of Houston (Bayport / Barbours Cut)",
+        code: "USHOU",
+        country: "United States",
+        lat: 29.7604,
+        lng: -95.3698,
+        throughputTeu: "3.8M TEU/yr + Energy",
+        berthWaitHours: 28,
+        congestionLevel: 52,
+        status: "Energy Export Surge",
+        topExports: ["WTI Crude", "LNG", "Resins & Plastics"],
+        topImports: ["Steel", "Wind Turbines", "Machinery"]
+      },
+      {
+        id: "port_santos",
+        name: "Port of Santos",
+        code: "BRSSZ",
+        country: "Brazil",
+        lat: -23.9618,
+        lng: -46.3322,
+        throughputTeu: "4.8M TEU/yr + Ag Bulk",
+        berthWaitHours: 54,
+        congestionLevel: 72,
+        status: "Agricultural Peak Queue",
+        topExports: ["Soybeans", "Sugar", "Coffee", "Iron Ore"],
+        topImports: ["Fertilizers", "Auto Components", "Electronics"]
+      }
+    ];
+
+    const vessels = [
+      {
+        id: "vsl-001",
+        name: "Ever Given II",
+        mmsi: "353136000",
+        type: "Container",
+        flag: "Panama",
+        origin: "Shanghai (CNSHA)",
+        destination: "Rotterdam (NLRTM)",
+        lat: 12.5,
+        lng: 45.2,
+        speedKnots: 18.4,
+        heading: 265,
+        progress: 68,
+        status: "In Transit",
+        cargo: "Consumer Electronics & Lithium Battery Modules",
+        cargoValueUsd: "$240M",
+        eta: "5 days",
+        draftMeters: 15.8,
+        routeCode: "ASIA-EU-SOUTH",
+        waypoints: [
+          [31.23, 121.47],
+          [22.28, 114.16],
+          [1.29, 103.85],
+          [5.95, 80.53],
+          [12.5, 45.2],
+          [-34.35, 18.47],
+          [35.96, -5.60],
+          [51.92, 4.47]
+        ]
+      },
+      {
+        id: "vsl-002",
+        name: "Ocean Titan (VLCC)",
+        mmsi: "538006124",
+        type: "Tanker",
+        flag: "Liberia",
+        origin: "Ras Tanura",
+        destination: "Houston (USHOU)",
+        lat: 25.1,
+        lng: -60.5,
+        speedKnots: 13.8,
+        heading: 285,
+        progress: 74,
+        status: "In Transit",
+        cargo: "Saudi Arab Light Crude (2,000,000 bbls)",
+        cargoValueUsd: "$162M",
+        eta: "4 days",
+        draftMeters: 21.2,
+        routeCode: "MIDEAST-US-GULF",
+        waypoints: [
+          [26.65, 50.15],
+          [26.56, 56.25],
+          [-34.35, 18.47],
+          [25.1, -60.5],
+          [29.76, -95.36]
+        ]
+      },
+      {
+        id: "vsl-003",
+        name: "Global Bulk Pioneer (Capesize)",
+        mmsi: "372991000",
+        type: "Bulk Carrier",
+        flag: "Marshall Islands",
+        origin: "Santos (BRSSZ)",
+        destination: "Qingdao (CNTAO)",
+        lat: -15.2,
+        lng: 115.4,
+        speedKnots: 11.2,
+        heading: 38,
+        progress: 88,
+        status: "In Transit",
+        cargo: "Brazilian Soybeans (180,000 MT)",
+        cargoValueUsd: "$98M",
+        eta: "2 days",
+        draftMeters: 18.4,
+        routeCode: "BR-CN-GRAIN",
+        waypoints: [
+          [-23.96, -46.33],
+          [-34.35, 18.47],
+          [-15.2, 115.4],
+          [2.20, 102.20],
+          [36.06, 120.38]
+        ]
+      },
+      {
+        id: "vsl-004",
+        name: "Pacific Pioneer LNG",
+        mmsi: "431005882",
+        type: "Gas Carrier",
+        flag: "Japan",
+        origin: "Gladstone (AUGLA)",
+        destination: "Tokyo Bay (JPTYO)",
+        lat: 18.4,
+        lng: 132.8,
+        speedKnots: 17.5,
+        heading: 10,
+        progress: 72,
+        status: "In Transit",
+        cargo: "Liquefied Natural Gas (174,000 cbm)",
+        cargoValueUsd: "$84M",
+        eta: "3 days",
+        draftMeters: 11.6,
+        routeCode: "AU-JP-LNG",
+        waypoints: [
+          [-23.84, 151.26],
+          [18.4, 132.8],
+          [35.65, 139.75]
+        ]
+      },
+      {
+        id: "vsl-005",
+        name: "Nordic Voyager (Neo-Panamax)",
+        mmsi: "219018440",
+        type: "Container",
+        flag: "Denmark",
+        origin: "Hamburg (DEHAM)",
+        destination: "New York (USNYC)",
+        lat: 46.2,
+        lng: -38.4,
+        speedKnots: 19.8,
+        heading: 250,
+        progress: 60,
+        status: "In Transit",
+        cargo: "Precision Machinery & Chemical Precursors",
+        cargoValueUsd: "$145M",
+        eta: "3 days",
+        draftMeters: 14.2,
+        routeCode: "EU-US-ATLANTIC",
+        waypoints: [
+          [53.55, 9.99],
+          [50.40, -0.80],
+          [46.2, -38.4],
+          [40.71, -74.00]
+        ]
+      },
+      {
+        id: "vsl-006",
+        name: "Cosco Harmony",
+        mmsi: "413348000",
+        type: "Container",
+        flag: "China",
+        origin: "Ningbo (CNNGB)",
+        destination: "Los Angeles (USLAX)",
+        lat: 32.8,
+        lng: -152.4,
+        speedKnots: 20.1,
+        heading: 85,
+        progress: 79,
+        status: "In Transit",
+        cargo: "High-Density Storage Servers & EV Motors",
+        cargoValueUsd: "$310M",
+        eta: "2 days",
+        draftMeters: 15.5,
+        routeCode: "PACIFIC-EXPRESS",
+        waypoints: [
+          [29.86, 121.54],
+          [32.8, -152.4],
+          [33.74, -118.26]
+        ]
+      },
+      {
+        id: "vsl-007",
+        name: "Stena Sunrise (Suezmax)",
+        mmsi: "311000912",
+        type: "Tanker",
+        flag: "Bahamas",
+        origin: "Corpus Christi",
+        destination: "Rotterdam (NLRTM)",
+        lat: 38.6,
+        lng: -22.4,
+        speedKnots: 14.2,
+        heading: 65,
+        progress: 62,
+        status: "In Transit",
+        cargo: "WTI Midland Sweet Crude (1,000,000 bbls)",
+        cargoValueUsd: "$81M",
+        eta: "4 days",
+        draftMeters: 16.0,
+        routeCode: "US-EU-CRUDE",
+        waypoints: [
+          [27.80, -97.39],
+          [38.6, -22.4],
+          [51.92, 4.47]
+        ]
+      },
+      {
+        id: "vsl-008",
+        name: "Auto Eco Carrier (PCTC)",
+        mmsi: "258793000",
+        type: "Ro-Ro",
+        flag: "Norway",
+        origin: "Busan (KRPUS)",
+        destination: "Bremerhaven (DEBRV)",
+        lat: -12.1,
+        lng: 28.5,
+        speedKnots: 16.4,
+        heading: 320,
+        progress: 55,
+        status: "In Transit",
+        cargo: "7,500 Electric Vehicles",
+        cargoValueUsd: "$290M",
+        eta: "8 days",
+        draftMeters: 9.8,
+        routeCode: "ASIA-EU-CAPE",
+        waypoints: [
+          [35.10, 129.04],
+          [1.29, 103.85],
+          [-34.35, 18.47],
+          [-12.1, 28.5],
+          [53.54, 8.58]
+        ]
+      }
+    ];
+
+    const tradeCorridors = [
+      {
+        id: "asia-europe-suez",
+        name: "Asia - Europe Maritime Highway (via Suez)",
+        volumeSharePct: 24,
+        riskLevel: "High (Red Sea Vulnerability)",
+        avgTransitDays: 28,
+        activeVessels: 380,
+        waypoints: [
+          [31.23, 121.47],
+          [1.29, 103.85],
+          [12.58, 43.33],
+          [30.58, 32.26],
+          [35.96, -5.60],
+          [51.92, 4.47]
+        ]
+      },
+      {
+        id: "asia-europe-cape",
+        name: "Asia - Europe Diversion Highway (via Cape)",
+        volumeSharePct: 18,
+        riskLevel: "Low (Extended Lead Times)",
+        avgTransitDays: 41,
+        activeVessels: 450,
+        waypoints: [
+          [31.23, 121.47],
+          [1.29, 103.85],
+          [-34.35, 18.47],
+          [35.96, -5.60],
+          [51.92, 4.47]
+        ]
+      },
+      {
+        id: "transpacific-express",
+        name: "Trans-Pacific Mega Corridor",
+        volumeSharePct: 32,
+        riskLevel: "Moderate (Port Labor / Weather)",
+        avgTransitDays: 14,
+        activeVessels: 620,
+        waypoints: [
+          [31.23, 121.47],
+          [32.8, -152.4],
+          [33.74, -118.26]
+        ]
+      },
+      {
+        id: "mideast-asia-energy",
+        name: "Middle East - East Asia Energy Lifeline",
+        volumeSharePct: 22,
+        riskLevel: "High (Hormuz Chokepoint)",
+        avgTransitDays: 18,
+        activeVessels: 290,
+        waypoints: [
+          [26.65, 50.15],
+          [26.56, 56.25],
+          [2.20, 102.20],
+          [31.23, 121.47],
+          [35.65, 139.75]
+        ]
+      },
+      {
+        id: "transatlantic-shuttle",
+        name: "Trans-Atlantic Industrial Shuttle",
+        volumeSharePct: 14,
+        riskLevel: "Low",
+        avgTransitDays: 9,
+        activeVessels: 210,
+        waypoints: [
+          [51.92, 4.47],
+          [50.40, -0.80],
+          [40.71, -74.00],
+          [29.76, -95.36]
+        ]
+      }
+    ];
+
+    const disruptionIndices = {
+      balticDryIndex: {
+        value: 1842,
+        changePct: 3.4,
+        trend: "up",
+        sentiment: "Bullish Dry Bulk Freight"
+      },
+      scfiContainerSpotIndex: {
+        value: 2210, // USD/FEU
+        changePct: 6.8,
+        trend: "up",
+        sentiment: "Supply Contraction Pressure"
+      },
+      globalSupplyChainPressureIndex: {
+        value: 0.38, // std dev above historical average
+        status: "Moderate Tension",
+        historicalNormal: 0.00
+      },
+      redSeaReroutingRate: {
+        pctOfAsiaEuTrafficDiverted: 68.4,
+        addedCostPerFeu: 1450,
+        co2EmissionsDeltaPct: 35.0
+      },
+      fuelBunkerIfo380: {
+        pricePerTonUsd: 524.50,
+        trend: "stable"
+      }
+    };
+
+    const correlatedEquities = [
+      { ticker: "ZIM", name: "ZIM Integrated Shipping", betaToFreight: 2.4, exposure: "Global Spot Container Freight Rates" },
+      { ticker: "FRO", name: "Frontline Ltd.", betaToFreight: 1.8, exposure: "VLCC & Suezmax Crude Tanker Day-Rates" },
+      { ticker: "STNG", name: "Scorpio Tankers", betaToFreight: 1.6, exposure: "Refined Clean Product Tankers" },
+      { ticker: "MATX", name: "Matson Inc.", betaToFreight: 1.1, exposure: "Transpacific Expedited Lifeline" },
+      { ticker: "BDRY", name: "Breakwave Dry Bulk ETF", betaToFreight: 3.1, exposure: "Direct Baltic Dry Index Futures" },
+      { ticker: "DAC", name: "Danaos Corp", betaToFreight: 1.3, exposure: "Containership Charter Tonnage" }
+    ];
+
+    res.json({
+      success: true,
+      openApi: {
+        version: "v2.6-open",
+        provider: "OpenStreetMap & OpenSeaMap Telemetry",
+        tileServices: [
+          { id: "osm_dark", name: "Carto Dark Matter", url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" },
+          { id: "osm_standard", name: "OpenStreetMap Standard", url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" },
+          { id: "esri_sat", name: "Esri Satellite Imagery", url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" },
+          { id: "openseamap_overlay", name: "OpenSeaMap Marine Aids", url: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" }
+        ],
+        geocodingEndpoint: "https://nominatim.openstreetmap.org/search?format=json&q=",
+        license: "ODbL (Open Database License) & Open Data",
+        timestamp
+      },
+      summary: {
+        activeVesselsTracked: vessels.length,
+        chokepointsMonitored: chokepoints.length,
+        megaPortsIndexed: ports.length,
+        averageChokepointDelayDays: Number((chokepoints.reduce((acc, c) => acc + c.delayDays, 0) / chokepoints.length).toFixed(1)),
+        globalCongestionScore: Number((chokepoints.reduce((acc, c) => acc + c.congestionLevel, 0) / chokepoints.length).toFixed(0))
+      },
+      chokepoints,
+      ports,
+      vessels,
+      tradeCorridors,
+      disruptionIndices,
+      correlatedEquities
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to load supply chain open API" });
+  }
+});

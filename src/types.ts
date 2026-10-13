@@ -138,19 +138,22 @@ export interface GlobalState {
     importExport?: { us: number; china: number; eu: number, india: number, japan: number, brazil: number };
   };
   logistics: { 
-    shipping: { lane: string; status: string; delayDays: number; congestionLevel?: number; volume?: number }[]; 
+    shipping: { lane: string; status: string; delayDays: number; congestionLevel?: number; volume?: number; lat?: number; lng?: number }[]; 
     bottlenecks: string[];
     ships?: { 
       name: string; 
-      type: 'Container' | 'Tanker' | 'Bulk Carrier' | 'Gas Carrier'; 
-      capacity: string; 
+      type: string; 
+      capacity?: string; 
       origin: string; 
       destination: string; 
-      cargo: string; 
-      status: 'In Transit' | 'Docked' | 'Delayed' | 'Under Repair';
+      cargo?: string; 
+      status: string;
       progress: number;
       lat?: number;
       lng?: number;
+      speedKnots?: number;
+      heading?: number;
+      eta?: string;
     }[];
   };
   resources: { 

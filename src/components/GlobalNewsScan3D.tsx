@@ -44,7 +44,14 @@ import {
   Sliders,
   DollarSign,
   Box,
-  Share2
+  Share2,
+  ChevronDown,
+  ChevronUp,
+  Gauge,
+  Percent,
+  Settings2,
+  RotateCcw,
+  Info
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { StockData } from '../types';
@@ -55,6 +62,13 @@ import {
   GlobalNewsEvent,
   GlobalNewsScanResponse
 } from '../services/api';
+import {
+  calculateAdvancedProjection,
+  ProjectionModelType,
+  ProjectionEngineResult,
+  ProjectionDataPoint,
+  ProjectionMetrics
+} from '../utils/projectionEngine';
 
 export interface GlobalNewsScan3DProps {
   data?: StockData;
@@ -105,14 +119,34 @@ export default function GlobalNewsScan3D({
   const [customHeadline, setCustomHeadline] = useState<string>('');
   const [isAnalyzingCustom, setIsAnalyzingCustom] = useState<boolean>(false);
 
-  // Drag interaction refs for 3D rotation
+  // Drag interaction and smooth camera glide refs
   const [globeYaw, setGlobeYaw] = useState<number>(-120);
   const [globePitch, setGlobePitch] = useState<number>(20);
+  const curYawRef = useRef<number>(-120);
+  const curPitchRef = useRef<number>(20);
+  const targetYawRef = useRef<number>(-120);
+  const targetPitchRef = useRef<number>(20);
+  const isGlidingRef = useRef<boolean>(false);
+  const dragVelocityRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const canvas2DRef = useRef<HTMLCanvasElement | null>(null);
   const threeMountRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef<boolean>(false);
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const animFrameRef = useRef<number | null>(null);
+
+  // Advanced Quantitative Projection Algorithm Controls
+  const [projectionModel, setProjectionModel] = useState<ProjectionModelType>('merton_jump_diffusion');
+  const [confidenceSigma, setConfidenceSigma] = useState<1 | 2 | 3>(2); // 1 = 68%, 2 = 95%, 3 = 99%
+  const [viewUnit, setViewUnit] = useState<'dollar' | 'percent'>('dollar');
+  const [isQuantTunerOpen, setIsQuantTunerOpen] = useState<boolean>(false);
+  const [quantParams, setQuantParams] = useState({
+    meanReversionSpeed: 0.15,
+    recoveryHalfLife: 14,
+    liquidityAbsorption: 0.70,
+    jumpIntensity: 0.12,
+    horizonDays: 30
+  });
 
   // Hovered node tooltip for Three.js raycasting
   const [hoveredEvent, setHoveredEvent] = useState<GlobalNewsEvent | null>(null);
@@ -158,13 +192,21 @@ export default function GlobalNewsScan3D({
     return newsEvents.find(e => e.id === selectedEventId) || newsEvents[0] || FALLBACK_NEWS_EVENTS[0];
   }, [newsEvents, selectedEventId]);
 
-  // When selected event changes, pivot globe to coordinate
+  // When selected event changes, smoothly glide 3D camera to coordinate
   useEffect(() => {
     if (selectedEvent) {
-      const targetYaw = -selectedEvent.lng;
-      const targetPitch = Math.max(-50, Math.min(50, selectedEvent.lat));
-      setGlobeYaw(targetYaw);
-      setGlobePitch(targetPitch);
+      targetYawRef.current = -selectedEvent.lng - 90;
+      targetPitchRef.current = Math.max(-50, Math.min(50, selectedEvent.lat));
+      isGlidingRef.current = true;
+      dragVelocityRef.current = { x: 0, y: 0 };
+
+      // Sync default half-life if event provides it
+      if (selectedEvent.projectionLineShift?.recoveryHalfLifeDays) {
+        setQuantParams(prev => ({
+          ...prev,
+          recoveryHalfLife: selectedEvent.projectionLineShift.recoveryHalfLifeDays
+        }));
+      }
     }
   }, [selectedEventId]);
 
@@ -452,19 +494,36 @@ export default function GlobalNewsScan3D({
       surfaceGroup.add(surfWire);
     }
 
-    // 6. Animation Render Loop & Orbit Controller
-    let curYaw = globeYaw;
-    let curPitch = globePitch;
-
+    // 6. Ultra-Smooth Animation Render Loop with Inertial Glide & Orbit Controller
     const renderLoop = () => {
       animFrameRef.current = requestAnimationFrame(renderLoop);
 
-      if (isAutoRotating && !isDraggingRef.current) {
-        curYaw = (curYaw + rotationSpeed) % 360;
+      if (isGlidingRef.current) {
+        // Smooth spherical glide to selected news epicenter with shortest circular path
+        let deltaYaw = ((targetYawRef.current - curYawRef.current + 180) % 360) - 180;
+        if (deltaYaw < -180) deltaYaw += 360;
+        curYawRef.current += deltaYaw * 0.075;
+        curPitchRef.current += (targetPitchRef.current - curPitchRef.current) * 0.075;
+
+        if (Math.abs(deltaYaw) < 0.15 && Math.abs(targetPitchRef.current - curPitchRef.current) < 0.15) {
+          isGlidingRef.current = false;
+        }
+      } else if (!isDraggingRef.current) {
+        // Inertial release momentum with friction decay
+        if (Math.abs(dragVelocityRef.current.x) > 0.01 || Math.abs(dragVelocityRef.current.y) > 0.01) {
+          curYawRef.current = (curYawRef.current + dragVelocityRef.current.x) % 360;
+          curPitchRef.current = Math.max(-65, Math.min(65, curPitchRef.current + dragVelocityRef.current.y));
+          dragVelocityRef.current.x *= 0.92;
+          dragVelocityRef.current.y *= 0.92;
+        } else if (isAutoRotating) {
+          curYawRef.current = (curYawRef.current + rotationSpeed) % 360;
+        }
       }
 
+      const curYaw = curYawRef.current;
+      const curPitch = curPitchRef.current;
+
       if (vizMode === 'three_globe') {
-        // Rotate globe according to yaw and pitch
         globeGroup.rotation.y = (curYaw * Math.PI) / 180;
         globeGroup.rotation.x = (curPitch * Math.PI) / 180;
         globeGroup.scale.set(globeZoom, globeZoom, globeZoom);
@@ -686,9 +745,11 @@ export default function GlobalNewsScan3D({
     };
   }, [vizMode, globeYaw, globePitch, globeZoom, isAutoRotating, rotationSpeed, newsEvents, selectedEventId, selectedEvent]);
 
-  // Mouse drag handlers for orbit
+  // Mouse drag handlers for orbit with kinetic velocity tracking
   const handleMouseDown = (e: React.MouseEvent) => {
     isDraggingRef.current = true;
+    isGlidingRef.current = false;
+    dragVelocityRef.current = { x: 0, y: 0 };
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
   };
 
@@ -698,8 +759,10 @@ export default function GlobalNewsScan3D({
     const deltaY = e.clientY - lastMousePosRef.current.y;
     lastMousePosRef.current = { x: e.clientX, y: e.clientY };
 
-    setGlobeYaw(prev => (prev + deltaX * 0.5) % 360);
-    setGlobePitch(prev => Math.max(-65, Math.min(65, prev - deltaY * 0.5)));
+    isGlidingRef.current = false;
+    dragVelocityRef.current = { x: deltaX * 0.45, y: -deltaY * 0.45 };
+    curYawRef.current = (curYawRef.current + deltaX * 0.5) % 360;
+    curPitchRef.current = Math.max(-65, Math.min(65, curPitchRef.current - deltaY * 0.5));
   };
 
   const handleMouseUp = () => {
@@ -707,38 +770,46 @@ export default function GlobalNewsScan3D({
   };
 
   // --------------------------------------------------------------------------
-  // PROJECTION LINE ENGINE: Forward baseline vs shocked trajectory (T+0 to T+30d)
+  // ADVANCED QUANTITATIVE PROJECTION ENGINE: Multi-Regime Forward Trajectory
   // --------------------------------------------------------------------------
-  const projectionChartData = useMemo(() => {
-    if (!selectedEvent) return [];
+  const projectionEngineResult = useMemo<ProjectionEngineResult | null>(() => {
+    if (!selectedEvent) return null;
     const basePrice = selectedEvent.impactedTickers[0]?.baselineTarget || 140;
     const shift = selectedEvent.projectionLineShift;
-    const dataPoints = [];
+    const expectedMove = selectedEvent.impactedTickers[0]?.expectedMovePct || 3.0;
 
-    for (let day = 0; day <= 30; day += 2) {
-      // Counterfactual Baseline projection drift
-      const baselineDrift = basePrice * (1 + (shift.baselineSlope * day) / 30);
-      
-      // Shocked projection with initial impulse and exponential half-life recovery decay
-      const decayFactor = Math.exp(-day / (shift.recoveryHalfLifeDays || 14));
-      const impulse = (selectedEvent.impactedTickers[0]?.expectedMovePct / 100) * basePrice * decayFactor;
-      const shockedDrift = baselineDrift + impulse;
+    return calculateAdvancedProjection({
+      basePrice,
+      expectedMovePct: expectedMove,
+      baselineSlope: shift.baselineSlope || 0.03,
+      recoveryHalfLifeDays: quantParams.recoveryHalfLife || shift.recoveryHalfLifeDays || 14,
+      volatilityMultiplier: shift.volatilityMultiplier || 1.15,
+      horizonDays: quantParams.horizonDays,
+      meanReversionSpeed: quantParams.meanReversionSpeed,
+      liquidityAbsorption: quantParams.liquidityAbsorption,
+      jumpIntensity: quantParams.jumpIntensity,
+      confidenceSigma: confidenceSigma,
+      modelType: projectionModel
+    });
+  }, [selectedEvent, quantParams, confidenceSigma, projectionModel]);
 
-      // Volatility confidence bounds (+/- 2 sigma cone)
-      const errorCone = basePrice * 0.02 * Math.sqrt((day + 1) / 10) * shift.volatilityMultiplier;
-
-      dataPoints.push({
-        day: `T+${day}d`,
-        baseline: Number(baselineDrift.toFixed(2)),
-        shocked: Number(shockedDrift.toFixed(2)),
-        upperCone: Number((shockedDrift + errorCone).toFixed(2)),
-        lowerCone: Number((shockedDrift - errorCone).toFixed(2)),
-        shockDeltaPct: Number((((shockedDrift - baselineDrift) / baselineDrift) * 100).toFixed(2))
-      });
-    }
-
-    return dataPoints;
-  }, [selectedEvent]);
+  const projectionChartData = useMemo(() => {
+    if (!projectionEngineResult) return [];
+    return projectionEngineResult.timeline.map(pt => ({
+      day: pt.dayLabel,
+      dayNum: pt.dayNum,
+      baseline: viewUnit === 'percent' ? 0 : pt.baseline,
+      shocked: viewUnit === 'percent' ? pt.shockDeltaPct : pt.shocked,
+      upperCone: viewUnit === 'percent' ? Number((((pt.upperCone - pt.baseline) / pt.baseline) * 100).toFixed(2)) : pt.upperCone,
+      lowerCone: viewUnit === 'percent' ? Number((((pt.lowerCone - pt.baseline) / pt.baseline) * 100).toFixed(2)) : pt.lowerCone,
+      innerUpperCone: viewUnit === 'percent' ? Number((((pt.innerUpperCone - pt.baseline) / pt.baseline) * 100).toFixed(2)) : pt.innerUpperCone,
+      innerLowerCone: viewUnit === 'percent' ? Number((((pt.innerLowerCone - pt.baseline) / pt.baseline) * 100).toFixed(2)) : pt.innerLowerCone,
+      shockDeltaPct: pt.shockDeltaPct,
+      volatilityEst: pt.volatilityEst,
+      rawBaseline: pt.baseline,
+      rawShocked: pt.shocked
+    }));
+  }, [projectionEngineResult, viewUnit]);
 
   // Apply shock parameters to active strategy in portfolioManager
   const handleApplyShock = () => {
@@ -1162,69 +1233,351 @@ export default function GlobalNewsScan3D({
             </div>
           </div>
 
-          {/* Market Projection Line Shock Visualizer */}
-          <div className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-5 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
+          {/* Advanced Quantitative Market Projection Terminal */}
+          <div className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-5 shadow-2xl space-y-4 relative overflow-hidden backdrop-blur-xl">
+            {/* Header: Title, Active Ticker, Unit & Quant Settings */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-purple-400" />
-                  Forward Projection Line Impact (T+30 Days)
-                </h4>
-                <p className="text-[11px] text-zinc-400">
-                  Baseline projection vs News-shocked trajectory with 2σ confidence bounds.
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-cyan-400" />
+                    Quantitative Forward Projection Shock Engine
+                  </h4>
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  Multi-regime stochastic trajectory with dynamic volatility envelope.
                 </p>
               </div>
-              <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 font-mono text-xs font-bold border border-purple-500/30">
-                {selectedEvent.impactedTickers[0]?.symbol || 'NVDA'}
-              </span>
+
+              <div className="flex items-center gap-1.5">
+                {/* Unit Toggle: Dollar vs Pct */}
+                <div className="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-[10px] font-mono">
+                  <button
+                    onClick={() => setViewUnit('dollar')}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md font-bold transition-all",
+                      viewUnit === 'dollar' ? "bg-cyan-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
+                    )}
+                    title="View Absolute Dollar Trajectory"
+                  >
+                    $ Price
+                  </button>
+                  <button
+                    onClick={() => setViewUnit('percent')}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md font-bold transition-all",
+                      viewUnit === 'percent' ? "bg-cyan-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
+                    )}
+                    title="View Percentage Return Trajectory"
+                  >
+                    % Delta
+                  </button>
+                </div>
+
+                {/* Quant Tuning Drawer Toggle */}
+                <button
+                  onClick={() => setIsQuantTunerOpen(!isQuantTunerOpen)}
+                  className={cn(
+                    "p-1.5 rounded-lg border transition-all text-xs flex items-center gap-1 font-mono font-bold",
+                    isQuantTunerOpen
+                      ? "bg-purple-600/30 border-purple-500/60 text-purple-300"
+                      : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                  )}
+                  title="Configure Quantitative Algorithm Parameters"
+                >
+                  <Settings2 size={13} />
+                  <span className="text-[10px]">Tuner</span>
+                </button>
+              </div>
             </div>
 
-            {/* Recharts Forward Projection Curve */}
-            <div className="h-44 w-full">
+            {/* Model Selector Bar */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 mr-1">Model:</span>
+              {[
+                { id: 'merton_jump_diffusion', label: 'Merton Jump OU', desc: 'Jump diffusion with mean-reverting drift' },
+                { id: 'garch_term_structure', label: 'GARCH(1,1)', desc: 'Mean-reverting volatility term structure' },
+                { id: 'liquidity_microstructure', label: 'Liquidity Micro', desc: 'Order book depth & absorption' },
+                { id: 'monte_carlo_ensemble', label: 'MC Ensemble', desc: '1,000-path probabilistic median' }
+              ].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setProjectionModel(m.id as ProjectionModelType)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold transition-all border",
+                    projectionModel === m.id
+                      ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400 shadow-sm shadow-cyan-500/20"
+                      : "bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700"
+                  )}
+                  title={m.desc}
+                >
+                  {m.label}
+                </button>
+              ))}
+
+              {/* Confidence Sigma */}
+              <div className="ml-auto flex items-center gap-1 bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-[10px] font-mono">
+                {([1, 2, 3] as const).map(sig => (
+                  <button
+                    key={sig}
+                    onClick={() => setConfidenceSigma(sig)}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md font-bold transition-all",
+                      confidenceSigma === sig ? "bg-purple-600 text-white" : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                    title={`${sig}-Sigma statistical confidence envelope (${sig === 1 ? '68%' : sig === 2 ? '95%' : '99%'})`}
+                  >
+                    {sig === 1 ? '68%' : sig === 2 ? '95%' : '99%'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Collapsible Quantitative Tuning Drawer */}
+            <AnimatePresence>
+              {isQuantTunerOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden bg-zinc-950/90 border border-zinc-800/90 rounded-2xl p-3.5 space-y-3 font-mono text-[11px]"
+                >
+                  <div className="flex items-center justify-between pb-1 border-b border-zinc-800/60">
+                    <span className="font-bold text-xs uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                      <Gauge size={13} />
+                      Algorithmic Calibration Controls
+                    </span>
+                    <button
+                      onClick={() => setQuantParams({
+                        meanReversionSpeed: 0.15,
+                        recoveryHalfLife: selectedEvent?.projectionLineShift?.recoveryHalfLifeDays || 14,
+                        liquidityAbsorption: 0.70,
+                        jumpIntensity: 0.12,
+                        horizonDays: 30
+                      })}
+                      className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1"
+                    >
+                      <RotateCcw size={10} /> Reset
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {/* Mean Reversion Speed (kappa) */}
+                    <div>
+                      <div className="flex justify-between text-zinc-400 text-[10px] mb-1">
+                        <span>Mean Reversion Pull (κ)</span>
+                        <span className="text-cyan-400 font-bold">{quantParams.meanReversionSpeed.toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.05"
+                        max="0.40"
+                        step="0.01"
+                        value={quantParams.meanReversionSpeed}
+                        onChange={(e) => setQuantParams(p => ({ ...p, meanReversionSpeed: parseFloat(e.target.value) }))}
+                        className="w-full accent-cyan-400 h-1 bg-zinc-800 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Shock Half-Life (days) */}
+                    <div>
+                      <div className="flex justify-between text-zinc-400 text-[10px] mb-1">
+                        <span>Impulse Half-Life (τ₁/₂)</span>
+                        <span className="text-cyan-400 font-bold">{quantParams.recoveryHalfLife} days</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="5"
+                        max="45"
+                        step="1"
+                        value={quantParams.recoveryHalfLife}
+                        onChange={(e) => setQuantParams(p => ({ ...p, recoveryHalfLife: parseInt(e.target.value) }))}
+                        className="w-full accent-cyan-400 h-1 bg-zinc-800 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Liquidity Absorption Factor (gamma) */}
+                    <div>
+                      <div className="flex justify-between text-zinc-400 text-[10px] mb-1">
+                        <span>Order Book Absorption (γ)</span>
+                        <span className="text-purple-400 font-bold">{(quantParams.liquidityAbsorption * 100).toFixed(0)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.20"
+                        max="0.95"
+                        step="0.05"
+                        value={quantParams.liquidityAbsorption}
+                        onChange={(e) => setQuantParams(p => ({ ...p, liquidityAbsorption: parseFloat(e.target.value) }))}
+                        className="w-full accent-purple-400 h-1 bg-zinc-800 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Jump Arrival Intensity (lambda) */}
+                    <div>
+                      <div className="flex justify-between text-zinc-400 text-[10px] mb-1">
+                        <span>Jump Intensity (λ)</span>
+                        <span className="text-purple-400 font-bold">{quantParams.jumpIntensity.toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.00"
+                        max="0.40"
+                        step="0.02"
+                        value={quantParams.jumpIntensity}
+                        onChange={(e) => setQuantParams(p => ({ ...p, jumpIntensity: parseFloat(e.target.value) }))}
+                        className="w-full accent-purple-400 h-1 bg-zinc-800 rounded-lg cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Institutional Shock Analytics Badges Strip */}
+            {projectionEngineResult && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[10px]">
+                <div className="bg-zinc-950/70 border border-zinc-800/80 p-2 rounded-xl">
+                  <div className="text-zinc-500 uppercase tracking-wider text-[9px]">Peak Impact</div>
+                  <div className="font-bold text-white text-xs mt-0.5">
+                    {projectionEngineResult.metrics.peakMovePct >= 0 ? '+' : ''}{projectionEngineResult.metrics.peakMovePct}%
+                    <span className="text-zinc-400 text-[10px] ml-1">@ T+{projectionEngineResult.metrics.peakImpactDay}d</span>
+                  </div>
+                </div>
+
+                <div className="bg-zinc-950/70 border border-zinc-800/80 p-2 rounded-xl">
+                  <div className="text-zinc-500 uppercase tracking-wider text-[9px]">Equilibrium Target</div>
+                  <div className="font-bold text-cyan-300 text-xs mt-0.5">
+                    ${projectionEngineResult.metrics.equilibriumPrice.toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="bg-zinc-950/70 border border-zinc-800/80 p-2 rounded-xl">
+                  <div className="text-zinc-500 uppercase tracking-wider text-[9px]">Absorption Ratio</div>
+                  <div className="font-bold text-emerald-400 text-xs mt-0.5">
+                    {projectionEngineResult.metrics.reversionRatioPct}% Retraced
+                  </div>
+                </div>
+
+                <div className="bg-zinc-950/70 border border-zinc-800/80 p-2 rounded-xl">
+                  <div className="text-zinc-500 uppercase tracking-wider text-[9px]">95% VaR Dollar / %</div>
+                  <div className="font-bold text-purple-300 text-xs mt-0.5">
+                    ±${projectionEngineResult.metrics.var95Dollar.toFixed(2)} ({projectionEngineResult.metrics.var95Pct.toFixed(1)}%)
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Recharts Forward Projection Curve with Ultra-Smooth Monotone Splines */}
+            <div className="h-48 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={projectionChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="day" stroke="#71717a" tick={{ fontSize: 9, fill: '#71717a' }} />
-                  <YAxis domain={['auto', 'auto']} stroke="#71717a" tick={{ fontSize: 9, fill: '#71717a' }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#18181b',
-                      borderColor: '#3f3f46',
-                      borderRadius: '0.75rem',
-                      fontSize: '11px'
-                    }}
-                    formatter={(val: any, name: any) => [`$${Number(val).toFixed(2)}`, name]}
+                <AreaChart data={projectionChartData} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="outerConeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.22} />
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="innerConeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.28} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" opacity={0.6} />
+                  <XAxis 
+                    dataKey="day" 
+                    stroke="#71717a" 
+                    tick={{ fontSize: 9, fill: '#71717a' }}
+                    interval={3}
                   />
+                  <YAxis 
+                    domain={['auto', 'auto']} 
+                    stroke="#71717a" 
+                    tick={{ fontSize: 9, fill: '#71717a' }}
+                    tickFormatter={(val: number) => viewUnit === 'percent' ? `${val >= 0 ? '+' : ''}${val.toFixed(1)}%` : `$${val.toFixed(0)}`}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      const pt = payload[0]?.payload;
+                      if (!pt) return null;
+                      return (
+                        <div className="bg-zinc-950/95 border border-zinc-700/80 rounded-2xl p-3 shadow-2xl backdrop-blur-xl font-mono text-[11px] space-y-1.5 min-w-[210px]">
+                          <div className="flex items-center justify-between pb-1 border-b border-zinc-800 text-xs font-bold">
+                            <span className="text-cyan-400">{label}</span>
+                            <span className="text-zinc-400">Vol: {pt.volatilityEst}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-zinc-400">Baseline Drift:</span>
+                            <span className="text-zinc-200 font-bold">${pt.rawBaseline.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-cyan-400">Shocked Target:</span>
+                            <span className="text-cyan-300 font-bold">${pt.rawShocked.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-emerald-400">
+                            <span>Projected Delta:</span>
+                            <span className="font-bold">{pt.shockDeltaPct >= 0 ? '+' : ''}{pt.shockDeltaPct}%</span>
+                          </div>
+                          <div className="flex justify-between text-purple-400 pt-0.5 border-t border-zinc-900 text-[10px]">
+                            <span>{confidenceSigma * 34}% Band:</span>
+                            <span>
+                              {viewUnit === 'percent'
+                                ? `[${pt.lowerCone}% to ${pt.upperCone}%]`
+                                : `[$${pt.lowerCone} - $${pt.upperCone}]`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  {/* Outer Confidence Envelope */}
                   <Area
                     type="monotone"
                     dataKey="upperCone"
                     stroke="none"
-                    fill="#a855f7"
-                    fillOpacity={0.15}
+                    fill="url(#outerConeGrad)"
                     isAnimationActive={false}
                   />
                   <Area
                     type="monotone"
                     dataKey="lowerCone"
                     stroke="none"
-                    fill="#a855f7"
-                    fillOpacity={0.15}
+                    fill="url(#outerConeGrad)"
                     isAnimationActive={false}
                   />
+                  {/* Inner 1-Sigma Confidence Envelope */}
+                  <Area
+                    type="monotone"
+                    dataKey="innerUpperCone"
+                    stroke="none"
+                    fill="url(#innerConeGrad)"
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="innerLowerCone"
+                    stroke="none"
+                    fill="url(#innerConeGrad)"
+                    isAnimationActive={false}
+                  />
+                  {/* Baseline Projection */}
                   <Line
                     type="monotone"
                     dataKey="baseline"
                     stroke="#71717a"
-                    strokeDasharray="3 3"
+                    strokeDasharray="4 4"
                     strokeWidth={1.5}
                     dot={false}
-                    name="Baseline Projection"
+                    name="Counterfactual Baseline"
                   />
+                  {/* News Shocked Trajectory Line */}
                   <Line
                     type="monotone"
                     dataKey="shocked"
                     stroke="#22d3ee"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     dot={false}
                     name="News Shocked Trajectory"
                   />
@@ -1232,13 +1585,13 @@ export default function GlobalNewsScan3D({
               </ResponsiveContainer>
             </div>
 
-            {/* CTA Button to Apply Shock */}
+            {/* CTA Button to Apply Shock to Strategy */}
             <button
               onClick={handleApplyShock}
-              className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-cyan-600 via-blue-600 to-purple-600 hover:from-cyan-500 hover:via-blue-500 hover:to-purple-500 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
             >
-              <Zap size={14} />
-              Apply News Shock to Live Strategy Projections
+              <Zap size={14} className="animate-pulse" />
+              Apply {projectionEngineResult?.metrics.modelName || 'MJD-OU'} Parameters to Active Execution Engine
             </button>
           </div>
 
