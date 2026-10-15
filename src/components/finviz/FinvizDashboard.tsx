@@ -332,6 +332,30 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
               Forex
             </button>
             <button
+              onClick={() => setActiveTab('insiders')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1",
+                activeTab === 'insiders'
+                  ? "bg-zinc-800 text-purple-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <Users size={13} className="text-purple-400" />
+              Insiders
+            </button>
+            <button
+              onClick={() => setActiveTab('crypto')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1",
+                activeTab === 'crypto'
+                  ? "bg-zinc-800 text-amber-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <Coins size={13} className="text-amber-400" />
+              Crypto
+            </button>
+            <button
               onClick={() => setActiveTab('chart')}
               className={cn(
                 "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border",
@@ -355,6 +379,28 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
               <Globe size={13} />
               News
             </button>
+
+            {/* Live SSE Stream Pulse Indicator */}
+            <div className="ml-auto hidden lg:flex items-center gap-2 pl-3">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono border bg-zinc-900 border-zinc-800 shadow-inner">
+                <span className={cn("w-2 h-2 rounded-full", streamConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400/80")} />
+                <span className={streamConnected ? "text-emerald-400 font-bold tracking-tight" : "text-zinc-400 font-medium"}>
+                  {streamConnected ? `LIVE STREAM • ${tickCount} ticks` : "CONNECTING STREAM"}
+                </span>
+                {lastTick && (
+                  <span className="text-zinc-400 ml-1 font-bold">
+                    ({lastTick.ticker} ${lastTick.price.toFixed(2)})
+                  </span>
+                )}
+                <button
+                  onClick={() => setStreamActive(s => !s)}
+                  className="ml-1 text-zinc-400 hover:text-white p-0.5"
+                  title={streamActive ? "Pause stream" : "Resume stream"}
+                >
+                  {streamActive ? <Pause size={10} /> : <Play size={10} />}
+                </button>
+              </div>
+            </div>
           </nav>
         </div>
       </header>
@@ -443,6 +489,30 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
                 allData={allData} 
                 onSelectTicker={handleSelectTicker} 
               />
+            </motion.div>
+          )}
+
+          {activeTab === 'insiders' && (
+            <motion.div
+              key="finviz-insiders"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizInsiders onSelectTicker={handleSelectTicker} />
+            </motion.div>
+          )}
+
+          {activeTab === 'crypto' && (
+            <motion.div
+              key="finviz-crypto"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FinvizCrypto onSelectTicker={handleSelectTicker} />
             </motion.div>
           )}
 

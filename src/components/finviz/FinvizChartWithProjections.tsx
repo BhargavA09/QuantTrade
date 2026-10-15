@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   ResponsiveContainer, 
@@ -132,12 +132,15 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
   const [bandHighCutoff, setBandHighCutoff] = useState<number>(0.25);
   const [hfDisplayView, setHfDisplayView] = useState<'zscore_oscillations' | 'price_overlay' | 'spectrum_density'>('zscore_oscillations');
 
-  // Trigger historical candle fetch on selection
-  React.useEffect(() => {
-    if (fetchData && ticker) {
-      fetchData(ticker);
+  // Trigger historical candle fetch on selection only when ticker changes and data is missing
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
+  useEffect(() => {
+    if (ticker && (!allData?.[ticker] || !allData[ticker]?.history || allData[ticker].history.length === 0)) {
+      fetchDataRef.current?.(ticker);
     }
-  }, [ticker, fetchData]);
+  }, [ticker]);
 
   // Monte Carlo controls
   const [numSims, setNumSims] = useState(200);

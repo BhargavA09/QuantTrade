@@ -628,12 +628,12 @@ export default function GlobalNewsScan3D({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let localYaw = globeYaw;
+    let localYaw = curYawRef.current || globeYaw;
 
     const render = () => {
       if (isAutoRotating && !isDraggingRef.current) {
         localYaw = (localYaw + rotationSpeed) % 360;
-        setGlobeYaw(localYaw);
+        curYawRef.current = localYaw;
       }
 
       const width = canvas.width;
@@ -778,7 +778,7 @@ export default function GlobalNewsScan3D({
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [vizMode, globeYaw, globePitch, globeZoom, isAutoRotating, rotationSpeed, newsEvents, selectedEventId, selectedEvent]);
+  }, [vizMode, globePitch, globeZoom, isAutoRotating, rotationSpeed, newsEvents, selectedEventId, selectedEvent]);
 
   // Mouse drag handlers for orbit with kinetic velocity tracking
   const handleMouseDown = (e: React.MouseEvent) => {

@@ -15,12 +15,21 @@
       (function() {
         try {
           var saved = localStorage.getItem('quant_theme') || localStorage.getItem('theme');
-          if (saved === 'light') {
-            document.documentElement.classList.add('light');
+          var theme = (saved === 'light' || saved === 'dark') ? saved : 'dark';
+          var root = document.documentElement;
+          root.classList.remove('theme-transitioning');
+          if (theme === 'light') {
+            root.classList.add('light');
+            root.classList.remove('dark');
+            root.setAttribute('data-theme', 'light');
             var meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', '#fafafa');
           } else {
-            document.documentElement.classList.remove('light');
+            root.classList.add('dark');
+            root.classList.remove('light');
+            root.setAttribute('data-theme', 'dark');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#09090b');
           }
         } catch (e) {}
       })();

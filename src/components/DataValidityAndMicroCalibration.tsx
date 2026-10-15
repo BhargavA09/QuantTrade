@@ -303,6 +303,9 @@ export default function DataValidityAndMicroCalibration({
   // Microsecond streaming loop
   const kalmanStateRef = useRef<number>(currentBasePrice);
   const currentPriceRef = useRef<number>(currentBasePrice);
+  const currentResidualRSSRef = useRef<number>(currentResidualRSS);
+  const currentBetaOFIRef = useRef<number>(currentBetaOFI);
+  const tickCounterRef = useRef<number>(tickCounter);
 
   useEffect(() => {
     kalmanStateRef.current = currentBasePrice;
@@ -318,7 +321,10 @@ export default function DataValidityAndMicroCalibration({
       const usFraction = Math.floor(Math.random() * 999);
       const formattedClock = formatMicroTime(now, usFraction);
       setMicroClockStr(formattedClock);
-      setTickCounter(c => c + 1);
+      setTickCounter(c => {
+        tickCounterRef.current = c + 1;
+        return c + 1;
+      });
 
       // Microstructure Brownian motion + Mean reversion
       const base = currentPriceRef.current;
@@ -342,8 +348,11 @@ export default function DataValidityAndMicroCalibration({
       const newOfi = Math.floor((Math.random() - 0.48) * 950);
 
       // Recursive least squares OFI impact update
-      const newBetaOFI = Number((currentBetaOFI + (newOfi > 0 ? 0.0003 : -0.0003)).toFixed(4));
-      const newRSS = Number(Math.max(0.0002, currentResidualRSS + (residual * residual * 0.05) - 0.00002).toFixed(6));
+      const newBetaOFI = Number((currentBetaOFIRef.current + (newOfi > 0 ? 0.0003 : -0.0003)).toFixed(4));
+      const newRSS = Number(Math.max(0.0002, currentResidualRSSRef.current + (residual * residual * 0.05) - 0.00002).toFixed(6));
+
+      currentResidualRSSRef.current = newRSS;
+      currentBetaOFIRef.current = Math.max(0.01, Math.min(0.09, newBetaOFI));
 
       setCurrentResidualRSS(newRSS);
       setCurrentOFI(newOfi);
@@ -382,13 +391,13 @@ export default function DataValidityAndMicroCalibration({
       if (Math.random() < 0.12) {
         addLogEntry(
           'CALIBRATION',
-          `μs Tick #${tickCounter}: P=$${newPrice.toFixed(2)} | Calibrated Fair=$${newKalmanState.toFixed(2)} | Gain K=${gain.toFixed(3)} | RSS=${newRSS.toFixed(5)}`
+          `μs Tick #${tickCounterRef.current}: P=$${newPrice.toFixed(2)} | Calibrated Fair=$${newKalmanState.toFixed(2)} | Gain K=${gain.toFixed(3)} | RSS=${newRSS.toFixed(5)}`
         );
       }
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [isStreamRunning, streamSpeedMultiplier, currentKalmanGain, currentResidualRSS, currentBetaOFI, tickCounter, ticker]);
+  }, [isStreamRunning, streamSpeedMultiplier, currentKalmanGain, ticker]);
 
   // Deploy calibrated parameters to portfolio and active strategies
   const handleDeployCalibratedParameters = () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Logo } from './components/Logo';
 import { 
   TrendingUp, 
@@ -719,12 +719,40 @@ export default function App() {
   });
 
   const toggleTheme = () => {
+    // Inject subtle CSS transition class across the document tree
     document.documentElement.classList.add('theme-transitioning');
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+    setTheme(prev => {
+      const nextTheme = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('quant_theme', nextTheme);
+        localStorage.setItem('theme', nextTheme);
+      } catch (e) {
+        console.warn('Failed to persist theme to localStorage', e);
+      }
+      return nextTheme;
+    });
+
+    // Remove transition class after the transition concludes to keep standard performance
     window.setTimeout(() => {
       document.documentElement.classList.remove('theme-transitioning');
-    }, 380);
+    }, 360);
   };
+
+  // Keyboard shortcut listener for fast theme switching (Alt+T or Ctrl+Shift+T)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.altKey && e.key.toLowerCase() === 't') ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 't')
+      ) {
+        e.preventDefault();
+        toggleTheme();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   useEffect(() => {
@@ -739,10 +767,15 @@ export default function App() {
       console.warn('Failed to persist theme to localStorage', e);
     }
 
+    const root = document.documentElement;
     if (theme === 'light') {
-      document.documentElement.classList.add('light');
+      root.classList.add('light');
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
     } else {
-      document.documentElement.classList.remove('light');
+      root.classList.remove('light');
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
     }
 
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
@@ -1268,9 +1301,12 @@ export default function App() {
     }
   };
 
-  const fetchData = async (t: string, forceRefresh: boolean = false) => {
+  const allDataRef = useRef(allData);
+  allDataRef.current = allData;
+
+  const fetchData = useCallback(async (t: string, forceRefresh: boolean = false) => {
     const resolvedT = resolveTickerSymbol(t);
-    if ((!forceRefresh && allData[resolvedT]) || fetchingTickers.current.has(resolvedT) || failedTickers.current.has(resolvedT)) return;
+    if ((!forceRefresh && allDataRef.current[resolvedT]) || fetchingTickers.current.has(resolvedT) || failedTickers.current.has(resolvedT)) return;
     fetchingTickers.current.add(resolvedT);
     setLoading(true);
     setError(null);
@@ -1344,10 +1380,13 @@ export default function App() {
       setLoading(false);
       fetchingTickers.current.delete(resolvedT);
     }
-  };
+  }, [numSims, confInterval]);
 
   const allTickersFetched = useMemo(() => {
-    return tickers.every(t => !!allData[t] || failedTickers.current.has(t));
+    return tickers.every(t => {
+      const resolvedT = resolveTickerSymbol(t);
+      return !!allData[resolvedT] || failedTickers.current.has(resolvedT);
+    });
   }, [tickers, Object.keys(allData).length]);
 
   useEffect(() => {
@@ -2174,8 +2213,8 @@ export default function App() {
                 <button 
                   id="theme-toggle-button"
                   onClick={toggleTheme}
-                  className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center hover:bg-zinc-800 transition-all duration-300 group relative overflow-hidden"
-                  title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                  className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center hover:bg-zinc-800 hover:border-zinc-700 active:scale-95 transition-all duration-300 group relative overflow-hidden shadow-sm"
+                  title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode (Alt+T)`}
                   aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                 >
                   <div className="relative w-5 h-5 flex items-center justify-center pointer-events-none">
