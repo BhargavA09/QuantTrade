@@ -41,7 +41,7 @@ export default function Quick3DNavigationDock({
     },
     {
       id: 'quantlab',
-      label: 'Strategy & Stanford Lab',
+      label: 'Strategy & Quant Lab',
       icon: Cpu,
       color: 'text-purple-400',
       activeBg: 'bg-purple-500/20 border-purple-500/60 shadow-purple-500/30',

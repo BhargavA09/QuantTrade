@@ -749,12 +749,12 @@ export interface StanfordMedallionPipelineReport {
 }
 
 /**
- * Executes the Stanford Data Engineering Framework Pipeline:
- * Implements the 5-Level Stanford Data Governance Maturity Model,
+ * Executes the Institutional Data Engineering Framework Pipeline:
+ * Implements the 5-Level Institutional Data Governance Maturity Model,
  * Lakehouse Bronze -> Silver -> Gold Medallion Pipeline,
  * and automated Data Contract validations.
  */
-export async function executeStanfordDataPipeline(tickerInput: string): Promise<StanfordMedallionPipelineReport> {
+export async function executeInstitutionalDataPipeline(tickerInput: string): Promise<any> {
   const upper = tickerInput.trim().toUpperCase();
   const quote = await getAccurateQuote(upper);
   const audit = await performDataValidityAudit(upper);
@@ -766,7 +766,7 @@ export async function executeStanfordDataPipeline(tickerInput: string): Promise<
     hash = ((hash << 5) + hash) + hashInput.charCodeAt(i);
     hash |= 0;
   }
-  const immutableHash = `0xSTANFORD-${Math.abs(hash).toString(16).toUpperCase().padStart(8, '0')}`;
+  const immutableHash = `0xINST-${Math.abs(hash).toString(16).toUpperCase().padStart(8, '0')}`;
 
   const levels: StanfordMedallionPipelineReport['levels'] = [
     {

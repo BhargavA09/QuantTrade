@@ -5,7 +5,7 @@ import {
   authenticateStreamQuote,
   performDataValidityAudit,
   calculateMicroCalibrationTelemetry,
-  executeStanfordDataPipeline
+  executeInstitutionalDataPipeline
 } from "../services/multiSourceMarketEngine";
 import { BASELINE_MARKET_PRICES } from "../services/marketDefaults";
 import { globalNewsScannerService } from "../services/autonomousNewsScanner";
@@ -276,22 +276,22 @@ marketRouter.get("/batch-validity", async (req, res) => {
   }
 });
 
-// 9. Stanford Data Engineering Framework Pipeline (Medallion Bronze/Silver/Gold + Governance)
-marketRouter.get("/stanford-pipeline/:ticker", async (req, res) => {
+// 9. Institutional Data Engineering Framework Pipeline (Medallion Bronze/Silver/Gold + Governance)
+marketRouter.get(["/pipeline/:ticker", "/stanford-pipeline/:ticker"], async (req, res) => {
   try {
     const ticker = (req.params.ticker || 'NVDA').toUpperCase();
-    const report = await executeStanfordDataPipeline(ticker);
+    const report = await executeInstitutionalDataPipeline(ticker);
     res.json(report);
   } catch (error: any) {
-    res.status(500).json({ error: "Failed to execute Stanford Data Engineering pipeline", details: error.message });
+    res.status(500).json({ error: "Failed to execute Institutional Data Engineering pipeline", details: error.message });
   }
 });
 
-// 10. Stanford Data Governance Assessment Matrix
-marketRouter.get("/stanford-governance", async (req, res) => {
+// 10. Institutional Data Governance Assessment Matrix
+marketRouter.get(["/governance", "/stanford-governance"], async (req, res) => {
   try {
     const defaultTicker = (req.query.ticker as string) || 'SPY';
-    const report = await executeStanfordDataPipeline(defaultTicker);
+    const report = await executeInstitutionalDataPipeline(defaultTicker);
     res.json({
       governanceMaturityLevel: report.governanceMaturityLevel,
       maturityScore: report.maturityScore,
@@ -300,7 +300,7 @@ marketRouter.get("/stanford-governance", async (req, res) => {
       timestamp: report.timestamp
     });
   } catch (error: any) {
-    res.status(500).json({ error: "Failed to retrieve Stanford Data Governance assessment", details: error.message });
+    res.status(500).json({ error: "Failed to retrieve Institutional Data Governance assessment", details: error.message });
   }
 });
 

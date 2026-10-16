@@ -64,6 +64,8 @@ import {
   SpectralPeak
 } from '../../services/api/signalProcessing';
 import { cn } from '../../utils/cn';
+import { detectAutomatedPatterns, ChartPattern } from '../../utils/patternRecognition';
+import { soundEngine } from '../../utils/audioAlerts';
 
 interface FinvizChartWithProjectionsProps {
   ticker: string;
@@ -318,6 +320,16 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
     }
     return data;
   }, [stock, allData, ticker]);
+
+  // Quantitative Automated Chart Pattern Recognition Engine
+  const detectedPatterns = useMemo(() => {
+    return detectAutomatedPatterns(historicalData);
+  }, [historicalData]);
+  const [selectedPatternId, setSelectedPatternId] = useState<string | null>(null);
+  const [showAutoPatterns, setShowAutoPatterns] = useState<boolean>(true);
+  const activePattern = useMemo(() => {
+    return detectedPatterns.find(p => p.id === selectedPatternId) || detectedPatterns[0] || null;
+  }, [detectedPatterns, selectedPatternId]);
 
   // High-Frequency Signal Analysis and Fourier Spectrum Decomposition
   const hfAnalysis = useMemo(() => {
@@ -746,8 +758,58 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
               />
               <span className="text-[11px] font-mono text-emerald-400 font-bold">Trendlines</span>
             </label>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={showAutoPatterns} 
+                onChange={(e) => {
+                  setShowAutoPatterns(e.target.checked);
+                  soundEngine.playNotificationTap();
+                }}
+                className="accent-cyan-500 rounded" 
+              />
+              <span className="text-[11px] font-mono text-cyan-400 font-bold flex items-center gap-1">
+                <Sparkles size={11} />
+                Auto Patterns ({detectedPatterns.length})
+              </span>
+            </label>
           </div>
         </div>
+
+        {/* Dynamic Pattern Chips Selector */}
+        {showAutoPatterns && detectedPatterns.length > 0 && (
+          <div className="px-3 pt-2.5 pb-1 flex flex-wrap items-center gap-2 border-b border-zinc-800/80 bg-zinc-950/60">
+            <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold flex items-center gap-1">
+              Detected Extrema Patterns:
+            </span>
+            {detectedPatterns.map(p => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  setSelectedPatternId(p.id);
+                  soundEngine.playBullishBreakout();
+                }}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 border",
+                  activePattern?.id === p.id
+                    ? "bg-zinc-800 border-cyan-500 text-cyan-300 shadow-sm"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                )}
+              >
+                <span>{p.name}</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] bg-cyan-500/20 text-cyan-400 font-bold">
+                  {p.confidence}%
+                </span>
+                {p.targetPrice && (
+                  <span className="text-[10px] text-emerald-400">Target: ${p.targetPrice}</span>
+                )}
+                {p.stopLossPrice && (
+                  <span className="text-[10px] text-rose-400">Stop: ${p.stopLossPrice}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Chart Viewport */}
         <div className="h-80 w-full pt-3">
@@ -851,6 +913,57 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
                   strokeWidth={1.5} 
                   dot={false} 
                 />
+              )}
+
+              {/* Dynamic Auto Pattern Recognition Levels */}
+              {showAutoPatterns && activePattern && (
+                <>
+                  {activePattern.keyLevels.resistance && (
+                    <ReferenceLine 
+                      yAxisId="price" 
+                      y={activePattern.keyLevels.resistance} 
+                      stroke="#10b981" 
+                      strokeDasharray="4 4" 
+                      strokeWidth={1.5}
+                      label={{ 
+                        value: `${activePattern.name} Resistance $${activePattern.keyLevels.resistance.toFixed(2)}`, 
+                        fill: '#10b981', 
+                        fontSize: 10, 
+                        position: 'insideTopLeft' 
+                      }} 
+                    />
+                  )}
+                  {activePattern.keyLevels.support && (
+                    <ReferenceLine 
+                      yAxisId="price" 
+                      y={activePattern.keyLevels.support} 
+                      stroke="#f43f5e" 
+                      strokeDasharray="4 4" 
+                      strokeWidth={1.5}
+                      label={{ 
+                        value: `Support $${activePattern.keyLevels.support.toFixed(2)}`, 
+                        fill: '#f43f5e', 
+                        fontSize: 10, 
+                        position: 'insideBottomLeft' 
+                      }} 
+                    />
+                  )}
+                  {activePattern.keyLevels.neckline && (
+                    <ReferenceLine 
+                      yAxisId="price" 
+                      y={activePattern.keyLevels.neckline} 
+                      stroke="#06b6d4" 
+                      strokeDasharray="3 3" 
+                      strokeWidth={1.5}
+                      label={{ 
+                        value: `Neckline $${activePattern.keyLevels.neckline.toFixed(2)}`, 
+                        fill: '#06b6d4', 
+                        fontSize: 10, 
+                        position: 'insideRight' 
+                      }} 
+                    />
+                  )}
+                </>
               )}
 
               {/* Trendline Channels */}

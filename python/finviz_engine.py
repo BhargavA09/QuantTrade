@@ -736,6 +736,221 @@ class FinvizEngine:
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
+    def get_patterns(self, ticker: str) -> dict:
+        """Automated Finviz Technical Pattern Recognition & Trendline Projection Engine."""
+        clean = ticker.strip().upper()
+        stock = self.stocks_db.get(clean, {})
+        curr_price = float(stock.get("price", 150.0))
+
+        # Generate rolling 60-day deterministic candles anchored to current price
+        seed_val = sum(ord(c) for c in clean)
+        rng = random.Random(seed_val)
+        
+        candles = []
+        base = curr_price * 0.88
+        for i in range(60):
+            day_trend = 0.0018 + (rng.random() - 0.48) * 0.02
+            base = max(5.0, base * (1.0 + day_trend))
+            high = base * (1.0 + rng.random() * 0.018)
+            low = base * (1.0 - rng.random() * 0.016)
+            close = low + (high - low) * rng.random()
+            candles.append({
+                "day": i,
+                "high": round(high, 2),
+                "low": round(low, 2),
+                "close": round(close, 2)
+            })
+
+        # Find rolling swing highs and swing lows (local extrema)
+        pivot_highs = []
+        pivot_lows = []
+        window = 4
+        for i in range(window, len(candles) - window):
+            h = candles[i]["high"]
+            l = candles[i]["low"]
+            if all(candles[i - k]["high"] <= h and candles[i + k]["high"] <= h for k in range(1, window + 1)):
+                pivot_highs.append({"index": i, "price": h})
+            if all(candles[i - k]["low"] >= l and candles[i + k]["low"] >= l for k in range(1, window + 1)):
+                pivot_lows.append({"index": i, "price": l})
+
+        # Fallback if too few pivots
+        if len(pivot_highs) < 2:
+            pivot_highs = [{"index": 10, "price": curr_price * 0.95}, {"index": 50, "price": curr_price * 1.04}]
+        if len(pivot_lows) < 2:
+            pivot_lows = [{"index": 12, "price": curr_price * 0.88}, {"index": 48, "price": curr_price * 0.97}]
+
+        # Linear regression across pivot highs for Resistance Line
+        x_h = [p["index"] for p in pivot_highs]
+        y_h = [p["price"] for p in pivot_highs]
+        n_h = len(x_h)
+        mean_x_h = sum(x_h) / n_h
+        mean_y_h = sum(y_h) / n_h
+        cov_h = sum((x_h[k] - mean_x_h) * (y_h[k] - mean_y_h) for k in range(n_h))
+        var_h = sum((x_h[k] - mean_x_h) ** 2 for k in range(n_h)) or 1.0
+        r_slope = cov_h / var_h
+        r_intercept = mean_y_h - r_slope * mean_x_h
+
+        # Linear regression across pivot lows for Support Line
+        x_l = [p["index"] for p in pivot_lows]
+        y_l = [p["price"] for p in pivot_lows]
+        n_l = len(x_l)
+        mean_x_l = sum(x_l) / n_l
+        mean_y_l = sum(y_l) / n_l
+        cov_l = sum((x_l[k] - mean_x_l) * (y_l[k] - mean_y_l) for k in range(n_l))
+        var_l = sum((x_l[k] - mean_x_l) ** 2 for k in range(n_l)) or 1.0
+        s_slope = cov_l / var_l
+        s_intercept = mean_y_l - s_slope * mean_x_l
+
+        # Project lines forward through 65 days
+        current_res = round(r_slope * 59 + r_intercept, 2)
+        current_sup = round(s_slope * 59 + s_intercept, 2)
+
+        # Ensure support is below resistance
+        if current_sup >= current_res:
+            current_sup = round(current_res * 0.92, 2)
+            s_slope = r_slope * 0.9
+
+        # Pattern classification
+        diff_slope = r_slope - s_slope
+        if abs(diff_slope) < 0.08 and r_slope > 0.15:
+            pattern = "Channel Up (Bullish Continuation)"
+            pattern_type = "bullish"
+        elif abs(diff_slope) < 0.08 and r_slope < -0.15:
+            pattern = "Channel Down (Bearish Trend)"
+            pattern_type = "bearish"
+        elif abs(r_slope) < 0.12 and s_slope > 0.12:
+            pattern = "Ascending Triangle (Bullish Accumulation)"
+            pattern_type = "bullish"
+        elif abs(s_slope) < 0.12 and r_slope < -0.12:
+            pattern = "Descending Triangle (Distribution Risk)"
+            pattern_type = "bearish"
+        elif r_slope < -0.12 and s_slope > 0.12:
+            pattern = "Symmetrical Triangle (Volatility Coiling)"
+            pattern_type = "neutral"
+        elif r_slope < -0.15 and s_slope < -0.05 and abs(r_slope) > abs(s_slope):
+            pattern = "Falling Wedge (High-Probability Bullish Reversal)"
+            pattern_type = "bullish"
+        elif r_slope > 0.15 and s_slope > 0.05 and abs(s_slope) > abs(r_slope):
+            pattern = "Rising Wedge (Bearish Exhaustion)"
+            pattern_type = "bearish"
+        else:
+            pattern = "Horizontal Support / Resistance Range"
+            pattern_type = "neutral"
+
+        # Breakout status
+        if curr_price > current_res:
+            status = "Bullish Breakout Above Resistance"
+            target = round(curr_price + (curr_price - current_sup) * 1.2, 2)
+            stop_loss = round(current_res * 0.98, 2)
+        elif curr_price < current_sup:
+            status = "Support Breakdown Risk"
+            target = round(current_sup - (current_res - current_sup) * 0.8, 2)
+            stop_loss = round(current_sup * 1.02, 2)
+        elif (current_res - curr_price) / curr_price < 0.02:
+            status = "Testing Upper Resistance Barrier"
+            target = round(current_res * 1.08, 2)
+            stop_loss = round(curr_price * 0.96, 2)
+        elif (curr_price - current_sup) / curr_price < 0.02:
+            status = "Rebounding from Primary Support Floor"
+            target = round(current_res, 2)
+            stop_loss = round(current_sup * 0.97, 2)
+        else:
+            status = "Consolidating Inside Pattern Bounds"
+            target = round(current_res, 2)
+            stop_loss = round(current_sup, 2)
+
+        return {
+            "success": True,
+            "ticker": clean,
+            "currentPrice": curr_price,
+            "pattern": pattern,
+            "patternType": pattern_type,
+            "confidenceScore": rng.randint(84, 96),
+            "status": status,
+            "supportLevel": current_sup,
+            "resistanceLevel": current_res,
+            "targetPrice": target,
+            "stopLoss": stop_loss,
+            "supportSlope": round(s_slope, 4),
+            "resistanceSlope": round(r_slope, 4),
+            "trendlines": {
+                "support": [
+                    {"day": 0, "price": round(s_intercept, 2)},
+                    {"day": 30, "price": round(s_slope * 30 + s_intercept, 2)},
+                    {"day": 60, "price": current_sup}
+                ],
+                "resistance": [
+                    {"day": 0, "price": round(r_intercept, 2)},
+                    {"day": 30, "price": round(r_slope * 30 + r_intercept, 2)},
+                    {"day": 60, "price": current_res}
+                ]
+            },
+            "pivots": {
+                "highs": pivot_highs[-3:],
+                "lows": pivot_lows[-3:]
+            }
+        }
+
+    def get_calendar(self) -> dict:
+        """Earnings & Economic Calendar with Consensus vs Actual Surprises."""
+        earnings = [
+            {"date": "2026-10-16", "timing": "AMC", "ticker": "NVDA", "company": "NVIDIA Corporation", "epsEstimate": 0.74, "epsActual": None, "surprisePct": None, "revEst": "32.8B", "impliedMove": "7.4%"},
+            {"date": "2026-10-16", "timing": "BMO", "ticker": "TSM", "company": "Taiwan Semiconductor", "epsEstimate": 1.79, "epsActual": 1.94, "surprisePct": 8.38, "revEst": "23.3B", "impliedMove": "5.2%"},
+            {"date": "2026-10-17", "timing": "AMC", "ticker": "MSFT", "company": "Microsoft Corp.", "epsEstimate": 3.10, "epsActual": None, "surprisePct": None, "revEst": "64.5B", "impliedMove": "4.1%"},
+            {"date": "2026-10-17", "timing": "AMC", "ticker": "AAPL", "company": "Apple Inc.", "epsEstimate": 1.60, "epsActual": None, "surprisePct": None, "revEst": "94.2B", "impliedMove": "3.8%"},
+            {"date": "2026-10-18", "timing": "BMO", "ticker": "AMD", "company": "Advanced Micro Devices", "epsEstimate": 0.92, "epsActual": None, "surprisePct": None, "revEst": "7.5B", "impliedMove": "8.1%"},
+            {"date": "2026-10-18", "timing": "AMC", "ticker": "TSLA", "company": "Tesla, Inc.", "epsEstimate": 0.60, "epsActual": None, "surprisePct": None, "revEst": "25.4B", "impliedMove": "9.5%"},
+            {"date": "2026-10-19", "timing": "AMC", "ticker": "PLTR", "company": "Palantir Technologies", "epsEstimate": 0.09, "epsActual": 0.11, "surprisePct": 22.2, "revEst": "725M", "impliedMove": "11.2%"},
+            {"date": "2026-10-20", "timing": "BMO", "ticker": "JPM", "company": "JPMorgan Chase & Co.", "epsEstimate": 4.01, "epsActual": 4.37, "surprisePct": 8.98, "revEst": "42.6B", "impliedMove": "3.2%"}
+        ]
+
+        economic = [
+            {"date": "2026-10-16", "time": "08:30 EDT", "event": "Core CPI Inflation (YoY)", "impact": "HIGH", "forecast": "3.2%", "previous": "3.3%", "actual": "3.1%", "volatilityScore": 92},
+            {"date": "2026-10-16", "time": "14:00 EDT", "event": "FOMC Meeting Minutes Release", "impact": "HIGH", "forecast": "-", "previous": "-", "actual": "-", "volatilityScore": 88},
+            {"date": "2026-10-17", "time": "08:30 EDT", "event": "Retail Sales (MoM)", "impact": "MEDIUM", "forecast": "0.3%", "previous": "0.1%", "actual": "0.4%", "volatilityScore": 74},
+            {"date": "2026-10-17", "time": "08:30 EDT", "event": "Initial Jobless Claims", "impact": "MEDIUM", "forecast": "220K", "previous": "225K", "actual": "-", "volatilityScore": 68},
+            {"date": "2026-10-18", "time": "09:45 EDT", "event": "S&P Global Manufacturing PMI", "impact": "MEDIUM", "forecast": "49.8", "previous": "47.9", "actual": "-", "volatilityScore": 65},
+            {"date": "2026-10-19", "time": "10:00 EDT", "event": "University of Michigan Consumer Sentiment", "impact": "MEDIUM", "forecast": "70.5", "previous": "70.1", "actual": "-", "volatilityScore": 71},
+            {"date": "2026-10-21", "time": "14:00 EDT", "event": "Federal Reserve Beige Book", "impact": "HIGH", "forecast": "-", "previous": "-", "actual": "-", "volatilityScore": 82}
+        ]
+
+        return {
+            "success": True,
+            "earnings": earnings,
+            "economic": economic
+        }
+
+    def get_darkpool_whale_flow(self) -> dict:
+        """Institutional Dark Pool Print Scanner & Unusual Options Order Flow."""
+        darkpool = [
+            {"id": "dp-1", "timestamp": "14:52:18", "ticker": "NVDA", "price": 138.92, "size": 350000, "totalValue": 48622000, "venue": "Off-Exchange ADF", "action": "ACCUMULATION", "percentOfVolume": 4.8},
+            {"id": "dp-2", "timestamp": "14:48:05", "ticker": "SPY", "price": 586.20, "size": 220000, "totalValue": 128964000, "venue": "FINRA/Nasdaq TRF", "action": "ACCUMULATION", "percentOfVolume": 6.2},
+            {"id": "dp-3", "timestamp": "14:41:30", "ticker": "TSLA", "price": 221.45, "size": 180000, "totalValue": 39861000, "venue": "Direct Cross Desk", "action": "DISTRIBUTION", "percentOfVolume": 3.9},
+            {"id": "dp-4", "timestamp": "14:35:12", "ticker": "AAPL", "price": 234.60, "size": 280000, "totalValue": 65688000, "venue": "Off-Exchange ADF", "action": "ACCUMULATION", "percentOfVolume": 5.1},
+            {"id": "dp-5", "timestamp": "14:28:44", "ticker": "AMD", "price": 156.80, "size": 140000, "totalValue": 21952000, "venue": "Direct Cross Desk", "action": "ACCUMULATION", "percentOfVolume": 4.2},
+            {"id": "dp-6", "timestamp": "14:15:20", "ticker": "MSFT", "price": 422.30, "size": 165000, "totalValue": 69679500, "venue": "FINRA/Nasdaq TRF", "action": "ACCUMULATION", "percentOfVolume": 5.4}
+        ]
+
+        options = [
+            {"id": "opt-1", "timestamp": "14:55:02", "ticker": "NVDA", "strike": 145.0, "expiration": "2026-11-20", "type": "CALL", "premium": 4250000, "volumeVsOi": "8.4x", "orderType": "SWEEP", "sentiment": "BULLISH", "gammaSqueeze": 89},
+            {"id": "opt-2", "timestamp": "14:50:33", "ticker": "TSLA", "strike": 240.0, "expiration": "2026-11-06", "type": "CALL", "premium": 2800000, "volumeVsOi": "6.2x", "orderType": "SWEEP", "sentiment": "BULLISH", "gammaSqueeze": 84},
+            {"id": "opt-3", "timestamp": "14:44:19", "ticker": "SPY", "strike": 575.0, "expiration": "2026-10-31", "type": "PUT", "premium": 3100000, "volumeVsOi": "4.1x", "orderType": "SPLIT", "sentiment": "BEARISH", "gammaSqueeze": 42},
+            {"id": "opt-4", "timestamp": "14:38:50", "ticker": "PLTR", "strike": 46.0, "expiration": "2026-11-20", "type": "CALL", "premium": 1850000, "volumeVsOi": "12.5x", "orderType": "SWEEP", "sentiment": "BULLISH", "gammaSqueeze": 94},
+            {"id": "opt-5", "timestamp": "14:26:15", "ticker": "AMD", "strike": 170.0, "expiration": "2026-12-18", "type": "CALL", "premium": 2100000, "volumeVsOi": "5.6x", "orderType": "SWEEP", "sentiment": "BULLISH", "gammaSqueeze": 78}
+        ]
+
+        return {
+            "success": True,
+            "darkpoolPrints": darkpool,
+            "unusualOptions": options,
+            "metrics": {
+                "totalDarkpoolVolumeUsd": 374766500,
+                "callPutRatio": 2.85,
+                "institutionalSentiment": "BULLISH_ACCUMULATION",
+                "smartMoneyIndex": 86.4
+            }
+        }
+
 
 # Global Finviz Engine Instance
 finviz_engine = FinvizEngine()

@@ -196,7 +196,7 @@ export interface MicroCalibrationSnapshot {
   };
 }
 
-export interface StanfordMedallionPipelineReport {
+export interface InstitutionalMedallionPipelineReport {
   ticker: string;
   timestamp: string;
   governanceMaturityLevel: 5;

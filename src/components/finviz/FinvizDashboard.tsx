@@ -15,6 +15,8 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Flame,
+  Calendar,
+  Bell,
   ArrowUpDown,
   Users,
   Coins,
@@ -32,11 +34,17 @@ import { FinvizForex } from './FinvizForex';
 import { FinvizInsiders } from './FinvizInsiders';
 import { FinvizCrypto } from './FinvizCrypto';
 import { FinvizChartWithProjections } from './FinvizChartWithProjections';
+import { FinvizMultiChartGrid } from './FinvizMultiChartGrid';
+import { FinvizCalendar } from './FinvizCalendar';
+import { FinvizWhaleRadar } from './FinvizWhaleRadar';
+import { FinvizNotificationCenter } from './FinvizNotificationCenter';
+import { soundEngine } from '../../utils/audioAlerts';
+
 import { FINVIZ_NEWS, FINVIZ_STOCKS } from '../../data/finvizData';
 import { subscribeFinvizStream, StreamEvent } from '../../services/api/finvizService';
 import { cn } from '../../utils/cn';
 
-export type FinvizTab = 'home' | 'news' | 'screener' | 'map' | 'groups' | 'futures' | 'forex' | 'insiders' | 'crypto' | 'chart';
+export type FinvizTab = 'home' | 'news' | 'screener' | 'chart' | 'multichart' | 'calendar' | 'whale' | 'map' | 'groups' | 'futures' | 'forex' | 'insiders' | 'crypto';
 
 interface FinvizDashboardProps {
   initialTicker?: string;
@@ -46,6 +54,7 @@ interface FinvizDashboardProps {
   allData?: Record<string, any>;
   lastUpdate?: any;
   fetchData?: (ticker: string) => Promise<void>;
+  onSendToQuantLab?: (ticker: string) => void;
 }
 
 export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
@@ -55,13 +64,15 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
   onToggleWatchlist,
   allData = {},
   lastUpdate,
-  fetchData
+  fetchData,
+  onSendToQuantLab
 }) => {
   const [activeTab, setActiveTab] = useState<FinvizTab>('home');
   const [selectedTicker, setSelectedTicker] = useState<string>(initialTicker);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [suggestions, setSuggestions] = useState<typeof FINVIZ_STOCKS>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   // Real-time live streaming state from Python backend
   const [streamActive, setStreamActive] = useState<boolean>(true);
@@ -356,6 +367,42 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
               Crypto
             </button>
             <button
+              onClick={() => setActiveTab('multichart')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1",
+                activeTab === 'multichart'
+                  ? "bg-zinc-800 text-emerald-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <Grid size={13} />
+              Tile Matrix (4/6/9)
+            </button>
+            <button
+              onClick={() => setActiveTab('calendar')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1",
+                activeTab === 'calendar'
+                  ? "bg-zinc-800 text-cyan-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <Calendar size={13} className="text-cyan-400" />
+              Calendar (EPS/Macro)
+            </button>
+            <button
+              onClick={() => setActiveTab('whale')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1",
+                activeTab === 'whale'
+                  ? "bg-zinc-800 text-purple-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <ShieldAlert size={13} className="text-purple-400" />
+              Whale & Dark Pool
+            </button>
+            <button
               onClick={() => setActiveTab('chart')}
               className={cn(
                 "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border",
@@ -516,6 +563,52 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
             </motion.div>
           )}
 
+                    {activeTab === 'multichart' && (
+            <motion.div
+              key="finviz-multichart"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              <FinvizMultiChartGrid
+                allData={allData}
+                onSelectTicker={handleSelectTicker}
+                onSendToQuantLab={onSendToQuantLab}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'calendar' && (
+            <motion.div
+              key="finviz-calendar"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              <FinvizCalendar
+                onSelectTicker={handleSelectTicker}
+                onSendToQuantLab={onSendToQuantLab}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'whale' && (
+            <motion.div
+              key="finviz-whale"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              <FinvizWhaleRadar
+                onSelectTicker={handleSelectTicker}
+                onSendToQuantLab={onSendToQuantLab}
+              />
+            </motion.div>
+          )}
+
           {activeTab === 'chart' && (
             <motion.div
               key={`finviz-chart-${selectedTicker}`}
@@ -602,6 +695,9 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
           </div>
         </div>
       </footer>
+          {/* Sound & Notification Center Modal */}
+      <FinvizNotificationCenter
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+      />
     </div>
-  );
-};

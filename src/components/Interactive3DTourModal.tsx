@@ -45,14 +45,14 @@ export default function Interactive3DTourModal({
       ]
     },
     {
-      title: 'Stanford Data Engineering & HFT Engine',
+      title: 'Institutional Data Engineering & HFT Engine',
       subtitle: 'Multi-layer Feature Pipelines & Sub-Millisecond Calibration',
       icon: Cpu,
       color: 'from-purple-500/20 to-pink-500/20 border-purple-500/40 text-purple-400',
       description:
-        'Engineered after Stanford big-data quantitative architectures. Processes raw tick data through Bronze, Silver, and Gold validation pipelines with micro-calibration for high-frequency execution buffers.',
+        'Engineered after top institutional quantitative architectures. Processes raw tick data through Bronze, Silver, and Gold validation pipelines with micro-calibration for high-frequency execution buffers.',
       actionTab: 'quantlab',
-      actionLabel: 'Open Stanford Quant Lab',
+      actionLabel: 'Open Quant Lab',
       highlights: [
         'Bronze/Silver/Gold data validation pipelines with zero NaN drift',
         'Micro-calibration telemetry with sub-millisecond execution buffers',

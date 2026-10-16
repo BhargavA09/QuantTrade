@@ -24,7 +24,7 @@ import GitHubDeploymentGuideModal from './GitHubDeploymentGuideModal';
 import AdaptiveTraderLab from './AdaptiveTraderLab';
 import HFTBacktestEngine from './HFTBacktestEngine';
 import DataValidityAndMicroCalibration from './DataValidityAndMicroCalibration';
-import StanfordDataEngineeringLab from './StanfordDataEngineeringLab';
+
 import GlobalNewsScan3D from './GlobalNewsScan3D';
 import { FileCode, Compass, Github, Radio, Workflow, Globe } from 'lucide-react';
 
@@ -341,8 +341,8 @@ function runLocalBacktest(
 }
 
 export default function QuantLab({ data, allData }: QuantLabProps) {
-  const [activeView, setActiveView] = useState<'backtest' | 'micro_calibration' | 'stanford_data' | 'newsscan3d' | 'suggestive' | 'traderai' | 'python' | 'execution' | 'simulation' | 'github'>('backtest');
-  const [backtestEngineMode, setBacktestEngineMode] = useState<'hft_engine' | 'comparative_cards' | 'micro_calibration' | 'stanford_data'>('hft_engine');
+  const [activeView, setActiveView] = useState<'backtest' | 'micro_calibration' | 'newsscan3d' | 'suggestive' | 'traderai' | 'python' | 'execution' | 'simulation' | 'github'>('backtest');
+  const [backtestEngineMode, setBacktestEngineMode] = useState<'hft_engine' | 'comparative_cards' | 'micro_calibration'>('hft_engine');
   const [lookbackPeriod, setLookbackPeriod] = useState(252); // 1 year
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
@@ -711,17 +711,7 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
               μs Stream Calibration & Validity
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse absolute -top-0.5 -right-0.5" />
             </button>
-            <button
-              onClick={() => setActiveView('stanford_data')}
-              className={cn(
-                "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 relative",
-                activeView === 'stanford_data' ? "bg-purple-600 text-white shadow-md shadow-purple-500/20" : "text-purple-400 hover:bg-purple-500/10"
-              )}
-            >
-              <Workflow size={13} />
-              Stanford Data Engineering
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping absolute -top-0.5 -right-0.5" />
-            </button>
+
             <button
               onClick={() => setActiveView('newsscan3d')}
               className={cn(
@@ -853,16 +843,7 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
         />
       )}
 
-      {activeView === 'stanford_data' && (
-        <StanfordDataEngineeringLab
-          initialTicker={data.ticker || 'NVDA'}
-          allData={allData}
-          onDeployToLiveEngine={(features) => {
-            setDeploymentMessage(`Stanford Gold Feature Table deployed to Live HFT Strategy Engine!`);
-            setTimeout(() => setDeploymentMessage(null), 4000);
-          }}
-        />
-      )}
+
 
       {activeView === 'newsscan3d' && (
         <GlobalNewsScan3D
@@ -914,18 +895,6 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
                 Live μs Calibration & Data Validator
               </button>
               <button
-                onClick={() => setBacktestEngineMode('stanford_data')}
-                className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5",
-                  backtestEngineMode === 'stanford_data'
-                    ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
-                    : "text-zinc-400 hover:text-white"
-                )}
-              >
-                <Workflow size={12} className={cn(backtestEngineMode === 'stanford_data' ? "text-white" : "text-purple-400")} />
-                Stanford Data Engineering
-              </button>
-              <button
                 onClick={() => setBacktestEngineMode('comparative_cards')}
                 className={cn(
                   "px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5",
@@ -956,15 +925,6 @@ export default function QuantLab({ data, allData }: QuantLabProps) {
               allData={allData}
               onDeployCalibratedParams={(params) => {
                 setDeploymentMessage(`Calibrated parameters deployed: SL ${(params.stopLossPct * 100).toFixed(2)}%, TP ${(params.takeProfitPct * 100).toFixed(2)}%, Buffer ${params.latencyUs}μs`);
-                setTimeout(() => setDeploymentMessage(null), 4000);
-              }}
-            />
-          ) : backtestEngineMode === 'stanford_data' ? (
-            <StanfordDataEngineeringLab
-              initialTicker={data.ticker || 'NVDA'}
-              allData={allData}
-              onDeployToLiveEngine={(features) => {
-                setDeploymentMessage(`Stanford Gold Feature Table deployed to Live HFT Strategy Engine!`);
                 setTimeout(() => setDeploymentMessage(null), 4000);
               }}
             />

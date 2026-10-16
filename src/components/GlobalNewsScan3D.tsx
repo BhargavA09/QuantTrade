@@ -95,6 +95,38 @@ const CONTINENT_LANDMASSES = [
   [[115, -22], [125, -35], [135, -35], [150, -30], [145, -15], [130, -12], [115, -22]]
 ];
 
+// Fallback items if API is initializing
+const FALLBACK_NEWS_EVENTS: GlobalNewsEvent[] = [
+  {
+    id: "scan-news-01",
+    headline: "Taiwan Foundry Clusters Ramp Advanced 2nm Packaging Lines Ahead of AI Server Surge",
+    summary: "Leading wafer fabrication hubs in Hsinchu & Tainan confirm 28% yield acceleration for next-gen hyperscaler accelerator chips.",
+    timestamp: new Date().toISOString(),
+    source: "Taipei Tech Digest",
+    city: "Taipei",
+    country: "Taiwan",
+    region: "Asia-Pacific",
+    lat: 25.033,
+    lng: 121.5654,
+    category: "Semiconductors & AI",
+    severity: "critical",
+    sentiment: "bullish",
+    sentimentScore: 0.88,
+    impactedTickers: [
+      { symbol: "NVDA", name: "NVIDIA Corp.", expectedMovePct: 4.2, baselineTarget: 138.5, shockedTarget: 144.3, transmissionReason: "Primary beneficiary of advanced packaging substrate throughput." },
+      { symbol: "TSM", name: "Taiwan Semiconductor", expectedMovePct: 4.8, baselineTarget: 188.0, shockedTarget: 197.0, transmissionReason: "Margin expansion on 2nm packaging volume." }
+    ],
+    projectionLineShift: {
+      baselineSlope: 0.04,
+      shockedSlope: 0.12,
+      volatilityMultiplier: 1.25,
+      horizonDays: 30,
+      recoveryHalfLifeDays: 14
+    },
+    connectedHub: { name: "Silicon Valley / San Francisco", lat: 37.7749, lng: -122.4194 }
+  }
+];
+
 export default function GlobalNewsScan3D({
   data,
   allData,
@@ -102,7 +134,7 @@ export default function GlobalNewsScan3D({
   className
 }: GlobalNewsScan3DProps) {
   // News scan state
-  const [newsEvents, setNewsEvents] = useState<GlobalNewsEvent[]>([]);
+  const [newsEvents, setNewsEvents] = useState<GlobalNewsEvent[]>(FALLBACK_NEWS_EVENTS);
   const [selectedEventId, setSelectedEventId] = useState<string>('scan-news-01');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAutoScanning, setIsAutoScanning] = useState<boolean>(true);
@@ -224,7 +256,12 @@ export default function GlobalNewsScan3D({
 
   // Selected news item
   const selectedEvent = useMemo(() => {
-    return newsEvents.find(e => e.id === selectedEventId) || newsEvents[0] || FALLBACK_NEWS_EVENTS[0];
+    return (
+      newsEvents?.find(e => e.id === selectedEventId) ||
+      newsEvents?.[0] ||
+      FALLBACK_NEWS_EVENTS?.[0] ||
+      null
+    );
   }, [newsEvents, selectedEventId]);
 
   // When selected event changes, smoothly glide 3D camera to coordinate
@@ -490,8 +527,8 @@ export default function GlobalNewsScan3D({
       const surfGeo = new THREE.PlaneGeometry(160, 120, gridX, gridY);
       const posAttr = surfGeo.attributes.position;
 
-      const baseMove = selectedEvent ? selectedEvent.impactedTickers[0]?.expectedMovePct || 3 : 3;
-      const decay = selectedEvent ? selectedEvent.projectionLineShift.recoveryHalfLifeDays || 14 : 14;
+      const baseMove = selectedEvent?.impactedTickers?.[0]?.expectedMovePct ?? 3;
+      const decay = selectedEvent?.projectionLineShift?.recoveryHalfLifeDays ?? 14;
 
       for (let i = 0; i < posAttr.count; i++) {
         const xVal = posAttr.getX(i); // horizon days mapped to space
@@ -809,9 +846,13 @@ export default function GlobalNewsScan3D({
   // --------------------------------------------------------------------------
   const projectionEngineResult = useMemo<ProjectionEngineResult | null>(() => {
     if (!selectedEvent) return null;
-    const basePrice = selectedEvent.impactedTickers[0]?.baselineTarget || 140;
-    const shift = selectedEvent.projectionLineShift;
-    const expectedMove = selectedEvent.impactedTickers[0]?.expectedMovePct || 3.0;
+    const basePrice = selectedEvent.impactedTickers?.[0]?.baselineTarget || 140;
+    const shift = selectedEvent.projectionLineShift || {
+      baselineSlope: 0.03,
+      recoveryHalfLifeDays: 14,
+      volatilityMultiplier: 1.15
+    };
+    const expectedMove = selectedEvent.impactedTickers?.[0]?.expectedMovePct ?? 3.0;
 
     return calculateAdvancedProjection({
       basePrice,
@@ -849,7 +890,9 @@ export default function GlobalNewsScan3D({
   // Apply shock parameters to active strategy in portfolioManager
   const handleApplyShock = () => {
     if (!selectedEvent) return;
-    const topAsset = selectedEvent.impactedTickers[0];
+    const topAsset = selectedEvent.impactedTickers?.[0];
+    const volMult = selectedEvent.projectionLineShift?.volatilityMultiplier ?? 1.15;
+    const expMove = topAsset ? topAsset.expectedMovePct : 3;
 
     const active = portfolioManager.getActiveStrategy();
     if (active) {
@@ -858,8 +901,8 @@ export default function GlobalNewsScan3D({
         name: `${active.name} [Shocked: ${selectedEvent.city}]`,
         parameters: {
           ...active.parameters,
-          stopLossPct: Number((0.04 * selectedEvent.projectionLineShift.volatilityMultiplier).toFixed(3)),
-          takeProfitPct: Number((0.08 * (1 + Math.abs(topAsset.expectedMovePct) / 100)).toFixed(3))
+          stopLossPct: Number((0.04 * volMult).toFixed(3)),
+          takeProfitPct: Number((0.08 * (1 + Math.abs(expMove) / 100)).toFixed(3))
         }
       });
     }
@@ -1688,7 +1731,7 @@ export default function GlobalNewsScan3D({
             </h4>
 
             <div className="divide-y divide-zinc-800/80">
-              {selectedEvent.impactedTickers.map((t) => (
+              {(selectedEvent.impactedTickers || []).map((t) => (
                 <div key={t.symbol} className="py-2 flex items-center justify-between text-xs">
                   <div>
                     <div className="font-bold text-white flex items-center gap-1.5">
@@ -1891,34 +1934,4 @@ export default function GlobalNewsScan3D({
   );
 }
 
-// Fallback items if API is initializing
-const FALLBACK_NEWS_EVENTS: GlobalNewsEvent[] = [
-  {
-    id: "scan-news-01",
-    headline: "Taiwan Foundry Clusters Ramp Advanced 2nm Packaging Lines Ahead of AI Server Surge",
-    summary: "Leading wafer fabrication hubs in Hsinchu & Tainan confirm 28% yield acceleration for next-gen hyperscaler accelerator chips.",
-    timestamp: new Date().toISOString(),
-    source: "Taipei Tech Digest",
-    city: "Taipei",
-    country: "Taiwan",
-    region: "Asia-Pacific",
-    lat: 25.033,
-    lng: 121.5654,
-    category: "Semiconductors & AI",
-    severity: "critical",
-    sentiment: "bullish",
-    sentimentScore: 0.88,
-    impactedTickers: [
-      { symbol: "NVDA", name: "NVIDIA Corp.", expectedMovePct: 4.2, baselineTarget: 138.5, shockedTarget: 144.3, transmissionReason: "Primary beneficiary of advanced packaging substrate throughput." },
-      { symbol: "TSM", name: "Taiwan Semiconductor", expectedMovePct: 4.8, baselineTarget: 188.0, shockedTarget: 197.0, transmissionReason: "Margin expansion on 2nm packaging volume." }
-    ],
-    projectionLineShift: {
-      baselineSlope: 0.04,
-      shockedSlope: 0.12,
-      volatilityMultiplier: 1.25,
-      horizonDays: 30,
-      recoveryHalfLifeDays: 14
-    },
-    connectedHub: { name: "Silicon Valley / San Francisco", lat: 37.7749, lng: -122.4194 }
-  }
-];
+

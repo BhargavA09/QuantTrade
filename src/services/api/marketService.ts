@@ -10,7 +10,7 @@ import {
   MarketAssetQuote, 
   DataValidityAuditResult, 
   MicroCalibrationSnapshot,
-  StanfordMedallionPipelineReport,
+  InstitutionalMedallionPipelineReport,
   GlobalNewsScanResponse,
   GlobalNewsEvent
 } from "./types";
@@ -250,19 +250,19 @@ export const fetchBatchDataValidity = async (tickers?: string[]): Promise<{ audi
 };
 
 /**
- * Fetch Stanford Data Engineering Medallion Pipeline & Lineage
+ * Fetch Institutional Data Engineering Medallion Pipeline & Lineage
  */
-export const fetchStanfordDataPipeline = async (ticker: string): Promise<StanfordMedallionPipelineReport> => {
+export const fetchInstitutionalDataPipeline = async (ticker: string): Promise<InstitutionalMedallionPipelineReport> => {
   const sym = encodeURIComponent(ticker.trim().toUpperCase());
-  return defaultApiClient.fetchWithRetry<StanfordMedallionPipelineReport>(`/api/market/stanford-pipeline/${sym}`);
+  return defaultApiClient.fetchWithRetry<InstitutionalMedallionPipelineReport>(`/api/market/pipeline/${sym}`);
 };
 
 /**
- * Fetch Stanford Data Governance Assessment
+ * Fetch Institutional Data Governance Assessment
  */
-export const fetchStanfordGovernance = async (ticker?: string): Promise<any> => {
+export const fetchInstitutionalGovernance = async (ticker?: string): Promise<any> => {
   const query = ticker ? `?ticker=${encodeURIComponent(ticker.trim().toUpperCase())}` : '';
-  return defaultApiClient.fetchWithRetry<any>(`/api/market/stanford-governance${query}`);
+  return defaultApiClient.fetchWithRetry<any>(`/api/market/governance${query}`);
 };
 
 /**
