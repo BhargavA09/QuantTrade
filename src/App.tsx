@@ -2492,6 +2492,16 @@ export default function App() {
                 allData={allData}
                 lastUpdate={lastUpdate}
                 fetchData={fetchData}
+                onSendToQuantLab={(t) => {
+                  if (t) {
+                    setActiveTicker(t);
+                    if (!tickers.includes(t)) {
+                      setTickers(prev => [...new Set([...prev, t])]);
+                      fetchData(t);
+                    }
+                  }
+                  setActiveTab('quantlab');
+                }}
               />
             )}
 

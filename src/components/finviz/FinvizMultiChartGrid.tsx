@@ -225,12 +225,13 @@ export const FinvizMultiChartGrid: React.FC<FinvizMultiChartGridProps> = ({
             ticker,
             name: ticker,
             price: 150.0,
-            changePercent: 1.25,
-            volume: '15.4M',
-            marketCap: '$450B',
+            change: 1.25,
+            volume: 15400000,
+            marketCap: 450000000000,
             pe: 28.4
           };
-          const isUp = (stock.changePercent ?? 0) >= 0;
+          const changeVal = (stock as any).change ?? (stock as any).changePercent ?? 0;
+          const isUp = changeVal >= 0;
           const chartData = getTileChartData(ticker, stock, allData);
 
           return (
@@ -260,7 +261,7 @@ export const FinvizMultiChartGrid: React.FC<FinvizMultiChartGridProps> = ({
                       )}
                     >
                       {isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                      {isUp ? '+' : ''}{stock.changePercent?.toFixed(2)}%
+                      {isUp ? '+' : ''}{changeVal.toFixed(2)}%
                     </span>
                   </div>
                 </div>

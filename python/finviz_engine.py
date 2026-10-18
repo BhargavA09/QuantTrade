@@ -726,6 +726,59 @@ class FinvizEngine:
             self.stocks_db[picked]["price"] = new_price
             self.stocks_db[picked]["change"] = chg_pct
 
+        # 10% chance to emit real-time quant pattern detection event (Ascending Triangle or Double Bottom)
+        if random.random() < 0.12:
+            alert_templates = [
+                {
+                    "ticker": "NVDA",
+                    "pattern": "Ascending Triangle (Bullish Accumulation)",
+                    "patternType": "ascending_triangle",
+                    "confidence": 94,
+                    "bias": "bullish",
+                    "description": "Higher lows pressing against horizontal resistance at 44.50 with expanding buy volume."
+                },
+                {
+                    "ticker": "TSLA",
+                    "pattern": "Double Bottom (W-Reversal)",
+                    "patternType": "double_bottom",
+                    "confidence": 89,
+                    "bias": "bullish",
+                    "description": "Two distinct rejection lows at 35.00 formed confirmed W-base with neckline breakout at 45.00."
+                },
+                {
+                    "ticker": "AAPL",
+                    "pattern": "Ascending Triangle Breakout",
+                    "patternType": "ascending_triangle",
+                    "confidence": 91,
+                    "bias": "bullish",
+                    "description": "Rising trendline support converging into 32.00 resistance corridor; upward expansion imminent."
+                },
+                {
+                    "ticker": "AMD",
+                    "pattern": "Double Bottom (W-Reversal)",
+                    "patternType": "double_bottom",
+                    "confidence": 88,
+                    "bias": "bullish",
+                    "description": "Confirmed support floor retest at 52.00; bullish MACD divergence confirms reversal."
+                }
+            ]
+            chosen = random.choice(alert_templates)
+            c_price = float(self.stocks_db.get(chosen["ticker"], {}).get("price", 150.0))
+            return {
+                "type": "PATTERN_ALERT",
+                "ticker": chosen["ticker"],
+                "companyName": self.stocks_db.get(chosen["ticker"], {}).get("name", chosen["ticker"]),
+                "pattern": chosen["pattern"],
+                "patternType": chosen["patternType"],
+                "confidence": chosen["confidence"],
+                "bias": chosen["bias"],
+                "description": chosen["description"],
+                "price": c_price,
+                "targetPrice": round(c_price * 1.11, 2),
+                "stopLoss": round(c_price * 0.965, 2),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
         return {
             "type": "PRICE_TICK",
             "ticker": picked,
@@ -810,17 +863,29 @@ class FinvizEngine:
             current_sup = round(current_res * 0.92, 2)
             s_slope = r_slope * 0.9
 
+        # Check for Double Bottom (W-Reversal) pattern in pivot lows
+        is_double_bottom = False
+        if len(pivot_lows) >= 2:
+            l1_p = pivot_lows[-2]["price"]
+            l2_p = pivot_lows[-1]["price"]
+            l_diff = abs(l1_p - l2_p) / (l1_p if l1_p > 0 else 1.0)
+            if l_diff < 0.028 and (pivot_lows[-1]["index"] - pivot_lows[-2]["index"]) >= 4:
+                is_double_bottom = True
+
         # Pattern classification
         diff_slope = r_slope - s_slope
-        if abs(diff_slope) < 0.08 and r_slope > 0.15:
+        if is_double_bottom:
+            pattern = "Double Bottom (W-Reversal)"
+            pattern_type = "bullish"
+        elif abs(r_slope) < 0.12 and s_slope > 0.12:
+            pattern = "Ascending Triangle (Bullish Accumulation)"
+            pattern_type = "bullish"
+        elif abs(diff_slope) < 0.08 and r_slope > 0.15:
             pattern = "Channel Up (Bullish Continuation)"
             pattern_type = "bullish"
         elif abs(diff_slope) < 0.08 and r_slope < -0.15:
             pattern = "Channel Down (Bearish Trend)"
             pattern_type = "bearish"
-        elif abs(r_slope) < 0.12 and s_slope > 0.12:
-            pattern = "Ascending Triangle (Bullish Accumulation)"
-            pattern_type = "bullish"
         elif abs(s_slope) < 0.12 and r_slope < -0.12:
             pattern = "Descending Triangle (Distribution Risk)"
             pattern_type = "bearish"
@@ -890,6 +955,46 @@ class FinvizEngine:
                 "lows": pivot_lows[-3:]
             }
         }
+
+    def scan_patterns(self, tickers: list = None) -> list:
+        """Scan market universe for technical patterns, highlighting Ascending Triangles and Double Bottoms."""
+        if not tickers:
+            tickers = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "META", "GOOGL", "AMZN", "PLTR", "COIN", "SMCI"]
+        results = []
+        for t in tickers:
+            try:
+                res = self.get_patterns(t)
+                if res.get("success"):
+                    p_name = res.get("pattern", "")
+                    p_type = "other"
+                    if "Ascending Triangle" in p_name:
+                        p_type = "ascending_triangle"
+                    elif "Double Bottom" in p_name:
+                        p_type = "double_bottom"
+                    elif "Channel Up" in p_name:
+                        p_type = "bull_channel"
+                    elif "Support" in p_name:
+                        p_type = "support_resistance"
+
+                    results.append({
+                        "ticker": t,
+                        "companyName": self.stocks_db.get(t, {}).get("name", t),
+                        "pattern": p_name,
+                        "patternType": p_type,
+                        "confidence": res.get("confidenceScore", 88),
+                        "currentPrice": res.get("currentPrice", 0),
+                        "targetPrice": res.get("targetPrice", 0),
+                        "stopLossPrice": res.get("stopLoss", 0),
+                        "supportLevel": res.get("supportLevel", 0),
+                        "resistanceLevel": res.get("resistanceLevel", 0),
+                        "status": res.get("status", ""),
+                        "bias": res.get("patternType", "bullish"),
+                        "isAscendingTriangle": p_type == "ascending_triangle",
+                        "isDoubleBottom": p_type == "double_bottom"
+                    })
+            except Exception as e:
+                pass
+        return results
 
     def get_calendar(self) -> dict:
         """Earnings & Economic Calendar with Consensus vs Actual Surprises."""

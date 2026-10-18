@@ -66,6 +66,7 @@ import {
 import { cn } from '../../utils/cn';
 import { detectAutomatedPatterns, ChartPattern } from '../../utils/patternRecognition';
 import { soundEngine } from '../../utils/audioAlerts';
+import { patternAlertManager } from '../../services/patternAlertService';
 
 interface FinvizChartWithProjectionsProps {
   ticker: string;
@@ -808,6 +809,34 @@ export const FinvizChartWithProjections: React.FC<FinvizChartWithProjectionsProp
                 )}
               </button>
             ))}
+
+            {activePattern && (
+              <button
+                onClick={() => {
+                  patternAlertManager.emitAlert({
+                    id: `chart-alert-${Date.now()}-${ticker}`,
+                    ticker: ticker,
+                    companyName: stock?.name || ticker,
+                    patternType: activePattern.type as any,
+                    patternName: activePattern.name,
+                    confidence: activePattern.confidence,
+                    currentPrice: stock?.price || 0,
+                    targetPrice: activePattern.targetPrice || 0,
+                    stopLossPrice: activePattern.stopLossPrice || 0,
+                    bias: activePattern.bias,
+                    description: activePattern.description,
+                    timestamp: 'Just now',
+                    read: false
+                  });
+                  soundEngine.playBullishBreakout();
+                }}
+                className="ml-auto px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 flex items-center gap-1.5 transition-all shadow-sm"
+                title="Broadcast active pattern alert to real-time notification radar"
+              >
+                <Bell size={11} className="text-cyan-400" />
+                <span>Broadcast Alert</span>
+              </button>
+            )}
           </div>
         )}
 

@@ -16,19 +16,29 @@ import {
   RefreshCw,
   Eye,
   Grid,
-  List
+  List,
+  Download,
+  FileSpreadsheet,
+  Zap,
+  Flame
 } from 'lucide-react';
 import { FINVIZ_STOCKS, FinvizStock } from '../../data/finvizData';
 import { cn } from '../../utils/cn';
+import { soundEngine } from '../../utils/audioAlerts';
 
 interface FinvizScreenerProps {
   onSelectTicker: (ticker: string) => void;
   allData?: Record<string, any>;
+  onSendToQuantLab?: (ticker: string) => void;
 }
 
 type ScreenerView = 'overview' | 'valuation' | 'financial' | 'ownership' | 'performance' | 'technical' | 'charts';
 
-export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker, allData }) => {
+export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ 
+  onSelectTicker, 
+  allData,
+  onSendToQuantLab 
+}) => {
   const [activeView, setActiveView] = useState<ScreenerView>('overview');
   const [exchangeFilter, setExchangeFilter] = useState<string>('any');
   const [marketCapFilter, setMarketCapFilter] = useState<string>('any');
@@ -156,6 +166,63 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker, 
     signalFilter, searchQuery, sortKey, sortAsc
   ]);
 
+  const exportToCSV = () => {
+    soundEngine.playNotificationTap();
+    const headers = ['Ticker', 'Name', 'Sector', 'Industry', 'Exchange', 'MarketCap', 'PE', 'Price', 'ChangePct', 'Volume', 'SMA20', 'SMA50', 'SMA200', 'RSI'];
+    const rows = filteredStocks.map(s => [
+      s.ticker,
+      `"${s.name.replace(/"/g, '""')}"`,
+      `"${s.sector}"`,
+      `"${s.industry}"`,
+      s.exchange,
+      s.marketCap,
+      s.pe,
+      s.price,
+      s.change,
+      s.volume,
+      s.sma20,
+      s.sma50,
+      s.sma200,
+      s.rsi
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `finviz_elite_screener_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToJSON = () => {
+    soundEngine.playNotificationTap();
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(filteredStocks, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', dataStr);
+    link.setAttribute('download', `finviz_elite_screener_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const applySignalPreset = (preset: string) => {
+    soundEngine.playBullishBreakout();
+    resetFilters();
+    if (preset === 'short_squeeze') {
+      setSignalFilter('short_squeeze');
+    } else if (preset === 'golden_cross') {
+      setSignalFilter('golden_cross');
+    } else if (preset === 'rsi_oversold') {
+      setRsiFilter('oversold');
+    } else if (preset === 'inst_buying') {
+      setSignalFilter('inst_buying');
+    } else if (preset === 'breakout') {
+      setSma20Filter('above');
+      setSma50Filter('above');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Finviz Screener Filter Controls Box */}
@@ -171,7 +238,25 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker, 
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap gap-2">
+            {/* 1-Click Export Buttons */}
+            <button
+              onClick={exportToCSV}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border border-emerald-500/30 transition-all shadow-sm"
+              title="Download CSV for Excel / Python Analysis"
+            >
+              <FileSpreadsheet size={12} />
+              Export CSV
+            </button>
+            <button
+              onClick={exportToJSON}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-cyan-400 border border-cyan-500/30 transition-all shadow-sm"
+              title="Download Raw JSON"
+            >
+              <Download size={12} />
+              Export JSON
+            </button>
+
             <button
               onClick={resetFilters}
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-750 transition-all"
@@ -190,6 +275,68 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker, 
               />
             </div>
           </div>
+        </div>
+
+        {/* Finviz Elite Quantitative Signal Presets Bar */}
+        <div className="pt-3 pb-2 flex flex-wrap items-center gap-2 border-b border-zinc-800/60">
+          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider flex items-center gap-1">
+            <Zap size={11} className="text-amber-400" />
+            Quant Signal Presets:
+          </span>
+          <button
+            onClick={() => applySignalPreset('short_squeeze')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1",
+              signalFilter === 'short_squeeze'
+                ? "bg-rose-500/20 text-rose-300 border-rose-500 shadow-sm"
+                : "bg-zinc-950/80 text-zinc-400 border-zinc-800 hover:text-rose-400 hover:border-rose-500/40"
+            )}
+          >
+            <Flame size={12} className="text-rose-400" />
+            Short Squeeze Candidates (Float &gt; 15%)
+          </button>
+          <button
+            onClick={() => applySignalPreset('golden_cross')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1",
+              signalFilter === 'golden_cross'
+                ? "bg-amber-500/20 text-amber-300 border-amber-500 shadow-sm"
+                : "bg-zinc-950/80 text-zinc-400 border-zinc-800 hover:text-amber-400 hover:border-amber-500/40"
+            )}
+          >
+            <TrendingUp size={12} className="text-amber-400" />
+            Golden Cross (SMA50 &gt; SMA200)
+          </button>
+          <button
+            onClick={() => applySignalPreset('rsi_oversold')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1",
+              rsiFilter === 'oversold'
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500 shadow-sm"
+                : "bg-zinc-950/80 text-zinc-400 border-zinc-800 hover:text-emerald-400 hover:border-emerald-500/40"
+            )}
+          >
+            <Activity size={12} className="text-emerald-400" />
+            RSI Oversold Bounce (RSI &lt; 30)
+          </button>
+          <button
+            onClick={() => applySignalPreset('inst_buying')}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1",
+              signalFilter === 'inst_buying'
+                ? "bg-purple-500/20 text-purple-300 border-purple-500 shadow-sm"
+                : "bg-zinc-950/80 text-zinc-400 border-zinc-800 hover:text-purple-400 hover:border-purple-500/40"
+            )}
+          >
+            <Sparkles size={12} className="text-purple-400" />
+            High Institutional Buying (&gt; 70%)
+          </button>
+          <button
+            onClick={() => applySignalPreset('breakout')}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all border bg-zinc-950/80 text-zinc-400 border-zinc-800 hover:text-cyan-400 hover:border-cyan-500/40"
+          >
+            New Highs & Breakouts
+          </button>
         </div>
 
         {/* 2-Row Filter Grid */}
@@ -358,8 +505,23 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker, 
           ))}
         </div>
 
-        <div className="text-[11px] font-mono text-zinc-400 flex items-center gap-2">
-          <span>Sort by: <strong className="text-zinc-200">{String(sortKey)}</strong> ({sortAsc ? 'ASC' : 'DESC'})</span>
+        <div className="flex items-center gap-3">
+          {onSendToQuantLab && filteredStocks.length > 0 && (
+            <button
+              onClick={() => {
+                onSendToQuantLab(filteredStocks[0].ticker);
+                soundEngine.playBullishBreakout();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 text-xs font-mono font-bold transition-all shadow-sm"
+              title="Port top filtered asset to Monte Carlo / HFT Engine"
+            >
+              <Sparkles size={12} className="text-purple-400" />
+              <span>Send {filteredStocks[0].ticker} to QuantLab</span>
+            </button>
+          )}
+          <div className="text-[11px] font-mono text-zinc-400 flex items-center gap-2">
+            <span>Sort by: <strong className="text-zinc-200">{String(sortKey)}</strong> ({sortAsc ? 'ASC' : 'DESC'})</span>
+          </div>
         </div>
       </div>
 
@@ -664,16 +826,27 @@ export const FinvizScreener: React.FC<FinvizScreenerProps> = ({ onSelectTicker, 
                     )}
 
                     <td className="py-2 px-3 text-center">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectTicker(stock.ticker);
-                        }}
-                        className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-[10px] font-bold uppercase transition-all flex items-center gap-1 mx-auto"
-                      >
-                        <Sparkles size={10} />
-                        Quant
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <button 
+                          onClick={() => onSelectTicker(stock.ticker)}
+                          className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-[10px] font-bold uppercase transition-all"
+                        >
+                          Chart
+                        </button>
+                        {onSendToQuantLab && (
+                          <button
+                            onClick={() => {
+                              onSendToQuantLab(stock.ticker);
+                              soundEngine.playBullishBreakout();
+                            }}
+                            className="px-2 py-0.5 rounded bg-purple-500/20 border border-purple-500/40 text-purple-300 hover:bg-purple-500/30 text-[10px] font-bold uppercase transition-all flex items-center gap-0.5"
+                            title="Send to QuantLab Monte Carlo"
+                          >
+                            <Sparkles size={9} />
+                            QuantLab
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

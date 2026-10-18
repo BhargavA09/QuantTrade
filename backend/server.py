@@ -334,6 +334,17 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
         if path in ["/api/finviz/crypto"]:
             return self._send_json(finviz_engine.get_crypto())
 
+        # Finviz Technical Pattern Recognition Engine for Single Ticker
+        if path.startswith("/api/finviz/patterns/"):
+            ticker = path.split("/")[-1].upper()
+            return self._send_json(finviz_engine.get_patterns(ticker))
+
+        # Finviz Comprehensive Pattern Radar Scanner
+        if path in ["/api/finviz/pattern-scan", "/api/finviz/patterns"]:
+            tickers_p = query.get("tickers", [""])[0]
+            ticker_list = [t.strip().upper() for t in tickers_p.split(",") if t.strip()] if tickers_p else None
+            return self._send_json({"success": True, "patterns": finviz_engine.scan_patterns(ticker_list)})
+
         # Finviz Individual Stock 6x12 Metric Fundamental & Valuation Matrix
         if path.startswith("/api/finviz/ticker/"):
             ticker = path.split("/")[-1].upper()

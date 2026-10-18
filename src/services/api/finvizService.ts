@@ -99,12 +99,11 @@ export interface FinvizFuturesResponse {
 export interface FinvizForexResponse {
   success: boolean;
   forex: Array<{
-    pair: string;
-    rate: number;
+    ticker: string;
+    name: string;
+    price: number;
     change: number;
     changePercent: number;
-    high: number;
-    low: number;
   }>;
 }
 
@@ -114,6 +113,7 @@ export interface FinvizCryptoResponse {
     symbol: string;
     name: string;
     price: number;
+    change: number;
     changePercent: number;
     marketCap: string;
     volume24h: string;
@@ -128,21 +128,39 @@ export async function fetchFinvizOverview(): Promise<FinvizOverviewResponse> {
   return res.json();
 }
 
-export async function fetchFinvizScreener(params: Record<string, any> = {}): Promise<FinvizScreenerResponse> {
+export async function fetchFinvizScreener(params: Record<string, string | number> = {}): Promise<FinvizScreenerResponse> {
   const query = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null && v !== '' && v !== 'any') {
-      query.set(k, String(v));
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') {
+      query.append(k, String(v));
     }
-  }
+  });
   const res = await fetch(`${API_BASE}/screener?${query.toString()}`);
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz screener`);
   return res.json();
 }
 
+export async function fetchFinvizTreemap(universe = 'sp500', timeframe = '1D'): Promise<any> {
+  const res = await fetch(`${API_BASE}/treemap?universe=${universe}&timeframe=${timeframe}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz treemap`);
+  return res.json();
+}
+
+export async function fetchFinvizGroups(timeframe = '1D'): Promise<any> {
+  const res = await fetch(`${API_BASE}/groups?timeframe=${timeframe}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz groups`);
+  return res.json();
+}
+
 export async function fetchFinvizInsiders(): Promise<FinvizInsidersResponse> {
   const res = await fetch(`${API_BASE}/insiders`);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz insider trades`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz insiders`);
+  return res.json();
+}
+
+export async function fetchFinvizNews(category = 'all'): Promise<{ news: any[] }> {
+  const res = await fetch(`${API_BASE}/news?category=${category}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz news`);
   return res.json();
 }
 
@@ -171,14 +189,52 @@ export async function fetchFinvizTicker(ticker: string): Promise<{ success: bool
 }
 
 export interface StreamEvent {
-  type: 'PRICE_TICK' | 'SNAPSHOT';
+  type: 'PRICE_TICK' | 'SNAPSHOT' | 'PATTERN_ALERT';
   ticker?: string;
+  companyName?: string;
+  pattern?: string;
+  patternType?: 'ascending_triangle' | 'double_bottom' | 'support_resistance' | 'bull_channel' | 'other';
+  confidence?: number;
+  bias?: 'bullish' | 'bearish' | 'neutral';
   price?: number;
   change?: number;
   changePercent?: number;
   volume?: number;
+  targetPrice?: number;
+  stopLoss?: number;
+  description?: string;
   timestamp?: string;
   data?: any;
+}
+
+export interface FinvizPatternScanResult {
+  ticker: string;
+  companyName: string;
+  pattern: string;
+  patternType: 'ascending_triangle' | 'double_bottom' | 'support_resistance' | 'bull_channel' | 'other';
+  confidence: number;
+  currentPrice: number;
+  targetPrice: number;
+  stopLossPrice: number;
+  supportLevel: number;
+  resistanceLevel: number;
+  status: string;
+  bias: 'bullish' | 'bearish' | 'neutral';
+  isAscendingTriangle: boolean;
+  isDoubleBottom: boolean;
+}
+
+export async function fetchFinvizPatterns(ticker: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/patterns/${encodeURIComponent(ticker.toUpperCase())}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz patterns for ${ticker}`);
+  return res.json();
+}
+
+export async function fetchFinvizPatternScan(tickers?: string[]): Promise<{ success: boolean; patterns: FinvizPatternScanResult[] }> {
+  const q = tickers && tickers.length > 0 ? `?tickers=${encodeURIComponent(tickers.join(','))}` : '';
+  const res = await fetch(`${API_BASE}/pattern-scan${q}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching Finviz pattern scan`);
+  return res.json();
 }
 
 /**
