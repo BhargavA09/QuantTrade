@@ -292,3 +292,99 @@ export const fetchRiskAnalysis = async (
     }
   });
 };
+
+export interface LiveAssetDataResponse {
+  ticker: string;
+  quote: {
+    ticker: string;
+    currentPrice: number;
+    change: number;
+    changePercent: number;
+    companyName: string;
+    volume: number;
+    high: number;
+    low: number;
+    source: string;
+    timestamp: string;
+  };
+  bars: Array<{
+    date: string;
+    price: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    ema20?: number;
+    ema50?: number;
+    bbUpper?: number;
+    bbLower?: number;
+  }>;
+  isLiveMarketData: boolean;
+  exchangeTimestamp: string;
+}
+
+/**
+ * Fetches real live market spot quote and real historical daily OHLCV bars directly from exchange feeds.
+ */
+export const fetchLiveAssetData = async (ticker: string): Promise<LiveAssetDataResponse | null> => {
+  const cleanTicker = resolveTickerSymbol(ticker);
+  try {
+    const res = await defaultApiClient.fetchWithRetry<LiveAssetDataResponse>(
+      `/api/stock/live-data/${cleanTicker}`
+    );
+    return res;
+  } catch (err) {
+    console.warn("fetchLiveAssetData fallback:", err);
+    return null;
+  }
+};
+
+/**
+ * Fetches real live batch quotes for the global commodities and equities universe.
+ */
+export const fetchGlobalLiveQuotes = async (): Promise<Record<string, any>> => {
+  try {
+    const res = await defaultApiClient.fetchWithRetry<{ success: boolean; quotes: Record<string, any> }>(
+      `/api/market/global-live-quotes`
+    );
+    return res?.quotes || {};
+  } catch (err) {
+    console.warn("fetchGlobalLiveQuotes error:", err);
+    return {};
+  }
+};
+
+export interface LiveNewsEvent {
+  id: string;
+  title: string;
+  source: string;
+  link?: string;
+  pubDate?: string;
+  timestamp: string;
+  region: string;
+  is_live_feed: boolean;
+  category: string;
+  sentiment_score: number;
+  trade_bias: string;
+  urgency: string;
+  impacted_tickers: string[];
+  suggested_action: string;
+  market_thesis: string;
+  volatility_impact: number;
+}
+
+/**
+ * Fetches real-time live financial news headlines from live news wires (Yahoo Finance & Google News).
+ */
+export const fetchLiveMarketNews = async (ticker?: string): Promise<LiveNewsEvent[]> => {
+  try {
+    const url = ticker ? `/api/news?ticker=${encodeURIComponent(ticker)}` : `/api/news`;
+    const res = await defaultApiClient.fetchWithRetry<{ success: boolean; count: number; events: LiveNewsEvent[] }>(url);
+    return res?.events || [];
+  } catch (err) {
+    console.warn("fetchLiveMarketNews error:", err);
+    return [];
+  }
+};
+

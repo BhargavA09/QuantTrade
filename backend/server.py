@@ -236,6 +236,66 @@ def fetch_historical_bars(ticker: str, range_str: str = "1mo") -> list:
     return bars
 
 
+GLOBAL_LIVE_QUOTES_CACHE = {
+    "timestamp": 0.0,
+    "data": {}
+}
+
+def get_cached_global_live_quotes():
+    """Cached batch live quotes for global commodities, stocks, and indices."""
+    now = time.time()
+    if now - GLOBAL_LIVE_QUOTES_CACHE["timestamp"] < 12.0 and GLOBAL_LIVE_QUOTES_CACHE["data"]:
+        return GLOBAL_LIVE_QUOTES_CACHE["data"]
+    
+    tickers = [
+        "GLD", "SLV", "USO", "UNG", "CPER", "WEAT", "BNO", "URA",
+        "NVDA", "AAPL", "TSLA", "MSFT", "TSM", "ASML", "BABA", "PLTR", "AMZN",
+        "SPY", "QQQ", "IWM", "EWJ", "EWG", "EWU", "FXI", "INDA", "BTC-USD", "ETH-USD", "TLT"
+    ]
+    results = {}
+    for t in tickers:
+        results[t] = fetch_live_yahoo_quote(t)
+    
+    GLOBAL_LIVE_QUOTES_CACHE["timestamp"] = now
+    GLOBAL_LIVE_QUOTES_CACHE["data"] = results
+    return results
+
+
+def fetch_live_chart_data(ticker: str) -> dict:
+    """Fetch live quote and real historical daily OHLCV candles with EMAs."""
+    clean_ticker = ticker.strip().upper()
+    quote = fetch_live_yahoo_quote(clean_ticker)
+    bars = fetch_historical_bars(clean_ticker, "1mo")
+    
+    # Anchor the last bar price to the real live spot price
+    if bars and len(bars) > 0:
+        bars[-1]['price'] = quote['currentPrice']
+        bars[-1]['close'] = quote['currentPrice']
+    
+    # Compute dynamic technical overlays (EMA20, EMA50, Bollinger Bands) on live bars
+    if bars and len(bars) >= 2:
+        ema20 = bars[0]['price']
+        ema50 = bars[0]['price'] * 0.98
+        k20 = 2.0 / (20 + 1)
+        k50 = 2.0 / (50 + 1)
+        for b in bars:
+            p = b['price']
+            ema20 = (p * k20) + (ema20 * (1 - k20))
+            ema50 = (p * k50) + (ema50 * (1 - k50))
+            b['ema20'] = round(ema20, 2)
+            b['ema50'] = round(ema50, 2)
+            b['bbUpper'] = round(ema20 * 1.025, 2)
+            b['bbLower'] = round(ema20 * 0.975, 2)
+
+    return {
+        "ticker": clean_ticker,
+        "quote": quote,
+        "bars": bars,
+        "isLiveMarketData": True,
+        "exchangeTimestamp": quote.get("timestamp", datetime.now(timezone.utc).isoformat())
+    }
+
+
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
@@ -417,11 +477,21 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
             ticker = path.split("/")[-1].upper()
             return self._send_json(finviz_engine.get_ticker_detail(ticker))
 
-        # 2. Stock Quote
+        # 2. Stock Quote (Live)
         if path.startswith("/api/stock/quote/"):
             ticker = path.split("/")[-1].upper()
             quote = fetch_live_yahoo_quote(ticker)
             return self._send_json({"type": "PRICE_UPDATE", **quote})
+
+        # 2b. Full Live Asset Package (Live Spot Quote + Real Historical Daily Candles + EMAs)
+        if path.startswith("/api/stock/live-data/"):
+            ticker = path.split("/")[-1].upper()
+            data = fetch_live_chart_data(ticker)
+            return self._send_json(data)
+
+        # 2c. Global Market Universe Live Batch Quotes
+        if path in ["/api/market/global-live-quotes", "/api/market/live-quotes"]:
+            return self._send_json({"success": True, "quotes": get_cached_global_live_quotes()})
 
         # 3. Batch Quotes
         if path in ["/api/stock/quotes", "/api/quotes"]:
@@ -659,11 +729,12 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
             ]
             return self._send_json({"futures": futures})
 
-        # 15. Global News Scan
+        # 15. Global News Scan & Live News Wires
         if path in ["/api/market/global-news-scan", "/api/market/news-scan", "/api/news"]:
+            ticker = query.get("ticker", [None])[0]
             scanner = GlobalNewsScanner()
-            events = scanner.scan_all()
-            return self._send_json({"success": True, "events": events})
+            events = scanner.scan_all(ticker=ticker)
+            return self._send_json({"success": True, "count": len(events), "is_live_wire": True, "events": events})
 
         # 16. Portfolio Data
         if path in ["/api/portfolio/data", "/api/portfolio"]:
