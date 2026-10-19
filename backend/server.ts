@@ -36,7 +36,10 @@ function startPythonBackend() {
   });
 
   pythonProcess.on("exit", (code, signal) => {
-    console.warn(`[Python Core] Process exited with code ${code}, signal ${signal}`);
+    console.warn(`[Python Core] Process exited with code ${code}, signal ${signal}. Respawning in 800ms...`);
+    setTimeout(() => {
+      startPythonBackend();
+    }, 800);
   });
 }
 
