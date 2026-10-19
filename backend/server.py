@@ -81,7 +81,26 @@ BASELINE_MARKET_PRICES = {
     'ETH-USD': {'price': 2640.00, 'change': 54.00, 'changePercent': 2.09, 'name': 'Ethereum USD', 'pe': 0, 'high': 2690.00, 'low': 2580.00, 'volume': 14200000000},
     'ZIM': {'price': 24.80, 'change': 1.65, 'changePercent': 7.13, 'name': 'ZIM Integrated Shipping', 'pe': 4.2, 'high': 25.40, 'low': 23.00, 'volume': 8900000},
     '^TNX': {'price': 4.14, 'change': 0.02, 'changePercent': 0.48, 'name': '10Y Treasury Yield', 'pe': 0, 'high': 4.18, 'low': 4.10, 'volume': 0},
-    'TLT': {'price': 94.50, 'change': -0.45, 'changePercent': -0.47, 'name': '20Y Treasury Bond ETF', 'pe': 0, 'high': 95.20, 'low': 94.10, 'volume': 19500000}
+    'TLT': {'price': 94.50, 'change': -0.45, 'changePercent': -0.47, 'name': '20Y Treasury Bond ETF', 'pe': 0, 'high': 95.20, 'low': 94.10, 'volume': 19500000},
+    # Commodities
+    'GLD': {'price': 246.50, 'change': 1.85, 'changePercent': 0.76, 'name': 'SPDR Gold Shares', 'pe': 0, 'high': 247.20, 'low': 245.10, 'volume': 8500000},
+    'SLV': {'price': 29.40, 'change': 0.62, 'changePercent': 2.15, 'name': 'iShares Silver Trust', 'pe': 0, 'high': 29.80, 'low': 28.90, 'volume': 18500000},
+    'USO': {'price': 74.20, 'change': -1.10, 'changePercent': -1.46, 'name': 'United States Oil Fund', 'pe': 0, 'high': 75.80, 'low': 73.60, 'volume': 6400000},
+    'UNG': {'price': 12.80, 'change': 0.45, 'changePercent': 3.64, 'name': 'United States Natural Gas', 'pe': 0, 'high': 13.10, 'low': 12.40, 'volume': 11200000},
+    'CPER': {'price': 26.10, 'change': 0.38, 'changePercent': 1.48, 'name': 'United States Copper Index', 'pe': 0, 'high': 26.40, 'low': 25.80, 'volume': 1400000},
+    'WEAT': {'price': 5.62, 'change': 0.08, 'changePercent': 1.44, 'name': 'Teucrium Wheat Fund', 'pe': 0, 'high': 5.70, 'low': 5.55, 'volume': 980000},
+    'BNO': {'price': 28.30, 'change': -0.35, 'changePercent': -1.22, 'name': 'United States Brent Oil', 'pe': 0, 'high': 28.80, 'low': 28.10, 'volume': 1100000},
+    'URA': {'price': 31.40, 'change': 1.20, 'changePercent': 3.97, 'name': 'Global X Uranium ETF', 'pe': 0, 'high': 31.90, 'low': 30.50, 'volume': 4200000},
+    # Global Equities & International Markets
+    'TSM': {'price': 192.50, 'change': 3.80, 'changePercent': 2.01, 'name': 'Taiwan Semiconductor Mfg', 'pe': 29.4, 'high': 194.20, 'low': 189.50, 'volume': 18500000},
+    'ASML': {'price': 745.00, 'change': 14.50, 'changePercent': 1.99, 'name': 'ASML Holding N.V.', 'pe': 39.8, 'high': 752.00, 'low': 736.00, 'volume': 2100000},
+    'BABA': {'price': 98.60, 'change': 2.40, 'changePercent': 2.49, 'name': 'Alibaba Group Holding', 'pe': 18.2, 'high': 100.20, 'low': 96.80, 'volume': 24500000},
+    'EWJ': {'price': 72.40, 'change': 0.85, 'changePercent': 1.19, 'name': 'iShares MSCI Japan ETF', 'pe': 16.5, 'high': 72.90, 'low': 71.80, 'volume': 7200000},
+    'EWG': {'price': 33.80, 'change': 0.28, 'changePercent': 0.84, 'name': 'iShares MSCI Germany ETF', 'pe': 14.2, 'high': 34.10, 'low': 33.50, 'volume': 3400000},
+    'EWU': {'price': 36.20, 'change': 0.15, 'changePercent': 0.42, 'name': 'iShares MSCI United Kingdom ETF', 'pe': 13.8, 'high': 36.50, 'low': 35.90, 'volume': 2800000},
+    'FXI': {'price': 31.50, 'change': 0.72, 'changePercent': 2.34, 'name': 'iShares China Large-Cap ETF', 'pe': 11.4, 'high': 32.00, 'low': 30.90, 'volume': 38000000},
+    'INDA': {'price': 55.10, 'change': 0.45, 'changePercent': 0.82, 'name': 'iShares MSCI India ETF', 'pe': 24.6, 'high': 55.60, 'low': 54.80, 'volume': 4900000},
+    'EEM': {'price': 44.80, 'change': 0.65, 'changePercent': 1.47, 'name': 'iShares MSCI Emerging Markets ETF', 'pe': 15.1, 'high': 45.20, 'low': 44.30, 'volume': 31000000}
 }
 
 
