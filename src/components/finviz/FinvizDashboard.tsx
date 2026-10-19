@@ -25,7 +25,9 @@ import {
   Pause,
   X,
   Activity,
-  Target
+  Target,
+  FolderGit2,
+  Brain
 } from 'lucide-react';
 import { patternAlertManager, PatternAlert } from '../../services/patternAlertService';
 import { fetchFinvizPatternScan } from '../../services/api/finvizService';
@@ -43,14 +45,16 @@ import { FinvizMultiChartGrid } from './FinvizMultiChartGrid';
 import { FinvizCalendar } from './FinvizCalendar';
 import { FinvizWhaleRadar } from './FinvizWhaleRadar';
 import { FinvizPatternHistory } from './FinvizPatternHistory';
+import { QuantPortfolioSuite } from '../quant/QuantPortfolioSuite';
 import { FinvizNotificationCenter } from './FinvizNotificationCenter';
+import { ContinuousLearningStudio } from '../ContinuousLearningStudio';
 import { soundEngine } from '../../utils/audioAlerts';
 
 import { FINVIZ_NEWS, FINVIZ_STOCKS } from '../../data/finvizData';
 import { subscribeFinvizStream, StreamEvent } from '../../services/api/finvizService';
 import { cn } from '../../utils/cn';
 
-export type FinvizTab = 'home' | 'news' | 'screener' | 'chart' | 'multichart' | 'calendar' | 'whale' | 'patterns' | 'map' | 'groups' | 'futures' | 'forex' | 'insiders' | 'crypto';
+export type FinvizTab = 'home' | 'news' | 'screener' | 'chart' | 'multichart' | 'calendar' | 'whale' | 'patterns' | 'quant_suite' | 'continuous_learning' | 'map' | 'groups' | 'futures' | 'forex' | 'insiders' | 'crypto';
 
 interface FinvizDashboardProps {
   initialTicker?: string;
@@ -395,6 +399,22 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
                   </span>
                 )}
               </button>
+
+              {/* Continuous Learning Engine Button */}
+              <button
+                onClick={() => setActiveTab('continuous_learning')}
+                className={cn(
+                  "relative flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border transition-all shadow-sm",
+                  activeTab === 'continuous_learning'
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-indigo-950/40 border-indigo-500/30 text-indigo-300 hover:bg-indigo-900/40"
+                )}
+                title="Continuous Daily & News Learning Core"
+              >
+                <Brain size={13} className="text-indigo-400" />
+                <span className="font-mono">AI Learning</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              </button>
             </div>
 
           </div>
@@ -543,6 +563,31 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
             >
               <Target size={13} className="text-cyan-400" />
               Pattern History
+            </button>
+            <button
+              onClick={() => setActiveTab('quant_suite')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5",
+                activeTab === 'quant_suite'
+                  ? "bg-zinc-800 text-cyan-400 font-black shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+              )}
+            >
+              <FolderGit2 size={13} className="text-cyan-400" />
+              <span>Quant Portfolio (5 Models)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('continuous_learning')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border relative group",
+                activeTab === 'continuous_learning'
+                  ? "bg-indigo-600 text-white font-black border-indigo-500 shadow-sm"
+                  : "border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
+              )}
+            >
+              <Brain size={13} className="text-indigo-400 group-hover:scale-110 transition-transform" />
+              <span>Continuous Learning</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping absolute -top-0.5 -right-0.5" />
             </button>
             <button
               onClick={() => setActiveTab('chart')}
@@ -763,6 +808,38 @@ export const FinvizDashboard: React.FC<FinvizDashboardProps> = ({
                 onSelectTicker={handleSelectTicker}
                 onSendToQuantLab={onSendToQuantLab}
                 allData={allData}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'quant_suite' && (
+            <motion.div
+              key="finviz-quant-suite"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              <QuantPortfolioSuite
+                initialTicker={selectedTicker}
+                onSelectTicker={handleSelectTicker}
+                onOpenRiskEngine={onOpenRiskEngine}
+                onSendToQuantLab={onSendToQuantLab}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'continuous_learning' && (
+            <motion.div
+              key="finviz-continuous-learning"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              <ContinuousLearningStudio
+                onNavigateToNews={() => setActiveTab('news')}
+                onNavigateToScreener={() => setActiveTab('screener')}
               />
             </motion.div>
           )}

@@ -42,15 +42,16 @@ function startPythonBackend() {
 
 function proxyToPythonBackend(req: express.Request, res: express.Response) {
   const targetPath = req.originalUrl || (req.url.startsWith('/api') ? req.url : `/api${req.url}`);
+  const headers = { ...req.headers, host: `127.0.0.1:${PYTHON_PORT}` };
+  delete headers["connection"];
+  delete headers["transfer-encoding"];
+
   const options: http.RequestOptions = {
     hostname: "127.0.0.1",
     port: PYTHON_PORT,
     path: targetPath,
     method: req.method,
-    headers: {
-      ...req.headers,
-      host: `127.0.0.1:${PYTHON_PORT}`,
-    },
+    headers,
   };
 
   const bodyStr = req.body && Object.keys(req.body).length > 0 
@@ -70,15 +71,21 @@ function proxyToPythonBackend(req: express.Request, res: express.Response) {
   });
 
   proxyReq.on("error", (err) => {
-    res.status(503).json({
-      error: "Python Backend initializing",
-      details: err.message,
-      engine: "Python-QuantLab-Core"
-    });
+    if (!res.headersSent) {
+      res.status(503).json({
+        error: "Python Backend initializing",
+        details: err.message,
+        engine: "Python-QuantLab-Core"
+      });
+    }
   });
 
   if (bodyStr) {
     proxyReq.write(bodyStr);
+    proxyReq.end();
+  } else if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE" || req.method === "OPTIONS") {
+    proxyReq.end();
+  } else if (req.readableEnded) {
     proxyReq.end();
   } else {
     req.pipe(proxyReq);

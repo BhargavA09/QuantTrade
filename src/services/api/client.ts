@@ -139,7 +139,21 @@ export class ApiClient {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const timer = setTimeout(() => {
+        controller.abort(new Error(`Request timeout of ${timeoutMs}ms exceeded`));
+      }, timeoutMs);
+
+      const onCallerAbort = () => {
+        controller.abort(fetchOptions.signal?.reason || new Error("Operation aborted"));
+      };
+
+      if (fetchOptions.signal) {
+        if (fetchOptions.signal.aborted) {
+          controller.abort(fetchOptions.signal.reason);
+        } else {
+          fetchOptions.signal.addEventListener('abort', onCallerAbort, { once: true });
+        }
+      }
 
       try {
         const response = await fetch(fullUrl, {
@@ -147,6 +161,9 @@ export class ApiClient {
           signal: controller.signal
         });
         clearTimeout(timer);
+        if (fetchOptions.signal) {
+          fetchOptions.signal.removeEventListener('abort', onCallerAbort);
+        }
 
         const contentType = response.headers.get('content-type') || '';
 
@@ -172,6 +189,9 @@ export class ApiClient {
         return await response.json();
       } catch (error: any) {
         clearTimeout(timer);
+        if (fetchOptions.signal) {
+          fetchOptions.signal.removeEventListener('abort', onCallerAbort);
+        }
         lastError = error;
 
         // Immediately fail on non-retryable conditions

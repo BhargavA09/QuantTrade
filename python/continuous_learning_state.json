@@ -1,0 +1,523 @@
+{
+  "version": "2.4.0-ContinuousQuant",
+  "engine_status": "AUTONOMOUS_ONLINE",
+  "auto_learning_enabled": true,
+  "last_learning_time": "2026-10-19T05:34:55.395011+00:00",
+  "learning_rate": 0.035,
+  "momentum_decay": 0.92,
+  "current_day": 16,
+  "total_epochs_trained": 15,
+  "current_loss": 0.0146,
+  "cumulative_accuracy": 81.0,
+  "current_weights": {
+    "momentum": 0.2914,
+    "mean_reversion": 0.21,
+    "pattern_breakout": 0.1888,
+    "news_catalyst": 0.1881,
+    "volatility_penalty": 0.0829,
+    "order_flow": 0.0387
+  },
+  "factor_performance": {
+    "momentum": {
+      "sharpe": 1.94,
+      "win_rate": 74.2,
+      "alpha_contribution": "+4.8%"
+    },
+    "mean_reversion": {
+      "sharpe": 1.42,
+      "win_rate": 61.5,
+      "alpha_contribution": "+2.3%"
+    },
+    "pattern_breakout": {
+      "sharpe": 1.78,
+      "win_rate": 69.8,
+      "alpha_contribution": "+3.9%"
+    },
+    "news_catalyst": {
+      "sharpe": 1.65,
+      "win_rate": 66.4,
+      "alpha_contribution": "+3.2%"
+    },
+    "volatility_penalty": {
+      "sharpe": 2.1,
+      "win_rate": 81.0,
+      "alpha_contribution": "+5.4%"
+    },
+    "order_flow": {
+      "sharpe": 1.35,
+      "win_rate": 58.7,
+      "alpha_contribution": "+1.7%"
+    }
+  },
+  "news_categories": {
+    "SEMICONDUCTORS": {
+      "reliability": 1.105,
+      "fade_rate": 0.112,
+      "sample_tickers": [
+        "NVDA",
+        "TSM",
+        "AMD",
+        "ASML"
+      ],
+      "confirmed_count": 19,
+      "faded_count": 3
+    },
+    "MARITIME_SUPPLY_CHAIN": {
+      "reliability": 1.165,
+      "fade_rate": 0.072,
+      "sample_tickers": [
+        "ZIM",
+        "MATX",
+        "BDRY"
+      ],
+      "confirmed_count": 15,
+      "faded_count": 2
+    },
+    "ENERGY_AND_COMMODITIES": {
+      "reliability": 1.02,
+      "fade_rate": 0.15,
+      "sample_tickers": [
+        "XOM",
+        "CVX",
+        "USO"
+      ],
+      "confirmed_count": 12,
+      "faded_count": 4
+    },
+    "CENTRAL_BANKS_MACRO": {
+      "reliability": 1.205,
+      "fade_rate": 0.052,
+      "sample_tickers": [
+        "SPY",
+        "QQQ",
+        "TLT",
+        "DXY"
+      ],
+      "confirmed_count": 23,
+      "faded_count": 2
+    },
+    "AEROSPACE_DEFENSE": {
+      "reliability": 0.98,
+      "fade_rate": 0.18,
+      "sample_tickers": [
+        "LMT",
+        "RTX",
+        "NOC"
+      ],
+      "confirmed_count": 9,
+      "faded_count": 3
+    },
+    "EV_AND_CLEAN_TECH": {
+      "reliability": 0.9,
+      "fade_rate": 0.26,
+      "sample_tickers": [
+        "TSLA",
+        "RIVN",
+        "ENPH"
+      ],
+      "confirmed_count": 11,
+      "faded_count": 7
+    }
+  },
+  "recent_news_learnings": [
+    {
+      "id": "NL-88095-74",
+      "timestamp": "2026-10-19T05:34:55.395011+00:00",
+      "headline": "Federal Open Market Committee Minutes Reaffirm Data-Driven Rate Adjustments",
+      "category": "CENTRAL_BANKS_MACRO",
+      "sentiment": 0.35,
+      "market_reaction": "+0.42% SPY, 10Y Yield -4bps",
+      "outcome": "CONFIRMED_LEADERSHIP",
+      "weight_adjustment": "+3.0% confidence in CENTRAL_BANKS_MACRO signal translation",
+      "reliability_score": 1.205
+    },
+    {
+      "id": "NL-88095-28",
+      "timestamp": "2026-10-19T05:34:55.395011+00:00",
+      "headline": "Enterprise Generative AI Server Clusters Drive 40% Increase in High-Bandwidth Memory Demand",
+      "category": "SEMICONDUCTORS",
+      "sentiment": 0.82,
+      "market_reaction": "+3.45% NVDA, +2.80% AMD",
+      "outcome": "CONFIRMED_LEADERSHIP",
+      "weight_adjustment": "+2.8% confidence in SEMICONDUCTORS signal translation",
+      "reliability_score": 1.105
+    },
+    {
+      "id": "NL-88095-58",
+      "timestamp": "2026-10-19T05:34:55.395011+00:00",
+      "headline": "Panama Canal Authority Raises Daily Draft Limits as Reservoir Depths Normalise",
+      "category": "MARITIME_SUPPLY_CHAIN",
+      "sentiment": 0.28,
+      "market_reaction": "Freight Rates Stabilizing",
+      "outcome": "CONFIRMED_FLOW",
+      "weight_adjustment": "+2.9% confidence in MARITIME_SUPPLY_CHAIN signal translation",
+      "reliability_score": 1.165
+    },
+    {
+      "id": "NL-88095-18",
+      "timestamp": "2026-10-19T05:34:55.395011+00:00",
+      "headline": "Pre-Market Social Rumors Predict Imminent Battery Chemistry Pivot for EV Maker",
+      "category": "EV_AND_CLEAN_TECH",
+      "sentiment": 0.52,
+      "market_reaction": "-2.10% Fade from Pre-Market High",
+      "outcome": "FADED_NOISE",
+      "weight_adjustment": "Increased fade-filter penalty on EV_AND_CLEAN_TECH retail catalysts",
+      "reliability_score": 0.9
+    },
+    {
+      "id": "NL-101",
+      "timestamp": "2026-10-19T02:34:55.393454+00:00",
+      "headline": "Semiconductor Fab Capex Upgraded 24% Across Leading Foundry Operations",
+      "category": "SEMICONDUCTORS",
+      "sentiment": 0.76,
+      "market_reaction": "+2.14% TSM, +3.10% NVDA",
+      "outcome": "CONFIRMED_LEADERSHIP",
+      "weight_adjustment": "+3.2% confidence in Semi Cap Basket",
+      "reliability_score": 1.11
+    },
+    {
+      "id": "NL-102",
+      "timestamp": "2026-10-18T22:34:55.393454+00:00",
+      "headline": "Red Sea Shipping Congestion Persists; Cape of Good Hope Transit Times Increase",
+      "category": "MARITIME_SUPPLY_CHAIN",
+      "sentiment": -0.68,
+      "market_reaction": "+4.80% ZIM, Freight Spot +12%",
+      "outcome": "CONFIRMED_INVERSE",
+      "weight_adjustment": "+4.1% freight rate shock sensitivity",
+      "reliability_score": 1.16
+    },
+    {
+      "id": "NL-103",
+      "timestamp": "2026-10-18T15:34:55.393454+00:00",
+      "headline": "Speculative Social Media Inflows Target Unprofitable Clean Energy Microcaps",
+      "category": "EV_AND_CLEAN_TECH",
+      "sentiment": 0.45,
+      "market_reaction": "-1.80% Intraday Gap-Fade",
+      "outcome": "FADED_NOISE",
+      "weight_adjustment": "+6.0% fade-filter penalty applied",
+      "reliability_score": 0.88
+    }
+  ],
+  "noise_rejections": [
+    "Filtered 12 unverified pre-market social chatter spikes on retail meme tickers",
+    "Suppressed speculative AI acquisition rumors without regulatory filings",
+    "Dampened overnight futures volatility spikes below 0.35% threshold"
+  ],
+  "epochs": [
+    {
+      "epoch_id": "EPOCH-100",
+      "day_number": 1,
+      "date": "2026-10-05",
+      "regime": "Bullish",
+      "market_spy_return": -0.006,
+      "predicted_drift": -0.005,
+      "prediction_error_pct": 3.94,
+      "directional_accuracy_pct": 61.9,
+      "active_weights": {
+        "momentum": 0.28,
+        "mean_reversion": 0.22,
+        "pattern_breakout": 0.2,
+        "news_catalyst": 0.18,
+        "volatility_penalty": 0.08,
+        "order_flow": 0.04
+      },
+      "top_corrective_adjustment": "Down-weighted pre-market retail hype on TSLA due to morning gap-fill behavior",
+      "news_catalysts_processed": 4,
+      "loss_decay": 0.0394
+    },
+    {
+      "epoch_id": "EPOCH-101",
+      "day_number": 2,
+      "date": "2026-10-06",
+      "regime": "Bullish",
+      "market_spy_return": 0.008,
+      "predicted_drift": 0.007,
+      "prediction_error_pct": 3.42,
+      "directional_accuracy_pct": 63.9,
+      "active_weights": {
+        "momentum": 0.286,
+        "mean_reversion": 0.2161,
+        "pattern_breakout": 0.198,
+        "news_catalyst": 0.18,
+        "volatility_penalty": 0.08,
+        "order_flow": 0.04
+      },
+      "top_corrective_adjustment": "Reinforced semiconductor breakout signal on NVDA after institutional volume confirmation",
+      "news_catalysts_processed": 5,
+      "loss_decay": 0.0342
+    },
+    {
+      "epoch_id": "EPOCH-102",
+      "day_number": 3,
+      "date": "2026-10-07",
+      "regime": "Volatile",
+      "market_spy_return": -0.006,
+      "predicted_drift": -0.006,
+      "prediction_error_pct": 3.56,
+      "directional_accuracy_pct": 63.9,
+      "active_weights": {
+        "momentum": 0.2885,
+        "mean_reversion": 0.217,
+        "pattern_breakout": 0.1951,
+        "news_catalyst": 0.1797,
+        "volatility_penalty": 0.0798,
+        "order_flow": 0.0399
+      },
+      "top_corrective_adjustment": "Adjusted Ornstein-Uhlenbeck mean-reversion speed for short-term spreads",
+      "news_catalysts_processed": 7,
+      "loss_decay": 0.0356
+    },
+    {
+      "epoch_id": "EPOCH-103",
+      "day_number": 4,
+      "date": "2026-10-08",
+      "regime": "Bearish",
+      "market_spy_return": 0.015,
+      "predicted_drift": 0.012,
+      "prediction_error_pct": 3.15,
+      "directional_accuracy_pct": 65.7,
+      "active_weights": {
+        "momentum": 0.288,
+        "mean_reversion": 0.2156,
+        "pattern_breakout": 0.194,
+        "news_catalyst": 0.1814,
+        "volatility_penalty": 0.0806,
+        "order_flow": 0.0403
+      },
+      "top_corrective_adjustment": "Tightened dynamic stop-loss triggers based on Hull Conditional Value at Risk",
+      "news_catalysts_processed": 4,
+      "loss_decay": 0.0315
+    },
+    {
+      "epoch_id": "EPOCH-104",
+      "day_number": 5,
+      "date": "2026-10-09",
+      "regime": "Bullish",
+      "market_spy_return": -0.011,
+      "predicted_drift": -0.011,
+      "prediction_error_pct": 3.05,
+      "directional_accuracy_pct": 68.5,
+      "active_weights": {
+        "momentum": 0.2908,
+        "mean_reversion": 0.216,
+        "pattern_breakout": 0.1924,
+        "news_catalyst": 0.1805,
+        "volatility_penalty": 0.0802,
+        "order_flow": 0.0401
+      },
+      "top_corrective_adjustment": "Elevated Central Bank Macro weight post-FOMC press conference wording analysis",
+      "news_catalysts_processed": 5,
+      "loss_decay": 0.0305
+    },
+    {
+      "epoch_id": "EPOCH-105",
+      "day_number": 6,
+      "date": "2026-10-10",
+      "regime": "Bearish",
+      "market_spy_return": 0.012,
+      "predicted_drift": 0.011,
+      "prediction_error_pct": 3.07,
+      "directional_accuracy_pct": 67.7,
+      "active_weights": {
+        "momentum": 0.2895,
+        "mean_reversion": 0.2133,
+        "pattern_breakout": 0.1941,
+        "news_catalyst": 0.1819,
+        "volatility_penalty": 0.0808,
+        "order_flow": 0.0404
+      },
+      "top_corrective_adjustment": "Calibrated maritime freight catalyst response coefficient following Red Sea routing updates",
+      "news_catalysts_processed": 5,
+      "loss_decay": 0.0307
+    },
+    {
+      "epoch_id": "EPOCH-106",
+      "day_number": 7,
+      "date": "2026-10-11",
+      "regime": "Volatile",
+      "market_spy_return": -0.011,
+      "predicted_drift": -0.01,
+      "prediction_error_pct": 2.8,
+      "directional_accuracy_pct": 69.4,
+      "active_weights": {
+        "momentum": 0.2909,
+        "mean_reversion": 0.2133,
+        "pattern_breakout": 0.1964,
+        "news_catalyst": 0.1797,
+        "volatility_penalty": 0.0798,
+        "order_flow": 0.0399
+      },
+      "top_corrective_adjustment": "Filtered speculative unverified social sentiment spikes from model feature pool",
+      "news_catalysts_processed": 8,
+      "loss_decay": 0.028
+    },
+    {
+      "epoch_id": "EPOCH-107",
+      "day_number": 8,
+      "date": "2026-10-12",
+      "regime": "Bullish",
+      "market_spy_return": -0.006,
+      "predicted_drift": -0.005,
+      "prediction_error_pct": 2.4,
+      "directional_accuracy_pct": 71.9,
+      "active_weights": {
+        "momentum": 0.2937,
+        "mean_reversion": 0.2115,
+        "pattern_breakout": 0.199,
+        "news_catalyst": 0.1776,
+        "volatility_penalty": 0.0789,
+        "order_flow": 0.0394
+      },
+      "top_corrective_adjustment": "Increased momentum factor weighting as market demonstrated strong trend persistence",
+      "news_catalysts_processed": 4,
+      "loss_decay": 0.024
+    },
+    {
+      "epoch_id": "EPOCH-108",
+      "day_number": 9,
+      "date": "2026-10-13",
+      "regime": "Bullish",
+      "market_spy_return": 0.018,
+      "predicted_drift": 0.018,
+      "prediction_error_pct": 2.54,
+      "directional_accuracy_pct": 73.7,
+      "active_weights": {
+        "momentum": 0.2938,
+        "mean_reversion": 0.2097,
+        "pattern_breakout": 0.2001,
+        "news_catalyst": 0.1779,
+        "volatility_penalty": 0.079,
+        "order_flow": 0.0395
+      },
+      "top_corrective_adjustment": "Faded low-volume breakouts during holiday liquidity contraction",
+      "news_catalysts_processed": 7,
+      "loss_decay": 0.0254
+    },
+    {
+      "epoch_id": "EPOCH-109",
+      "day_number": 10,
+      "date": "2026-10-14",
+      "regime": "Volatile",
+      "market_spy_return": 0.008,
+      "predicted_drift": 0.008,
+      "prediction_error_pct": 2.14,
+      "directional_accuracy_pct": 74.5,
+      "active_weights": {
+        "momentum": 0.2923,
+        "mean_reversion": 0.2117,
+        "pattern_breakout": 0.1988,
+        "news_catalyst": 0.1784,
+        "volatility_penalty": 0.0792,
+        "order_flow": 0.0396
+      },
+      "top_corrective_adjustment": "Decreased EV headline sensitivity after observing persistent next-day mean reversion",
+      "news_catalysts_processed": 4,
+      "loss_decay": 0.0214
+    },
+    {
+      "epoch_id": "EPOCH-110",
+      "day_number": 11,
+      "date": "2026-10-15",
+      "regime": "Bearish",
+      "market_spy_return": 0.004,
+      "predicted_drift": 0.003,
+      "prediction_error_pct": 2.04,
+      "directional_accuracy_pct": 75.5,
+      "active_weights": {
+        "momentum": 0.2908,
+        "mean_reversion": 0.2118,
+        "pattern_breakout": 0.2,
+        "news_catalyst": 0.1785,
+        "volatility_penalty": 0.0793,
+        "order_flow": 0.0396
+      },
+      "top_corrective_adjustment": "Updated options volatility skew penalty for extreme negative gamma regimes",
+      "news_catalysts_processed": 3,
+      "loss_decay": 0.0204
+    },
+    {
+      "epoch_id": "EPOCH-111",
+      "day_number": 12,
+      "date": "2026-10-16",
+      "regime": "Bullish",
+      "market_spy_return": 0.004,
+      "predicted_drift": 0.004,
+      "prediction_error_pct": 1.98,
+      "directional_accuracy_pct": 76.4,
+      "active_weights": {
+        "momentum": 0.292,
+        "mean_reversion": 0.2065,
+        "pattern_breakout": 0.2047,
+        "news_catalyst": 0.1781,
+        "volatility_penalty": 0.0791,
+        "order_flow": 0.0395
+      },
+      "top_corrective_adjustment": "Synchronized multi-timeframe moving average consensus into pattern weights",
+      "news_catalysts_processed": 5,
+      "loss_decay": 0.0198
+    },
+    {
+      "epoch_id": "EPOCH-112",
+      "day_number": 13,
+      "date": "2026-10-17",
+      "regime": "Bearish",
+      "market_spy_return": 0.018,
+      "predicted_drift": 0.018,
+      "prediction_error_pct": 1.8,
+      "directional_accuracy_pct": 76.7,
+      "active_weights": {
+        "momentum": 0.2976,
+        "mean_reversion": 0.2027,
+        "pattern_breakout": 0.2048,
+        "news_catalyst": 0.177,
+        "volatility_penalty": 0.0786,
+        "order_flow": 0.0393
+      },
+      "top_corrective_adjustment": "Calibrated overnight earnings gap drift factor based on post-bell tape prints",
+      "news_catalysts_processed": 8,
+      "loss_decay": 0.018
+    },
+    {
+      "epoch_id": "EPOCH-113",
+      "day_number": 14,
+      "date": "2026-10-18",
+      "regime": "Bullish",
+      "market_spy_return": 0.015,
+      "predicted_drift": 0.017,
+      "prediction_error_pct": 1.64,
+      "directional_accuracy_pct": 80.2,
+      "active_weights": {
+        "momentum": 0.2978,
+        "mean_reversion": 0.2048,
+        "pattern_breakout": 0.2026,
+        "news_catalyst": 0.177,
+        "volatility_penalty": 0.0786,
+        "order_flow": 0.0393
+      },
+      "top_corrective_adjustment": "Optimized Bayesian prior probabilities across tech leadership basket",
+      "news_catalysts_processed": 8,
+      "loss_decay": 0.0164
+    },
+    {
+      "epoch_id": "EPOCH-114",
+      "day_number": 15,
+      "date": "2026-10-19",
+      "regime": "Bearish",
+      "market_spy_return": -0.019,
+      "predicted_drift": -0.018,
+      "prediction_error_pct": 1.46,
+      "directional_accuracy_pct": 81.0,
+      "active_weights": {
+        "momentum": 0.2964,
+        "mean_reversion": 0.2136,
+        "pattern_breakout": 0.192,
+        "news_catalyst": 0.1743,
+        "volatility_penalty": 0.0843,
+        "order_flow": 0.0394
+      },
+      "top_corrective_adjustment": "Adjusted factor weighting: Momentum (29.6%), Mean-Reversion (21.4%) based on Day 15 tape",
+      "news_catalysts_processed": 10,
+      "loss_decay": 0.0146
+    }
+  ]
+}

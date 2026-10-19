@@ -26,7 +26,7 @@ import re
 import subprocess
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 import urllib.request
@@ -47,6 +47,8 @@ try:
     from options_pricing import BlackScholesEngine
     from backtest_engine import BacktestEngine
     from finviz_engine import finviz_engine
+    from continuous_learning_engine import continuous_learning_engine
+    import quant_portfolio_suite
 except ImportError:
     # If run directly from backend folder
     sys.path.insert(0, os.path.join(BASE_DIR, "python"))
@@ -56,6 +58,8 @@ except ImportError:
     from options_pricing import BlackScholesEngine
     from backtest_engine import BacktestEngine
     from finviz_engine import finviz_engine
+    from continuous_learning_engine import continuous_learning_engine
+    import quant_portfolio_suite
 
 # Baseline Market Prices for instant ultra-low latency response
 BASELINE_MARKET_PRICES = {
@@ -334,6 +338,50 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
         if path in ["/api/finviz/crypto"]:
             return self._send_json(finviz_engine.get_crypto())
 
+        # -----------------------------------------------------------------
+        # Quant Portfolio Suite (Momentum, Monte Carlo, Pairs, Frontier, Docs)
+        # -----------------------------------------------------------------
+        if path.startswith("/api/quant/momentum"):
+            ticker = query.get("ticker", ["NVDA"])[0]
+            lookback = int(query.get("lookback", [20])[0])
+            stop_loss = float(query.get("stopLoss", [4.0])[0])
+            take_profit = float(query.get("takeProfit", [12.0])[0])
+            return self._send_json(quant_portfolio_suite.run_momentum_backtest(
+                ticker=ticker, lookback_days=lookback, stop_loss_pct=stop_loss, take_profit_pct=take_profit
+            ))
+
+        if path.startswith("/api/quant/monte-carlo"):
+            ticker = query.get("ticker", ["NVDA"])[0]
+            price = float(query.get("price", [140.0])[0])
+            horizon = int(query.get("horizon", [90])[0])
+            sims = int(query.get("sims", [1500])[0])
+            vol = float(query.get("vol", [0.35])[0])
+            jump = float(query.get("jump", [0.10])[0])
+            return self._send_json(quant_portfolio_suite.run_monte_carlo_risk(
+                ticker=ticker, initial_price=price, horizon_days=horizon, num_simulations=sims, annual_vol=vol, jump_intensity=jump
+            ))
+
+        if path.startswith("/api/quant/pairs-trading"):
+            ticker_y = query.get("tickerY", ["NVDA"])[0]
+            ticker_x = query.get("tickerX", ["AMD"])[0]
+            lookback = int(query.get("lookback", [180])[0])
+            entry_z = float(query.get("entryZ", [2.0])[0])
+            return self._send_json(quant_portfolio_suite.run_pairs_trading(
+                ticker_y=ticker_y, ticker_x=ticker_x, lookback_days=lookback, entry_z=entry_z
+            ))
+
+        if path.startswith("/api/quant/efficient-frontier"):
+            tickers_p = query.get("tickers", ["NVDA,AAPL,MSFT,AMZN,GOOGL"])[0]
+            tickers_list = [t.strip().upper() for t in tickers_p.split(",") if t.strip()]
+            rf = float(query.get("rf", [0.0425])[0])
+            max_w = float(query.get("maxWeight", [0.35])[0])
+            return self._send_json(quant_portfolio_suite.run_efficient_frontier(
+                tickers=tickers_list, risk_free_rate=rf, max_weight=max_w
+            ))
+
+        if path.startswith("/api/quant/documentation") or path.startswith("/api/quant/github-repo"):
+            return self._send_json(quant_portfolio_suite.get_portfolio_documentation())
+
         # Finviz Technical Pattern Recognition Engine for Single Ticker
         if path.startswith("/api/finviz/patterns/"):
             ticker = path.split("/")[-1].upper()
@@ -410,10 +458,67 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/stock/options/"):
             ticker = path.split("/")[-1].upper()
             quote = fetch_live_yahoo_quote(ticker)
-            spot = quote['currentPrice']
+            spot = float(quote.get('currentPrice', 150.0))
             engine = BlackScholesEngine()
             chain = engine.generate_option_chain(spot=spot, days_to_expiry=30, base_vol=0.26)
-            return self._send_json({"ticker": ticker, "spot": spot, "chain": chain})
+
+            now = datetime.now(timezone.utc)
+            dates = [
+                (now + timedelta(days=7 * i)).strftime("%Y-%m-%d")
+                for i in range(1, 5)
+            ]
+            selected_date = query.get("date", [dates[0]])[0] if query and "date" in query else dates[0]
+
+            calls = []
+            puts = []
+            for item in chain:
+                strike = item["strike"]
+                iv = round(float(item.get("volatility_pct", 25.0)) / 100.0, 4)
+                call_p = float(item.get("call_price", 1.0))
+                put_p = float(item.get("put_price", 1.0))
+                strike_diff = strike - spot
+                calls.append({
+                    "strike": strike,
+                    "inTheMoney": spot > strike,
+                    "lastPrice": call_p,
+                    "bid": round(call_p * 0.98, 2),
+                    "ask": round(call_p * 1.02, 2),
+                    "volume": max(15, int(4200 - abs(strike_diff) * 15)),
+                    "openInterest": random.randint(1200, 8500),
+                    "impliedVolatility": iv,
+                    "delta": float(item.get("call_delta", 0.5)),
+                    "gamma": float(item.get("gamma", 0.01)),
+                    "vega": float(item.get("vega", 0.2)),
+                    "theta": float(item.get("theta_call_per_day", -0.05)),
+                    "rho": float(item.get("rho_call", 0.05))
+                })
+                puts.append({
+                    "strike": strike,
+                    "inTheMoney": spot < strike,
+                    "lastPrice": put_p,
+                    "bid": round(put_p * 0.98, 2),
+                    "ask": round(put_p * 1.02, 2),
+                    "volume": max(15, int(4100 - abs(strike_diff) * 15)),
+                    "openInterest": random.randint(1100, 8200),
+                    "impliedVolatility": iv,
+                    "delta": float(item.get("put_delta", -0.5)),
+                    "gamma": float(item.get("gamma", 0.01)),
+                    "vega": float(item.get("vega", 0.2)),
+                    "theta": float(item.get("theta_put_per_day", -0.05)),
+                    "rho": float(item.get("rho_put", -0.05))
+                })
+
+            return self._send_json({
+                "ticker": ticker,
+                "spot": spot,
+                "expirationDates": dates,
+                "options": [{
+                    "expirationDate": selected_date,
+                    "calls": calls,
+                    "puts": puts
+                }],
+                "chain": chain
+            })
 
         # 7. Fair Value Calculation
         if path.startswith("/api/stock/fairvalue/"):
@@ -603,6 +708,10 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
                 "timestamp": datetime.now(timezone.utc).isoformat()
             })
 
+        # 20. Continuous Daily & News Learning State
+        if path in ["/api/ai/continuous-learning", "/api/ai/continuous-learning/state"]:
+            return self._send_json(continuous_learning_engine.get_state())
+
         # Route Not Found
         return self._send_json({"error": f"Route not found: {path}"}, status=404)
 
@@ -732,6 +841,29 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
             scanner = GlobalNewsScanner()
             events = scanner.scan_all()
             return self._send_json({"success": True, "events": events})
+
+        # 7b. Continuous Daily & News Learning Handlers
+        if path.startswith("/api/ai/continuous-learning"):
+            if path in ["/api/ai/continuous-learning/step-day"]:
+                scenario = payload.get("scenario")
+                res = continuous_learning_engine.step_day(scenario)
+                return self._send_json(res)
+            elif path in ["/api/ai/continuous-learning/ingest-news"]:
+                items = payload.get("newsItems")
+                res = continuous_learning_engine.ingest_news_stream(items)
+                return self._send_json(res)
+            elif path in ["/api/ai/continuous-learning/simulate-epochs"]:
+                count = int(payload.get("count", 7))
+                res = continuous_learning_engine.simulate_epochs(count)
+                return self._send_json(res)
+            elif path in ["/api/ai/continuous-learning/toggle-auto"]:
+                enabled = bool(payload.get("enabled", True))
+                res = continuous_learning_engine.toggle_auto_learning(enabled)
+                return self._send_json(res)
+            elif path in ["/api/ai/continuous-learning/reset"]:
+                res = continuous_learning_engine.reset_state()
+                return self._send_json(res)
+            return self._send_json(continuous_learning_engine.get_state())
 
         # 8. Python Code Execution
         if path in ["/api/python/run"]:

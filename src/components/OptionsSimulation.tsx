@@ -44,18 +44,28 @@ const OptionsSimulation: React.FC<OptionsSimulationProps> = ({ data }) => {
   const [barrierLevel, setBarrierLevel] = useState<number>(currentPrice * 0.9);
 
   useEffect(() => {
+    let active = true;
     const loadOptions = async () => {
       setLoading(true);
-      const result = await fetchOptions(data.ticker, expiration || undefined);
-      if (result) {
-        setOptionsData(result);
-        if (!expiration && result.expirationDates && result.expirationDates.length > 0) {
-          setExpiration(result.expirationDates[0].split('T')[0]);
+      try {
+        const result = await fetchOptions(data.ticker, expiration || undefined);
+        if (!active) return;
+        if (result) {
+          setOptionsData(result);
+          if (!expiration && result.expirationDates && result.expirationDates.length > 0) {
+            setExpiration(result.expirationDates[0].split('T')[0]);
+          }
         }
+      } catch (err) {
+        // Handled with resilient fallback inside service
+      } finally {
+        if (active) setLoading(false);
       }
-      setLoading(false);
     };
     loadOptions();
+    return () => {
+      active = false;
+    };
   }, [data.ticker, expiration]);
 
   const rawChain = optionsData?.options?.[0]?.[optionType] || [];
