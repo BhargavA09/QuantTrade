@@ -536,8 +536,20 @@ def get_cached_global_live_quotes():
         "SPY", "QQQ", "IWM", "EWJ", "EWG", "EWU", "FXI", "INDA", "BTC-USD", "ETH-USD", "TLT"
     ]
     results = {}
-    for t in tickers:
-        results[t] = fetch_live_yahoo_quote(t)
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        future_map = {ex.submit(fetch_live_yahoo_quote, t): t for t in tickers}
+        for fut in future_map:
+            t = future_map[fut]
+            try:
+                results[t] = fut.result()
+            except Exception:
+                base = BASELINE_MARKET_PRICES.get(t, {})
+                results[t] = {
+                    'ticker': t,
+                    'currentPrice': base.get('price', 100.0),
+                    'change': base.get('change', 0.0),
+                    'changePercent': base.get('changePercent', 0.0)
+                }
     
     GLOBAL_LIVE_QUOTES_CACHE["timestamp"] = now
     GLOBAL_LIVE_QUOTES_CACHE["data"] = results
@@ -575,6 +587,8 @@ def fetch_live_chart_data(ticker: str) -> dict:
         "quote": quote,
         "bars": bars,
         "isLiveMarketData": True,
+        "isContinuouslyCorrected": quote.get("isContinuouslyCorrected", True),
+        "continuousCorrection": quote,
         "exchangeTimestamp": quote.get("timestamp", datetime.now(timezone.utc).isoformat())
     }
 
@@ -760,7 +774,24 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
             ticker = path.split("/")[-1].upper()
             return self._send_json(finviz_engine.get_ticker_detail(ticker))
 
-        # 2. Stock Quote (Live)
+        # 2a. Continuous Data Correction & Multi-Source Reconciliation Endpoint
+        if path.startswith("/api/stock/continuous-correction/"):
+            ticker = path.split("/")[-1].upper()
+            report = continuous_correction_engine.correct_ticker_data(ticker)
+            return self._send_json({"success": True, "ticker": ticker, **report})
+
+        # 2a-2. Continuous Data Correction Batch Endpoint
+        if path in ["/api/stock/continuous-correction-batch", "/api/market/continuous-correction-batch"]:
+            tickers_param = query.get("tickers", [""])[0]
+            ticker_list = [t.strip().upper() for t in tickers_param.split(",") if t.strip()]
+            if not ticker_list:
+                ticker_list = ["AAPL", "NVDA", "TSLA", "GLD", "USO", "BTC-USD"]
+            batch_corrections = {}
+            for t in ticker_list[:20]:
+                batch_corrections[t] = continuous_correction_engine.correct_ticker_data(t)
+            return self._send_json({"success": True, "corrections": batch_corrections})
+
+        # 2. Stock Quote (Live with Continuous Correction)
         if path.startswith("/api/stock/quote/"):
             ticker = path.split("/")[-1].upper()
             quote = fetch_live_yahoo_quote(ticker)

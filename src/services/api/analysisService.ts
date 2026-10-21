@@ -388,3 +388,67 @@ export const fetchLiveMarketNews = async (ticker?: string): Promise<LiveNewsEven
   }
 };
 
+export interface CorrectionSourceItem {
+  source_id: string;
+  name: string;
+  type: string;
+  price: number;
+  prev_close?: number;
+  volume?: number;
+  high?: number;
+  low?: number;
+  companyName?: string;
+  latency_ms: number;
+  status: 'HEALTHY' | 'OUTLIER_REJECTED' | 'OFFLINE';
+  weight?: number;
+  weight_percent?: number;
+  delta_vs_consensus?: number;
+}
+
+export interface ContinuousCorrectionReport {
+  success: boolean;
+  ticker: string;
+  currentPrice: number;
+  correctedPrice: number;
+  rawConsensusPrice: number;
+  primaryPrice: number;
+  change: number;
+  changePercent: number;
+  correctionDelta: number;
+  correctionDeltaPercent: number;
+  kalmanGain: number;
+  confidenceInterval95: [number, number];
+  noiseReductionDb: number;
+  spreadAcrossApis: number;
+  reconciliationScore: number;
+  sourcesCount: number;
+  outliersDetected: number;
+  activeSources: CorrectionSourceItem[];
+  streamHealth: 'OPTIMAL' | 'CALIBRATING' | 'RECONNECTING';
+  companyName: string;
+  volume: number;
+  high: number;
+  low: number;
+  isContinuouslyCorrected: boolean;
+  correctionEngine: string;
+  executionTimeMs: number;
+  timestamp: string;
+}
+
+/**
+ * Fetches real-time multi-source continuous correction telemetry from independent live market APIs.
+ */
+export const fetchContinuousCorrection = async (ticker: string): Promise<ContinuousCorrectionReport | null> => {
+  try {
+    const cleanTicker = resolveTickerSymbol(ticker);
+    const res = await defaultApiClient.fetchWithRetry<ContinuousCorrectionReport>(
+      `/api/stock/continuous-correction/${encodeURIComponent(cleanTicker)}`
+    );
+    return res;
+  } catch (err) {
+    console.warn("fetchContinuousCorrection error:", err);
+    return null;
+  }
+};
+
+
