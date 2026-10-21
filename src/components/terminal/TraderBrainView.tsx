@@ -8,6 +8,7 @@ import {
   FastForward, 
   Newspaper, 
   ShieldCheck, 
+  ShieldAlert,
   Sliders, 
   TrendingUp, 
   TrendingDown, 
@@ -27,6 +28,7 @@ import {
   TradeSuccess 
 } from '../../services/QuantTraderBrain';
 import { continuousLearningService } from '../../services/continuousLearningService';
+import { TraderBrainRiskManagement } from './TraderBrainRiskManagement';
 
 interface TraderBrainViewProps {
   onNavigateToTerminal?: () => void;
@@ -39,6 +41,7 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
 }) => {
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   const [activeLedgerTab, setActiveLedgerTab] = useState<'mistakes' | 'successes'>('mistakes');
+  const [activeSection, setActiveSection] = useState<'all' | 'risk' | 'ledger' | 'factors'>('all');
   const [isSimulating, setIsSimulating] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -244,7 +247,61 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
         </div>
       )}
 
-      {/* 2. Dynamic Factor Weights (W_t) */}
+      {/* Trader Brain Section Selector */}
+      <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl text-xs font-bold font-mono">
+        <button
+          onClick={() => setActiveSection('all')}
+          className={`px-3 py-1.5 rounded-xl transition-all ${
+            activeSection === 'all'
+              ? 'bg-zinc-800 text-white shadow-sm'
+              : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          All Modules
+        </button>
+        <button
+          onClick={() => setActiveSection('risk')}
+          className={`px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-2 ${
+            activeSection === 'risk'
+              ? 'bg-rose-600 text-white shadow-sm shadow-rose-950/40'
+              : 'text-rose-400 hover:text-rose-300'
+          }`}
+        >
+          <ShieldAlert className="w-3.5 h-3.5" />
+          <span>Risk Management (D3 VaR & Drawdown)</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-200">D3.JS</span>
+        </button>
+        <button
+          onClick={() => setActiveSection('ledger')}
+          className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-2 ${
+            activeSection === 'ledger'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Experience Ledger ({brainState.mistakes.length + brainState.successes.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveSection('factors')}
+          className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-2 ${
+            activeSection === 'factors'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span>Quant Factors (W_t)</span>
+        </button>
+      </div>
+
+      {/* 2. D3.js Portfolio Risk Management & Maximum Drawdown Scenarios */}
+      {(activeSection === 'all' || activeSection === 'risk') && (
+        <TraderBrainRiskManagement brainState={brainState} />
+      )}
+
+      {/* 3. Dynamic Factor Weights (W_t) */}
+      {(activeSection === 'all' || activeSection === 'factors') && (
       <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-5 space-y-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
@@ -285,8 +342,10 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
           })}
         </div>
       </div>
+      )}
 
-      {/* 3. Mistakes Ledger vs Successes Ledger (The Heart of Continuous Learning) */}
+      {/* 4. Mistakes Ledger vs Successes Ledger (The Heart of Continuous Learning) */}
+      {(activeSection === 'all' || activeSection === 'ledger') && (
       <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-5 space-y-4 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
           <div>
@@ -426,8 +485,10 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
           </div>
         )}
       </div>
+      )}
 
-      {/* 4. Active Algorithmic Guardrail Rules (Learned from Mistakes) */}
+      {/* 5. Active Algorithmic Guardrail Rules (Learned from Mistakes) */}
+      {(activeSection === 'all' || activeSection === 'ledger') && (
       <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-5 space-y-3 shadow-xl">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -446,6 +507,7 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 };

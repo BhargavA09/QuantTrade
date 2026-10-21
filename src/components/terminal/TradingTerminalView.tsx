@@ -60,6 +60,7 @@ import {
   CorrectionSourceItem
 } from '../../services/api/analysisService';
 import OptionsSimulation from '../OptionsSimulation';
+import { StockSearchScenarioProjection } from './StockSearchScenarioProjection';
 
 interface TradingTerminalViewProps {
   selectedTicker: string;
@@ -75,7 +76,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   
   // Terminal Sub-Tabs
-  const [activeSubTab, setActiveSubTab] = useState<'chart' | 'strategy' | 'correction' | 'global_radar' | 'options'>('chart');
+  const [activeSubTab, setActiveSubTab] = useState<'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options'>('chart');
 
   // Chart state & Indicator toggles
   const [showIndicators, setShowIndicators] = useState({
@@ -417,6 +418,19 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveSubTab('projection')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'projection'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Target className="w-4 h-4 text-indigo-400" />
+            <span>Search Scenarios & Projections</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-sans">INSIDERS</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('strategy')}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
               activeSubTab === 'strategy'
@@ -483,7 +497,9 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               onFocus={() => setIsSearchOpen(true)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && searchQuery.trim()) {
-                  onSelectTicker(searchQuery.trim().toUpperCase());
+                  const sym = searchQuery.trim().toUpperCase();
+                  onSelectTicker(sym);
+                  setActiveSubTab('projection');
                   setIsSearchOpen(false);
                   setSearchQuery('');
                 }
@@ -494,12 +510,14 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             <button
               onClick={() => {
                 if (searchQuery.trim()) {
-                  onSelectTicker(searchQuery.trim().toUpperCase());
+                  const sym = searchQuery.trim().toUpperCase();
+                  onSelectTicker(sym);
+                  setActiveSubTab('projection');
                   setIsSearchOpen(false);
                   setSearchQuery('');
                 }
               }}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[11px] font-mono text-zinc-300"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-[11px] font-mono text-white font-bold"
             >
               Analyze ↵
             </button>
@@ -514,6 +532,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                   key={item.ticker}
                   onClick={() => {
                     onSelectTicker(item.ticker);
+                    setActiveSubTab('projection');
                     setIsSearchOpen(false);
                     setSearchQuery('');
                   }}
@@ -534,14 +553,16 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               
               <div 
                 onClick={() => {
-                  onSelectTicker(searchQuery.trim().toUpperCase());
+                  const sym = searchQuery.trim().toUpperCase();
+                  onSelectTicker(sym);
+                  setActiveSubTab('projection');
                   setIsSearchOpen(false);
                   setSearchQuery('');
                 }}
                 className="p-2 border-t border-zinc-800 text-[11px] text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer flex items-center justify-between"
               >
-                <span>Fetch live market quote for <strong>{searchQuery.trim().toUpperCase()}</strong></span>
-                <span className="text-zinc-500">Stream Live &rarr;</span>
+                <span>Project scenario & insider flow for <strong>{searchQuery.trim().toUpperCase()}</strong></span>
+                <span className="text-zinc-400 font-mono text-[10px]">Deep Projection &rarr;</span>
               </div>
             </div>
           )}
@@ -1029,6 +1050,16 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB: SEARCH STOCK SCENARIO PROJECTION, INSIDERS & NEWS CATALYSTS     */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'projection' && (
+        <StockSearchScenarioProjection
+          initialTicker={selectedTicker}
+          onSelectTicker={onSelectTicker}
+        />
       )}
 
       {/* ========================================================================= */}
