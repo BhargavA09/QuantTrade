@@ -19,14 +19,21 @@ import {
   CheckCircle2, 
   RefreshCw,
   ExternalLink,
-  Target
+  Target,
+  Play,
+  History,
+  Scale,
+  Sparkles,
+  ArrowUpRight,
+  ArrowDownRight,
+  Trash2
 } from 'lucide-react';
 import { 
   fetchDeltaGammaSensitivity, 
   DeltaGammaSensitivityResult, 
   SensitivityCurvePoint 
 } from '../../services/api/quantPortfolioService';
-import { ActiveTrade } from '../../services/QuantTraderBrain';
+import { ActiveTrade, quantTraderBrain, HedgeAuditRecord } from '../../services/QuantTraderBrain';
 
 interface TradingTerminalDeltaGammaGaugeProps {
   selectedTicker: string;
@@ -74,6 +81,18 @@ export const TradingTerminalDeltaGammaGauge: React.FC<TradingTerminalDeltaGammaG
   const [data, setData] = useState<DeltaGammaSensitivityResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Algorithmic Delta-Hedging Executor State
+  const [hedgeAuditLog, setHedgeAuditLog] = useState<HedgeAuditRecord[]>(() => quantTraderBrain.getState().hedgeAuditLog || []);
+  const [isExecutingHedge, setIsExecutingHedge] = useState<boolean>(false);
+  const [hedgeFeedback, setHedgeFeedback] = useState<string | null>(null);
+  const [autoRehedgeEnabled, setAutoRehedgeEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    return quantTraderBrain.subscribe(state => {
+      setHedgeAuditLog(state.hedgeAuditLog || []);
+    });
+  }, []);
 
   // Hover states for D3 charts
   const [hoveredCurvePoint, setHoveredCurvePoint] = useState<SensitivityCurvePoint | null>(null);
@@ -149,6 +168,44 @@ export const TradingTerminalDeltaGammaGauge: React.FC<TradingTerminalDeltaGammaG
   useEffect(() => {
     loadSensitivity();
   }, [loadSensitivity]);
+
+  // Execute Algorithmic Delta Hedge Order
+  const handleExecuteHedge = useCallback(() => {
+    if (!data || data.hedgingRequirement.rebalanceShares === 0) return;
+    setIsExecutingHedge(true);
+    try {
+      const record = quantTraderBrain.executeDeltaHedgeOrder({
+        ticker: selectedTicker,
+        sharesToTrade: data.hedgingRequirement.rebalanceShares,
+        currentPrice: currentPrice > 0 ? currentPrice : 140.0,
+        currentDelta: data.shockedGreeks.shockedDelta,
+        targetDelta,
+        notes: `Dynamic Delta Rebalance: ${data.hedgingRequirement.rebalanceShares > 0 ? 'BUY' : 'SELL'} ${Math.abs(data.hedgingRequirement.rebalanceShares)} shs @ $${currentPrice.toFixed(2)}`
+      });
+      setHedgeFeedback(`Successfully executed ${record.hedgeAction} ${record.shares} shares of ${record.ticker} @ $${record.executionPrice.toFixed(2)} (Slippage: ${record.slippagePct}%). Delta realigned to ${record.postDelta}Δ`);
+      setTimeout(() => setHedgeFeedback(null), 6000);
+      loadSensitivity();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to execute delta hedge order');
+    } finally {
+      setIsExecutingHedge(false);
+    }
+  }, [data, selectedTicker, currentPrice, targetDelta, loadSensitivity]);
+
+  // Automated Rehedging Daemon (triggers when enabled and drift breaches corridor)
+  useEffect(() => {
+    if (autoRehedgeEnabled && data && data.hedgingRequirement.isOutsideTolerance && data.hedgingRequirement.rebalanceShares !== 0 && !isExecutingHedge) {
+      const timer = setTimeout(() => {
+        handleExecuteHedge();
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [autoRehedgeEnabled, data, isExecutingHedge, handleExecuteHedge]);
+
+  const handleClearHedgeLog = () => {
+    quantTraderBrain.clearHedgeAuditLog();
+    setHedgeAuditLog([]);
+  };
 
   // ---------------------------------------------------------------------------
   // D3 Gauge 1: Delta Directional Sensitivity Radial Arc Gauge
@@ -919,59 +976,164 @@ export const TradingTerminalDeltaGammaGauge: React.FC<TradingTerminalDeltaGammaG
         </div>
       </div>
 
-      {/* 4. Hedging Action Recommendation Banner */}
+      {/* 4. Algorithmic Delta-Hedging & Execution Simulator */}
       {data && (
-        <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono shadow-lg transition-all ${
-          !data.hedgingRequirement.isOutsideTolerance
-            ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-            : data.hedgingRequirement.status === 'REHEDGE_BUY'
-              ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200'
-              : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-lg shrink-0 ${
-              !data.hedgingRequirement.isOutsideTolerance ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-            }`}>
-              {!data.hedgingRequirement.isOutsideTolerance ? (
-                <ShieldCheck className="w-5 h-5" />
-              ) : (
-                <ShieldAlert className="w-5 h-5 animate-pulse" />
-              )}
+        <div className="space-y-3">
+          {/* Directive & Severity Card */}
+          <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono shadow-lg transition-all ${
+            !data.hedgingRequirement.isOutsideTolerance
+              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+              : data.hedgingRequirement.status === 'REHEDGE_BUY'
+                ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200'
+                : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-lg shrink-0 ${
+                !data.hedgingRequirement.isOutsideTolerance ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+              }`}>
+                {!data.hedgingRequirement.isOutsideTolerance ? (
+                  <ShieldCheck className="w-5 h-5" />
+                ) : (
+                  <ShieldAlert className="w-5 h-5 animate-pulse" />
+                )}
+              </div>
+              <div>
+                <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-2">
+                  <span>HEDGING DIRECTIVE (JOHN C. HULL)</span>
+                  <span>·</span>
+                  <span className={`px-1.5 py-0.2 rounded font-black ${
+                    data.hedgingRequirement.urgency === 'HIGH' ? 'bg-rose-500/30 text-rose-300' : 'bg-zinc-800 text-zinc-300'
+                  }`}>
+                    {data.hedgingRequirement.urgency} URGENCY
+                  </span>
+                  <span>·</span>
+                  <span className="text-zinc-500">Target Δ: {targetDelta.toFixed(1)}</span>
+                </div>
+                <div className="text-sm font-black text-white mt-0.5">
+                  {data.hedgingRequirement.action}
+                </div>
+                <div className="text-[11px] text-zinc-400 mt-0.5">
+                  Post-shock Delta: <span className="text-white font-bold">{data.shockedGreeks.shockedDelta > 0 ? `+${data.shockedGreeks.shockedDelta}` : data.shockedGreeks.shockedDelta}</span> · Drift: <span className={Math.abs(data.shockedGreeks.deltaDrift) > toleranceBand ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>{data.shockedGreeks.deltaDrift > 0 ? `+${data.shockedGreeks.deltaDrift}` : data.shockedGreeks.deltaDrift}Δ</span> (Corridor: ±{toleranceBand}Δ)
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-2">
-                <span>HEDGING ACTION DIRECTIVE</span>
-                <span>·</span>
-                <span className={`px-1.5 py-0.2 rounded font-black ${
-                  data.hedgingRequirement.urgency === 'HIGH' ? 'bg-rose-500/30 text-rose-300' : 'bg-zinc-800 text-zinc-300'
-                }`}>
-                  {data.hedgingRequirement.urgency} URGENCY
+
+            <div className="flex items-center gap-4 text-right shrink-0">
+              <div>
+                <span className="text-[10px] text-zinc-400 block uppercase">Rebalance Notional</span>
+                <span className="text-sm font-black text-white">
+                  ${data.hedgingRequirement.rebalanceNotional.toLocaleString()}
                 </span>
               </div>
-              <div className="text-sm font-black text-white mt-0.5">
-                {data.hedgingRequirement.action}
-              </div>
-              <div className="text-[11px] text-zinc-400 mt-0.5">
-                Post-shock Delta: <span className="text-white font-bold">{data.shockedGreeks.shockedDelta > 0 ? `+${data.shockedGreeks.shockedDelta}` : data.shockedGreeks.shockedDelta}</span> · Drift: <span className={Math.abs(data.shockedGreeks.deltaDrift) > toleranceBand ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>{data.shockedGreeks.deltaDrift > 0 ? `+${data.shockedGreeks.deltaDrift}` : data.shockedGreeks.deltaDrift}Δ</span> (Corridor: ±{toleranceBand}Δ)
+              <div>
+                <span className="text-[10px] text-zinc-400 block uppercase">Taylor PnL Impact</span>
+                <span className={`text-sm font-black ${
+                  data.pnlDecomposition.totalTaylorPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}>
+                  {data.pnlDecomposition.totalTaylorPnl >= 0 ? '+' : ''}${data.pnlDecomposition.totalTaylorPnl.toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-right shrink-0">
-            <div>
-              <span className="text-[10px] text-zinc-400 block uppercase">Rebalance Notional</span>
-              <span className="text-sm font-black text-white">
-                ${data.hedgingRequirement.rebalanceNotional.toLocaleString()}
-              </span>
+          {/* Interactive Algorithmic Order Execution Bar */}
+          <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs font-mono">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 flex items-center gap-1.5">
+                  <Scale className="w-3.5 h-3.5 text-amber-400" />
+                  Target Delta Alignment:
+                </span>
+                <div className="flex items-center gap-1">
+                  {[
+                    { label: 'Neutral (0.0Δ)', val: 0.0 },
+                    { label: 'Bullish (+25Δ)', val: 25.0 },
+                    { label: 'Bearish (-25Δ)', val: -25.0 }
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      onClick={() => setTargetDelta(preset.val)}
+                      className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
+                        targetDelta === preset.val
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                          : 'bg-zinc-900 text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Slippage & Market Impact Calculations */}
+              <div className="flex items-center gap-3 text-[11px] text-zinc-400">
+                <span>Spread: <strong className="text-zinc-200">1.75 bps</strong></span>
+                <span>·</span>
+                <span>
+                  Impact Slippage: <strong className="text-amber-400">
+                    {(Math.min(25, 2.5 * Math.sqrt(Math.max(1, Math.abs(data.hedgingRequirement.rebalanceShares)) / 100)) + 1.75).toFixed(1)} bps
+                  </strong>
+                </span>
+                <span>·</span>
+                <span>
+                  Est. Friction: <strong className="text-zinc-200">
+                    ${(Math.abs(data.hedgingRequirement.rebalanceShares) * (currentPrice * 0.00035) + Math.max(1.0, Math.abs(data.hedgingRequirement.rebalanceShares) * 0.005)).toFixed(2)}
+                  </strong>
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] text-zinc-400 block uppercase">Taylor PnL Impact</span>
-              <span className={`text-sm font-black ${
-                data.pnlDecomposition.totalTaylorPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
-              }`}>
-                {data.pnlDecomposition.totalTaylorPnl >= 0 ? '+' : ''}${data.pnlDecomposition.totalTaylorPnl.toFixed(2)}
-              </span>
+
+            {/* Execution Controls & Auto-Rehedge Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-800/80">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setAutoRehedgeEnabled(!autoRehedgeEnabled)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-2 transition-all border ${
+                    autoRehedgeEnabled
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm shadow-emerald-950/40'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200'
+                  }`}
+                  title="Automatically triggers hedge orders when delta drifts outside the configured tolerance corridor"
+                >
+                  <span className={`w-2 h-2 rounded-full ${autoRehedgeEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+                  <span>Auto-Rehedge on Breach: {autoRehedgeEnabled ? 'ON' : 'OFF'}</span>
+                </button>
+                <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">
+                  (Corridor: ±{toleranceBand}Δ)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExecuteHedge}
+                  disabled={data.hedgingRequirement.rebalanceShares === 0 || isExecutingHedge}
+                  className={`px-4 py-2 rounded-xl text-xs font-mono font-black flex items-center gap-2 transition-all shadow-lg ${
+                    data.hedgingRequirement.rebalanceShares === 0
+                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50'
+                      : data.hedgingRequirement.rebalanceShares > 0
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-950/50 border border-cyan-400'
+                        : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50 border border-rose-400'
+                  }`}
+                >
+                  <Play className={`w-3.5 h-3.5 ${isExecutingHedge ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isExecutingHedge
+                      ? 'Executing Hedge Order...'
+                      : data.hedgingRequirement.rebalanceShares === 0
+                        ? 'Delta-Neutral: No Rebalance Needed'
+                        : `Execute Delta Hedge: ${data.hedgingRequirement.rebalanceShares > 0 ? 'BUY' : 'SELL'} ${Math.abs(data.hedgingRequirement.rebalanceShares)} Shs ${selectedTicker}`}
+                  </span>
+                </button>
+              </div>
             </div>
+
+            {/* Execution Toast / Feedback */}
+            {hedgeFeedback && (
+              <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center gap-2 animate-fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{hedgeFeedback}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1180,7 +1342,102 @@ export const TradingTerminalDeltaGammaGauge: React.FC<TradingTerminalDeltaGammaG
         </div>
       )}
 
-      {/* 8. Mathematical Framework Reference (John C. Hull & Taylor Expansion) */}
+      {/* 8. Live Algorithmic Hedge Audit Log Table */}
+      <div className="p-5 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-3 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+              Live Algorithmic Hedge Audit Log & Market Impact Telemetry
+            </h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
+              {hedgeAuditLog.length} Records
+            </span>
+          </div>
+          {hedgeAuditLog.length > 0 && (
+            <button
+              onClick={handleClearHedgeLog}
+              className="text-[11px] font-mono text-zinc-500 hover:text-rose-400 flex items-center gap-1 transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Clear Audit Log</span>
+            </button>
+          )}
+        </div>
+
+        {hedgeAuditLog.length === 0 ? (
+          <div className="py-8 text-center text-xs font-mono text-zinc-500">
+            No hedge executions logged yet. Use the execution simulator above to trigger an adaptive delta hedge order.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left font-mono text-xs">
+              <thead>
+                <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase">
+                  <th className="py-2 px-3">Time</th>
+                  <th className="py-2 px-3">Ticker</th>
+                  <th className="py-2 px-3">Hedge Action</th>
+                  <th className="py-2 px-3 text-right">Shares</th>
+                  <th className="py-2 px-3 text-right">Benchmark Spot</th>
+                  <th className="py-2 px-3 text-right">Exec Price</th>
+                  <th className="py-2 px-3 text-right">Slippage</th>
+                  <th className="py-2 px-3 text-center">Pre / Post Δ</th>
+                  <th className="py-2 px-3 text-center">Status</th>
+                  <th className="py-2 px-3">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800/60">
+                {hedgeAuditLog.slice(0, 10).map((record) => (
+                  <tr key={record.id} className="hover:bg-zinc-900/40 transition-colors">
+                    <td className="py-2.5 px-3 text-zinc-400 whitespace-nowrap text-[11px]">
+                      {record.timestamp}
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-white">
+                      {record.ticker}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        record.hedgeAction === 'BUY'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}>
+                        {record.hedgeAction}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-bold text-white">
+                      {record.shares.toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-zinc-400">
+                      ${record.benchmarkPrice.toFixed(2)}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-bold text-emerald-400">
+                      ${record.executionPrice.toFixed(3)}
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-amber-400 text-[11px]">
+                      {record.slippagePct}% (${record.slippageDollar})
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-[11px]">
+                      <span className="text-zinc-400">{record.preDelta}Δ</span>
+                      <span className="text-zinc-600 mx-1">&rarr;</span>
+                      <span className="text-emerald-400 font-bold">{record.postDelta}Δ</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold">
+                        {record.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-[11px] text-zinc-400 truncate max-w-[200px]" title={record.notes}>
+                      {record.notes}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* 9. Mathematical Framework Reference (John C. Hull & Taylor Expansion) */}
       <div className="p-4 rounded-xl bg-zinc-950/60 border border-zinc-800 text-xs text-zinc-400 font-mono space-y-2">
         <div className="flex items-center gap-2 text-zinc-300 font-bold uppercase tracking-wider text-[11px]">
           <Info className="w-3.5 h-3.5 text-indigo-400" />

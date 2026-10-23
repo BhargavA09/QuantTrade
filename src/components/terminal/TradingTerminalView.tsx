@@ -40,7 +40,9 @@ import {
   Activity,
   Wifi,
   Server,
-  Gauge
+  Gauge,
+  FileText,
+  BarChart2
 } from 'lucide-react';
 import { 
   quantTraderBrain, 
@@ -64,6 +66,10 @@ import OptionsSimulation from '../OptionsSimulation';
 import { StockSearchScenarioProjection } from './StockSearchScenarioProjection';
 import { TradingTerminalVaRVisualizer } from './TradingTerminalVaRVisualizer';
 import { TradingTerminalDeltaGammaGauge } from './TradingTerminalDeltaGammaGauge';
+import { MultiLegOptionsStrategyBuilder } from './MultiLegOptionsStrategyBuilder';
+import { MarketMicrostructureVolumeProfile } from './MarketMicrostructureVolumeProfile';
+import { MacroStressTestingEngine } from './MacroStressTestingEngine';
+import { InstitutionalRiskTearSheet } from './InstitutionalRiskTearSheet';
 
 interface TradingTerminalViewProps {
   selectedTicker: string;
@@ -79,7 +85,13 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   
   // Terminal Sub-Tabs
-  const [activeSubTab, setActiveSubTab] = useState<'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma'>('chart');
+  const [activeSubTab, setActiveSubTab] = useState<
+    'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress'
+  >('chart');
+
+  // Tear Sheet & Chart Visualizer Toggles
+  const [isTearSheetOpen, setIsTearSheetOpen] = useState<boolean>(false);
+  const [showChartVolumeProfile, setShowChartVolumeProfile] = useState<boolean>(false);
 
   // Chart state & Indicator toggles
   const [showIndicators, setShowIndicators] = useState({
@@ -497,6 +509,55 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             <span>Delta-Gamma Gauge</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans font-bold">HEDGING</span>
           </button>
+
+          <button
+            onClick={() => setActiveSubTab('multileg')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'multileg'
+                ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-purple-400" />
+            <span>Multi-Leg Options</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-sans font-bold">POP %</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('volume_profile')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'volume_profile'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <BarChart2 className="w-4 h-4 text-blue-400" />
+            <span>Volume Profile & L2</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-sans font-bold">POC 70%</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('macro_stress')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'macro_stress'
+                ? 'bg-rose-600 text-white shadow-sm shadow-rose-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span>Macro Stress Engine</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 font-sans font-bold">CRISIS</span>
+          </button>
+
+          <button
+            onClick={() => setIsTearSheetOpen(true)}
+            className="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 shadow-sm font-bold"
+            title="Open Full Institutional Risk Tear Sheet & Report Generator"
+          >
+            <FileText className="w-4 h-4 text-emerald-400" />
+            <span>Risk Tear Sheet</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/30 text-emerald-200 font-sans">PDF / CSV</span>
+          </button>
         </div>
 
         {/* Global Asset Search Bar */}
@@ -766,6 +827,15 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                   >
                     Bollinger (2σ)
                   </button>
+                  <button
+                    onClick={() => setShowChartVolumeProfile(!showChartVolumeProfile)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1 ${
+                      showChartVolumeProfile ? 'bg-blue-600 text-white border border-blue-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <BarChart2 className="w-3 h-3 text-blue-300" />
+                    <span>Volume Profile</span>
+                  </button>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 font-bold flex items-center gap-1">
                     <ShieldAlert className="w-3 h-3 text-rose-400" />
                     VaR Downside Active
@@ -954,6 +1024,15 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             kellyAllocationPct={quantSignal.halfKellyAllocationPct}
             garchRisk={quantSignal.garchVolatilityRisk}
           />
+
+          {/* Conditional Volume Profile & Market Microstructure (when toggled on chart) */}
+          {showChartVolumeProfile && (
+            <MarketMicrostructureVolumeProfile
+              selectedTicker={selectedTicker}
+              currentPrice={currentPrice}
+              chartBars={chartBars}
+            />
+          )}
 
           {/* Real-Time Delta-Gamma Risk Sensitivity & Dynamic Hedging Gauge */}
           <TradingTerminalDeltaGammaGauge
@@ -1985,6 +2064,49 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           onNavigateToBrain={onNavigateToBrain}
         />
       )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 6: MULTI-LEG OPTIONS STRATEGY BUILDER & PAYOFF DIAGRAM            */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'multileg' && (
+        <MultiLegOptionsStrategyBuilder
+          selectedTicker={selectedTicker}
+          currentPrice={currentPrice}
+          onExecuteStrategy={(name) => {
+            setTradeMessage(`Multi-leg strategy ${name} deployed on ${selectedTicker}.`);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 7: VOLUME PROFILE & MARKET MICROSTRUCTURE L2 BOOK                 */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'volume_profile' && (
+        <MarketMicrostructureVolumeProfile
+          selectedTicker={selectedTicker}
+          currentPrice={currentPrice}
+          chartBars={chartBars}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 8: MACRO STRESS-TESTING & GLOBAL REGIME SHOCK ENGINE              */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'macro_stress' && (
+        <MacroStressTestingEngine
+          selectedTicker={selectedTicker}
+          currentPrice={currentPrice}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* INSTITUTIONAL RISK TEAR SHEET MODAL                                        */}
+      {/* ========================================================================= */}
+      <InstitutionalRiskTearSheet
+        isOpen={isTearSheetOpen}
+        onClose={() => setIsTearSheetOpen(false)}
+        selectedTicker={selectedTicker}
+      />
 
     </div>
   );

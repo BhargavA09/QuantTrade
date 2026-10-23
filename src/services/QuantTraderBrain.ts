@@ -134,6 +134,25 @@ export interface QuantStrategyParameters {
   }[];
 }
 
+export interface HedgeAuditRecord {
+  id: string;
+  timestamp: string;
+  ticker: string;
+  hedgeAction: 'BUY' | 'SELL';
+  shares: number;
+  executionPrice: number;
+  benchmarkPrice: number;
+  slippagePct: number;
+  slippageDollar: number;
+  frictionCost: number;
+  preDelta: number;
+  postDelta: number;
+  targetDelta: number;
+  status: 'EXECUTED' | 'SETTLED';
+  orderType: 'MARKET_IMPACT_ADAPTIVE';
+  notes: string;
+}
+
 export interface TraderBrainState {
   stats: TraderStats;
   weights: QuantWeights;
@@ -143,6 +162,7 @@ export interface TraderBrainState {
   activeTrades: ActiveTrade[];
   closedTrades: ClosedTrade[];
   activeRules: string[];
+  hedgeAuditLog: HedgeAuditRecord[];
 }
 
 type BrainListener = (state: TraderBrainState) => void;
@@ -190,6 +210,45 @@ class QuantTraderBrainService {
       ]
     };
 
+    const defaultHedgeAuditLogs: HedgeAuditRecord[] = [
+      {
+        id: 'AUD-HIST-101',
+        timestamp: '14:22:15',
+        ticker: 'NVDA',
+        hedgeAction: 'SELL',
+        shares: 45,
+        executionPrice: 138.68,
+        benchmarkPrice: 138.80,
+        slippagePct: 0.086,
+        slippageDollar: 5.40,
+        frictionCost: 6.40,
+        preDelta: 45.0,
+        postDelta: 0.0,
+        targetDelta: 0.0,
+        status: 'EXECUTED',
+        orderType: 'MARKET_IMPACT_ADAPTIVE',
+        notes: 'Delta-Neutral balancing: Flattened long equity gamma-drift'
+      },
+      {
+        id: 'AUD-HIST-102',
+        timestamp: '11:45:02',
+        ticker: 'SPY',
+        hedgeAction: 'BUY',
+        shares: 20,
+        executionPrice: 585.55,
+        benchmarkPrice: 585.40,
+        slippagePct: 0.026,
+        slippageDollar: 3.00,
+        frictionCost: 4.00,
+        preDelta: -20.0,
+        postDelta: 0.0,
+        targetDelta: 0.0,
+        status: 'EXECUTED',
+        orderType: 'MARKET_IMPACT_ADAPTIVE',
+        notes: 'Hedged short straddle delta surge after breakout'
+      }
+    ];
+
     const saved = localStorage.getItem('quant_trader_brain_state_v2');
     if (saved) {
       try {
@@ -197,6 +256,9 @@ class QuantTraderBrainService {
         if (parsed.stats && parsed.weights) {
           if (!parsed.strategyParameters) {
             parsed.strategyParameters = defaultStrategyParams;
+          }
+          if (!parsed.hedgeAuditLog || !Array.isArray(parsed.hedgeAuditLog)) {
+            parsed.hedgeAuditLog = defaultHedgeAuditLogs;
           }
           return parsed;
         }
@@ -441,7 +503,8 @@ class QuantTraderBrainService {
         "Rule #3: Stop-loss buffers calibrated dynamically to 1.5x ATR to avoid stop sweeps.",
         "Rule #4: Position size bounded to Half-Kelly fraction with maximum 8% capital per ticker.",
         "Rule #5: Retail-heavy speculative headlines require 30-minute confirmation before entry."
-      ]
+      ],
+      hedgeAuditLog: defaultHedgeAuditLogs
     };
   }
 
@@ -677,6 +740,132 @@ class QuantTraderBrainService {
     this.state.activeTrades = [trade, ...this.state.activeTrades];
     this.save();
     return trade;
+  }
+
+  /**
+   * Algorithmic Delta-Hedging Executor: Rebalances delta exposure via spot equity hedges
+   * with realistic square-root market impact slippage, exchange fee friction, and audit logging.
+   */
+  public executeDeltaHedgeOrder(params: {
+    ticker: string;
+    sharesToTrade: number;
+    currentPrice: number;
+    currentDelta: number;
+    targetDelta?: number;
+    notes?: string;
+  }): HedgeAuditRecord {
+    const { ticker, sharesToTrade, currentPrice, currentDelta, targetDelta = 0, notes } = params;
+    const absShares = Math.abs(Math.round(sharesToTrade));
+    if (absShares === 0) {
+      throw new Error("Shares to trade cannot be 0");
+    }
+
+    const isBuy = sharesToTrade > 0;
+    const action: 'BUY' | 'SELL' = isBuy ? 'BUY' : 'SELL';
+
+    // Market impact & slippage calculation (Square-root law & spread model)
+    const spreadBps = 3.5;
+    const marketImpactBps = Math.min(25, 2.5 * Math.sqrt(absShares / 100));
+    const totalSlippageBps = (spreadBps / 2) + marketImpactBps;
+    const slippagePct = totalSlippageBps / 10000;
+
+    const executionPrice = parseFloat(
+      (isBuy ? currentPrice * (1 + slippagePct) : currentPrice * (1 - slippagePct)).toFixed(3)
+    );
+    const slippageDollar = parseFloat((Math.abs(executionPrice - currentPrice) * absShares).toFixed(2));
+    const secFinraFriction = parseFloat(Math.max(1.00, absShares * 0.005).toFixed(2));
+    const frictionCost = parseFloat((slippageDollar + secFinraFriction).toFixed(2));
+
+    const postDelta = parseFloat((currentDelta + (isBuy ? absShares : -absShares)).toFixed(2));
+
+    // Update Cash Balance & Portfolio
+    const totalCashFlow = parseFloat((executionPrice * absShares).toFixed(2));
+    const stats = { ...this.state.stats };
+    if (isBuy) {
+      stats.capital = parseFloat((stats.capital - totalCashFlow - secFinraFriction).toFixed(2));
+    } else {
+      stats.capital = parseFloat((stats.capital + totalCashFlow - secFinraFriction).toFixed(2));
+    }
+
+    // Update existing active trade if exists or create hedge overlay position
+    const existingIndex = this.state.activeTrades.findIndex(t => t.ticker.toUpperCase() === ticker.toUpperCase());
+    if (existingIndex >= 0) {
+      const active = this.state.activeTrades[existingIndex];
+      let newQty = active.quantity;
+      if (active.tradeType === 'LONG') {
+        newQty = isBuy ? active.quantity + absShares : Math.max(0, active.quantity - absShares);
+      } else {
+        newQty = !isBuy ? active.quantity + absShares : Math.max(0, active.quantity - absShares);
+      }
+      if (newQty === 0) {
+        this.state.activeTrades = this.state.activeTrades.filter((_, idx) => idx !== existingIndex);
+      } else {
+        this.state.activeTrades[existingIndex] = {
+          ...active,
+          quantity: newQty,
+          currentPrice
+        };
+      }
+    } else {
+      const hedgeTrade: ActiveTrade = {
+        id: `HDG-${Date.now() % 100000}`,
+        ticker,
+        tradeType: isBuy ? 'LONG' : 'SHORT',
+        entryPrice: executionPrice,
+        currentPrice,
+        quantity: absShares,
+        stopLoss: parseFloat((executionPrice * (isBuy ? 0.96 : 1.04)).toFixed(2)),
+        takeProfit1: parseFloat((executionPrice * (isBuy ? 1.04 : 0.96)).toFixed(2)),
+        takeProfit2: parseFloat((executionPrice * (isBuy ? 1.08 : 0.92)).toFixed(2)),
+        unrealizedPnl: 0,
+        unrealizedPnlPct: 0,
+        entryTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        setup: `Delta Hedge (${action} ${absShares} shs)`,
+        kellyFraction: 0.05
+      };
+      this.state.activeTrades = [hedgeTrade, ...this.state.activeTrades];
+    }
+
+    const auditRecord: HedgeAuditRecord = {
+      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      ticker,
+      hedgeAction: action,
+      shares: absShares,
+      executionPrice,
+      benchmarkPrice: currentPrice,
+      slippagePct: parseFloat((slippagePct * 100).toFixed(3)),
+      slippageDollar,
+      frictionCost,
+      preDelta: parseFloat(currentDelta.toFixed(2)),
+      postDelta,
+      targetDelta,
+      status: 'EXECUTED',
+      orderType: 'MARKET_IMPACT_ADAPTIVE',
+      notes: notes || `Auto Delta Hedge rebalance to target Δ=${targetDelta}`
+    };
+
+    this.state.stats = stats;
+    this.state.hedgeAuditLog = [auditRecord, ...(this.state.hedgeAuditLog || []).slice(0, 49)];
+
+    try {
+      localStorage.setItem('quant_hedge_audit_log', JSON.stringify(this.state.hedgeAuditLog));
+    } catch (e) {
+      // ignore
+    }
+
+    this.save();
+    return auditRecord;
+  }
+
+  public clearHedgeAuditLog() {
+    this.state.hedgeAuditLog = [];
+    try {
+      localStorage.removeItem('quant_hedge_audit_log');
+    } catch (e) {
+      // ignore
+    }
+    this.save();
   }
 
   /**

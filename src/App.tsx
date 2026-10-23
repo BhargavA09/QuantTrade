@@ -13,12 +13,14 @@ import {
   RotateCw,
   Search,
   ArrowUpRight,
-  ShieldCheck
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 import { TradingTerminalView } from './components/terminal/TradingTerminalView';
 import { TraderBrainView } from './components/terminal/TraderBrainView';
 import { NewsCatalystView } from './components/terminal/NewsCatalystView';
 import { TradeJournalView } from './components/terminal/TradeJournalView';
+import { InstitutionalRiskTearSheet } from './components/terminal/InstitutionalRiskTearSheet';
 import { quantTraderBrain, TraderBrainState } from './services/QuantTraderBrain';
 import { continuousLearningService } from './services/continuousLearningService';
 
@@ -26,6 +28,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'terminal' | 'brain' | 'news' | 'journal'>('terminal');
   const [selectedTicker, setSelectedTicker] = useState<string>('NVDA');
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
+  const [isGlobalTearSheetOpen, setIsGlobalTearSheetOpen] = useState<boolean>(false);
 
   useEffect(() => {
     return quantTraderBrain.subscribe(setBrainState);
@@ -119,14 +122,26 @@ export default function App() {
               </button>
             </nav>
 
-            {/* Portfolio Balance Readout */}
-            <div className="hidden lg:flex items-center gap-3">
-              <div className="text-right font-mono">
-                <span className="text-[10px] text-zinc-500 uppercase font-bold block">Portfolio Capital</span>
-                <span className="text-sm font-black text-white">${brainState.stats.capital.toLocaleString()}</span>
-              </div>
-              <div className={`px-2 py-1 rounded text-xs font-mono font-bold ${brainState.stats.netPnl >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                {brainState.stats.netPnl >= 0 ? '+' : ''}${brainState.stats.netPnl.toLocaleString()}
+            {/* Global Actions & Portfolio Balance Readout */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsGlobalTearSheetOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 font-mono text-xs flex items-center gap-1.5 transition-colors shadow-sm font-bold"
+                title="Open Executive Risk Tear Sheet & Report Generator"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Risk Tear Sheet</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold">PDF/CSV</span>
+              </button>
+
+              <div className="hidden lg:flex items-center gap-3 pl-2 border-l border-zinc-800">
+                <div className="text-right font-mono">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold block">Portfolio Capital</span>
+                  <span className="text-sm font-black text-white">${brainState.stats.capital.toLocaleString()}</span>
+                </div>
+                <div className={`px-2 py-1 rounded text-xs font-mono font-bold ${brainState.stats.netPnl >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                  {brainState.stats.netPnl >= 0 ? '+' : ''}${brainState.stats.netPnl.toLocaleString()}
+                </div>
               </div>
             </div>
 
@@ -192,6 +207,13 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Institutional Risk Tear Sheet Modal */}
+      <InstitutionalRiskTearSheet
+        isOpen={isGlobalTearSheetOpen}
+        onClose={() => setIsGlobalTearSheetOpen(false)}
+        selectedTicker={selectedTicker}
+      />
     </div>
   );
 }
