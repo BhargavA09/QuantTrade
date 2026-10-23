@@ -381,7 +381,33 @@ export const fetchLiveMarketNews = async (ticker?: string): Promise<LiveNewsEven
   try {
     const url = ticker ? `/api/news?ticker=${encodeURIComponent(ticker)}` : `/api/news`;
     const res = await defaultApiClient.fetchWithRetry<{ success: boolean; count: number; events: LiveNewsEvent[] }>(url);
-    return res?.events || [];
+    const rawEvents = res?.events || [];
+    
+    // Deduplicate and ensure globally unique IDs
+    const seenTitles = new Set<string>();
+    const seenIds = new Set<string>();
+    const uniqueEvents: LiveNewsEvent[] = [];
+
+    rawEvents.forEach((evt, idx) => {
+      const normTitle = (evt.title || '').trim().toLowerCase();
+      if (normTitle && seenTitles.has(normTitle)) {
+        return; // skip duplicate title
+      }
+      if (normTitle) seenTitles.add(normTitle);
+
+      let cleanId = evt.id || `LIVE-NEWS-${Date.now()}-${idx}`;
+      if (seenIds.has(cleanId)) {
+        cleanId = `${cleanId}-${idx}`;
+      }
+      seenIds.add(cleanId);
+
+      uniqueEvents.push({
+        ...evt,
+        id: cleanId
+      });
+    });
+
+    return uniqueEvents;
   } catch (err) {
     console.warn("fetchLiveMarketNews error:", err);
     return [];

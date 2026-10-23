@@ -459,8 +459,8 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
-                    {insider.transactions.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-zinc-800/40 transition-colors">
+                    {insider.transactions.map((tx, txIdx) => (
+                      <tr key={`${tx.id || 'tx'}-${txIdx}`} className="hover:bg-zinc-800/40 transition-colors">
                         <td className="py-2.5 px-3">
                           <div className="font-bold text-zinc-200">{tx.insiderName}</div>
                           <div className="text-[10px] text-zinc-500 font-sans">{tx.title}</div>
@@ -539,7 +539,7 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {data.newsEvents.map((item, idx) => (
                   <div 
-                    key={item.id || idx}
+                    key={`${item.id || 'news'}-${idx}`}
                     className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800/80 flex flex-col justify-between space-y-2 hover:border-zinc-700 transition-colors"
                   >
                     <div className="space-y-1.5">

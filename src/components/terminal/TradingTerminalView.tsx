@@ -543,9 +543,9 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           {isSearchOpen && searchQuery.trim() && (
             <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto p-2 space-y-1">
               <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-1">Live Global Universe Matches</div>
-              {filteredGlobalUniverse.slice(0, 8).map(item => (
+              {filteredGlobalUniverse.slice(0, 8).map((item, idx) => (
                 <div
-                  key={item.ticker}
+                  key={`${item.ticker}-${idx}`}
                   onClick={() => {
                     onSelectTicker(item.ticker);
                     setActiveSubTab('projection');
@@ -985,7 +985,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {liveNews.slice(0, 6).map((item, idx) => (
                   <div 
-                    key={item.id || idx}
+                    key={`${item.id || 'live-news'}-${idx}`}
                     className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800/80 space-y-2 flex flex-col justify-between"
                   >
                     <div className="space-y-1.5">
@@ -1035,9 +1035,9 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {brainState.activeTrades.map(trade => (
+                {brainState.activeTrades.map((trade, idx) => (
                   <div 
-                    key={trade.id}
+                    key={`${trade.id || 'trade'}-${idx}`}
                     className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-2.5"
                   >
                     <div className="flex items-center justify-between">

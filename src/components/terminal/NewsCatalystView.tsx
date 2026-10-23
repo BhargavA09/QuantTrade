@@ -181,7 +181,7 @@ export const NewsCatalystView: React.FC<NewsCatalystViewProps> = ({ onSelectTick
                 const isBullish = item.sentiment_score > 0.15;
                 const isBearish = item.sentiment_score < -0.15;
                 return (
-                  <div key={item.id || idx} className="p-4 hover:bg-zinc-850/40 transition-colors space-y-2.5">
+                  <div key={`${item.id || 'catalyst'}-${idx}`} className="p-4 hover:bg-zinc-850/40 transition-colors space-y-2.5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono">
                         <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-bold">
@@ -223,9 +223,9 @@ export const NewsCatalystView: React.FC<NewsCatalystViewProps> = ({ onSelectTick
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 text-xs">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] text-zinc-500 uppercase font-bold font-mono">Impacted Assets:</span>
-                        {item.impacted_tickers?.map(sym => (
+                        {item.impacted_tickers?.map((sym, symIdx) => (
                           <button
-                            key={sym}
+                            key={`${sym}-${symIdx}`}
                             onClick={() => onSelectTicker && onSelectTicker(sym)}
                             className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-emerald-600 hover:text-white text-zinc-300 font-mono text-[11px] font-bold transition-colors flex items-center gap-1"
                           >
@@ -285,9 +285,9 @@ export const NewsCatalystView: React.FC<NewsCatalystViewProps> = ({ onSelectTick
                         {catKey.replace(/_/g, ' ')}
                       </h4>
                       <div className="flex items-center gap-1 mt-1.5">
-                        {cat.sample_tickers.map(sym => (
+                        {cat.sample_tickers.map((sym, sIdx) => (
                           <span 
-                            key={sym} 
+                            key={`${sym}-${sIdx}`} 
                             onClick={(e) => {
                               e.stopPropagation();
                               if (onSelectTicker) onSelectTicker(sym);
@@ -337,10 +337,10 @@ export const NewsCatalystView: React.FC<NewsCatalystViewProps> = ({ onSelectTick
             </div>
 
             <div className="divide-y divide-zinc-800/60">
-              {learnedItems.map(item => {
+              {learnedItems.map((item, lIdx) => {
                 const isConfirmed = item.outcome.includes('CONFIRMED');
                 return (
-                  <div key={item.id} className="p-4 hover:bg-zinc-800/20 transition-colors space-y-2">
+                  <div key={`${item.id || 'learned'}-${lIdx}`} className="p-4 hover:bg-zinc-800/20 transition-colors space-y-2">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">

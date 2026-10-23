@@ -17,6 +17,7 @@ import re
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
+import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
@@ -139,6 +140,7 @@ class GlobalNewsScanner:
             urls.append("https://news.google.com/rss/search?q=stock+market+OR+commodities+OR+federal+reserve&hl=en-US&gl=US&ceid=US:en")
 
         live_items = []
+        seen_titles = set()
         for url in urls:
             try:
                 req = urllib.request.Request(
@@ -166,6 +168,11 @@ class GlobalNewsScanner:
                                 if len(parts) == 2 and len(parts[1]) < 30:
                                     clean_title = parts[0].strip()
                                     source_name = parts[1].strip()
+
+                            normalized = re.sub(r'[^a-zA-Z0-9]', '', clean_title).lower()
+                            if not normalized or normalized in seen_titles:
+                                continue
+                            seen_titles.add(normalized)
 
                             live_items.append({
                                 "title": clean_title,
@@ -258,13 +265,18 @@ class GlobalNewsScanner:
         """
         live_raw = self.fetch_live_rss_headlines(ticker)
         results = []
+        seen_titles = set()
 
         if live_raw and len(live_raw) > 0:
-            for item in live_raw:
+            for idx, item in enumerate(live_raw):
                 title = item["title"]
+                norm = re.sub(r'[^a-zA-Z0-9]', '', title).lower()
+                if norm in seen_titles:
+                    continue
+                seen_titles.add(norm)
+
                 analysis = self.classify_and_score_headline(title, item.get("source", "Live Wire"))
-                
-                event_id = f"LIVE-NEWS-{int(time.time())}-{abs(hash(title)) % 100000:05d}"
+                event_id = f"LIVE-NEWS-{int(time.time())}-{idx:02d}-{uuid.uuid4().hex[:6]}"
                 results.append({
                     "id": event_id,
                     "title": title,
@@ -278,12 +290,18 @@ class GlobalNewsScanner:
                 })
         else:
             # Fallback to curated feeds if network connection drops
-            for raw in SAMPLE_GLOBAL_FEEDS:
-                analysis = self.classify_and_score_headline(raw["title"], raw["source"])
-                event_id = f"FALLBACK-NEWS-{int(time.time())}-{abs(hash(raw['title'])) % 10000:04d}"
+            for idx, raw in enumerate(SAMPLE_GLOBAL_FEEDS):
+                title = raw["title"]
+                norm = re.sub(r'[^a-zA-Z0-9]', '', title).lower()
+                if norm in seen_titles:
+                    continue
+                seen_titles.add(norm)
+
+                analysis = self.classify_and_score_headline(title, raw.get("source", "Macro Desk"))
+                event_id = f"FALLBACK-NEWS-{int(time.time())}-{idx:02d}-{uuid.uuid4().hex[:6]}"
                 results.append({
                     "id": event_id,
-                    "title": raw["title"],
+                    "title": title,
                     "source": raw.get("source", "Macro Desk"),
                     "link": "",
                     "pubDate": datetime.now(timezone.utc).isoformat(),
