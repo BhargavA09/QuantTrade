@@ -1064,3 +1064,310 @@ def run_dynamic_correlation_matrix(
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
+
+# ---------------------------------------------------------------------------
+# Project 7: Real-Time Delta-Gamma Risk Sensitivity & Dynamic Hedging Engine
+# Grounded in John C. Hull Chapter 19 & Mark S. Joshi Derivatives Mathematics
+# ---------------------------------------------------------------------------
+
+def _norm_pdf(x: float) -> float:
+    return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * x * x)
+
+def _norm_cdf(x: float) -> float:
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+def _calc_bs_greeks(S: float, K: float, T: float, r: float, sigma: float, option_type: str = "call") -> Dict[str, float]:
+    safe_sigma = max(0.01, sigma)
+    safe_T = max(0.001, T)
+    sqrt_T = math.sqrt(safe_T)
+    d1 = (math.log(max(1e-4, S / K)) + (r + 0.5 * safe_sigma * safe_sigma) * safe_T) / (safe_sigma * sqrt_T)
+    d2 = d1 - safe_sigma * sqrt_T
+
+    pdf_d1 = _norm_pdf(d1)
+    disc = math.exp(-r * safe_T)
+
+    if option_type == "call":
+        delta = _norm_cdf(d1)
+        price = max(0.0, S * _norm_cdf(d1) - K * disc * _norm_cdf(d2))
+    else:
+        delta = _norm_cdf(d1) - 1.0
+        price = max(0.0, K * disc * _norm_cdf(-d2) - S * _norm_cdf(-d1))
+
+    gamma = pdf_d1 / max(1e-6, S * safe_sigma * sqrt_T)
+    vega = (S * sqrt_T * pdf_d1) / 100.0  # dollar change per 1% vol change
+    vanna = - pdf_d1 * (d2 / safe_sigma)   # dDelta / dVol
+    speed = - (gamma / max(1e-6, S)) * ((d1 / (safe_sigma * sqrt_T)) + 1.0) # dGamma / dS
+
+    return {
+        "price": price,
+        "delta": delta,
+        "gamma": gamma,
+        "vega": vega,
+        "vanna": vanna,
+        "speed": speed
+    }
+
+def run_delta_gamma_sensitivity(
+    ticker: str = "NVDA",
+    spot_price: float = 140.0,
+    position_type: str = "long_equity",
+    quantity: int = 100,
+    target_delta: float = 0.0,
+    price_shock_pct: float = 0.0,
+    vol_shock_pct: float = 0.0,
+    base_iv: float = 0.32,
+    days_to_expiry: int = 30,
+    tolerance_band: float = 5.0
+) -> Dict[str, Any]:
+    """
+    Computes real-time Delta-Gamma sensitivity, Greek Taylor approximations, 
+    and dynamic delta-neutral hedging adjustments under price and volatility shocks.
+    """
+    clean_ticker = ticker.upper()
+    S0 = max(1.0, float(spot_price))
+    r = 0.045
+    T = max(1, days_to_expiry) / 365.0
+    sigma0 = max(0.05, float(base_iv))
+
+    # Determine position legs (shares and options)
+    # Options quantities represent contracts (each 100 shares multiplier)
+    shares_held = 0.0
+    calls_contracts = 0.0
+    calls_strike = S0
+    puts_contracts = 0.0
+    puts_strike = S0
+
+    if position_type == "long_equity":
+        shares_held = float(quantity)
+    elif position_type == "short_equity":
+        shares_held = -float(quantity)
+    elif position_type == "delta_hedged_straddle":
+        # Straddle: Long ATM Call + Long ATM Put + Delta Hedge in shares
+        # 1 contract Call + 1 contract Put, hedged to target_delta
+        contracts = max(1.0, float(quantity) / 100.0)
+        calls_contracts = contracts
+        puts_contracts = contracts
+        calls_strike = S0
+        puts_strike = S0
+        # Compute option delta to hedge to target
+        call_g = _calc_bs_greeks(S0, calls_strike, T, r, sigma0, "call")
+        put_g = _calc_bs_greeks(S0, puts_strike, T, r, sigma0, "put")
+        opt_delta = (call_g["delta"] * calls_contracts * 100.0) + (put_g["delta"] * puts_contracts * 100.0)
+        shares_held = target_delta - opt_delta
+    elif position_type == "covered_call":
+        # Long 100 shares, Short 1 OTM Call (+5% strike)
+        contracts = max(1.0, float(quantity) / 100.0)
+        shares_held = contracts * 100.0
+        calls_contracts = -contracts
+        calls_strike = round(S0 * 1.05, 2)
+    elif position_type == "protective_collar":
+        # Long shares + Long OTM Put (-5%) + Short OTM Call (+5%)
+        contracts = max(1.0, float(quantity) / 100.0)
+        shares_held = contracts * 100.0
+        puts_contracts = contracts
+        puts_strike = round(S0 * 0.95, 2)
+        calls_contracts = -contracts
+        calls_strike = round(S0 * 1.05, 2)
+    else: # Custom / default to active shares
+        shares_held = float(quantity)
+
+    # Base Greeks at S0 and sigma0
+    call_base = _calc_bs_greeks(S0, calls_strike, T, r, sigma0, "call") if calls_contracts != 0 else {"delta": 0, "gamma": 0, "vega": 0, "vanna": 0, "speed": 0, "price": 0}
+    put_base = _calc_bs_greeks(S0, puts_strike, T, r, sigma0, "put") if puts_contracts != 0 else {"delta": 0, "gamma": 0, "vega": 0, "vanna": 0, "speed": 0, "price": 0}
+
+    net_delta_0 = shares_held + (call_base["delta"] * calls_contracts * 100.0) + (put_base["delta"] * puts_contracts * 100.0)
+    net_gamma_0 = (call_base["gamma"] * calls_contracts * 100.0) + (put_base["gamma"] * puts_contracts * 100.0)
+    net_vega_0 = (call_base["vega"] * calls_contracts * 100.0) + (put_base["vega"] * puts_contracts * 100.0)
+    net_vanna_0 = (call_base["vanna"] * calls_contracts * 100.0) + (put_base["vanna"] * puts_contracts * 100.0)
+
+    # Dollar Delta & Dollar Gamma
+    dollar_delta_0 = net_delta_0 * S0
+    dollar_gamma_1pct = 0.5 * net_gamma_0 * ((0.01 * S0) ** 2)
+
+    # Apply Shocks
+    delta_S = S0 * (price_shock_pct / 100.0)
+    delta_sigma = vol_shock_pct / 100.0
+
+    shocked_price = round(max(0.01, S0 + delta_S), 2)
+    shocked_iv = round(max(0.01, sigma0 + delta_sigma), 4)
+
+    # Taylor series approximation for new Delta
+    # Delta(S + dS, vol + dVol) ~= Delta_0 + Gamma_0 * dS + Vanna_0 * dVol
+    delta_shocked_taylor = net_delta_0 + (net_gamma_0 * delta_S) + (net_vanna_0 * delta_sigma)
+
+    # Exact valuation at shocked parameters for verification
+    call_shocked = _calc_bs_greeks(shocked_price, calls_strike, T, r, shocked_iv, "call") if calls_contracts != 0 else {"delta": 0, "gamma": 0, "vega": 0, "vanna": 0, "price": 0}
+    put_shocked = _calc_bs_greeks(shocked_price, puts_strike, T, r, shocked_iv, "put") if puts_contracts != 0 else {"delta": 0, "gamma": 0, "vega": 0, "vanna": 0, "price": 0}
+    delta_shocked_exact = shares_held + (call_shocked["delta"] * calls_contracts * 100.0) + (put_shocked["delta"] * puts_contracts * 100.0)
+
+    # Use exact when options present, else Taylor/stock delta
+    active_shocked_delta = delta_shocked_exact if (calls_contracts != 0 or puts_contracts != 0) else delta_shocked_taylor
+
+    # Re-hedging requirement to restore target_delta
+    # Hedge adjustment needed in shares: -(active_shocked_delta - target_delta)
+    rebalance_shares_needed = - (active_shocked_delta - target_delta)
+    delta_drift = active_shocked_delta - target_delta
+    is_outside_tolerance = abs(delta_drift) > tolerance_band
+
+    if not is_outside_tolerance:
+        hedge_status = "IN_TOLERANCE"
+        hedge_action = "DELTA NEUTRAL — No re-hedge necessary"
+        hedge_urgency = "LOW"
+    elif rebalance_shares_needed > 0:
+        hedge_status = "REHEDGE_BUY"
+        hedge_action = f"BUY {abs(round(rebalance_shares_needed, 1))} shares at ${shocked_price:.2f} to restore neutral delta"
+        hedge_urgency = "HIGH" if abs(delta_drift) > tolerance_band * 2.5 else "MODERATE"
+    else:
+        hedge_status = "REHEDGE_SELL"
+        hedge_action = f"SELL {abs(round(rebalance_shares_needed, 1))} shares at ${shocked_price:.2f} to restore neutral delta"
+        hedge_urgency = "HIGH" if abs(delta_drift) > tolerance_band * 2.5 else "MODERATE"
+
+    rebalance_notional = abs(rebalance_shares_needed) * shocked_price
+
+    # PnL Taylor decomposition
+    linear_delta_pnl = net_delta_0 * delta_S
+    gamma_convexity_pnl = 0.5 * net_gamma_0 * (delta_S ** 2)
+    vega_pnl = net_vega_0 * (delta_sigma * 100.0)
+    total_taylor_pnl = linear_delta_pnl + gamma_convexity_pnl + vega_pnl
+
+    # Gamma acceleration score (0 to 100)
+    # Higher gamma = higher curvature, requires faster re-hedging
+    gamma_rel = abs(net_gamma_0) * S0 / max(1.0, abs(shares_held) + 1.0)
+    gamma_score = min(100.0, round(gamma_rel * 40.0, 1))
+
+    if gamma_score < 20:
+        gamma_regime = "LOW / LINEAR (Minimal curvature)"
+    elif gamma_score < 50:
+        gamma_regime = "MODERATE CONVEXITY (Controlled dynamic hedge)"
+    elif gamma_score < 80:
+        gamma_regime = "HIGH ACCELERATION (Aggressive re-hedging needed)"
+    else:
+        gamma_regime = "CRITICAL GAMMA RISK (Non-linear volatility pinch)"
+
+    # Curve across 31 price shock points (-15% to +15%)
+    sensitivity_curve = []
+    for pct in range(-15, 16):
+        dS_step = S0 * (pct / 100.0)
+        s_step = max(0.1, S0 + dS_step)
+        
+        if calls_contracts != 0 or puts_contracts != 0:
+            c_s = _calc_bs_greeks(s_step, calls_strike, T, r, shocked_iv, "call") if calls_contracts != 0 else {"delta": 0, "price": 0}
+            p_s = _calc_bs_greeks(s_step, puts_strike, T, r, shocked_iv, "put") if puts_contracts != 0 else {"delta": 0, "price": 0}
+            d_step = shares_held + (c_s["delta"] * calls_contracts * 100.0) + (p_s["delta"] * puts_contracts * 100.0)
+            exact_opt_pnl = (calls_contracts * 100.0 * (c_s["price"] - call_base["price"])) + (puts_contracts * 100.0 * (p_s["price"] - put_base["price"]))
+            exact_pnl = (shares_held * dS_step) + exact_opt_pnl
+        else:
+            d_step = net_delta_0
+            exact_pnl = shares_held * dS_step
+
+        hedge_step = - (d_step - target_delta)
+        linear_step = net_delta_0 * dS_step
+        gamma_pnl_step = 0.5 * net_gamma_0 * (dS_step ** 2)
+
+        sensitivity_curve.append({
+            "priceShockPct": pct,
+            "stockPrice": round(s_step, 2),
+            "positionDelta": round(d_step, 2),
+            "rehedgeShares": round(hedge_step, 1),
+            "linearPnl": round(linear_step, 2),
+            "convexPnl": round(linear_step + gamma_pnl_step, 2),
+            "exactPnl": round(exact_pnl, 2),
+            "convexityGap": round(gamma_pnl_step, 2),
+            "isBreached": abs(d_step - target_delta) > tolerance_band
+        })
+
+    # 2D Stress Matrix (5 price shocks x 3 vol environments)
+    stress_matrix = []
+    vol_scenarios = [
+        {"id": "crush", "label": "Vol Crush (-10%)", "dVol": -0.10},
+        {"id": "base", "label": "Baseline IV (0%)", "dVol": 0.0},
+        {"id": "spike", "label": "Vol Surge (+15%)", "dVol": 0.15}
+    ]
+    price_scenarios = [-10, -5, 0, 5, 10]
+
+    for ps in price_scenarios:
+        row_cells = []
+        dS_m = S0 * (ps / 100.0)
+        p_m = max(0.1, S0 + dS_m)
+        for vs in vol_scenarios:
+            v_m = max(0.05, sigma0 + vs["dVol"])
+            if calls_contracts != 0 or puts_contracts != 0:
+                c_m = _calc_bs_greeks(p_m, calls_strike, T, r, v_m, "call") if calls_contracts != 0 else {"delta": 0, "price": 0}
+                p_m_res = _calc_bs_greeks(p_m, puts_strike, T, r, v_m, "put") if puts_contracts != 0 else {"delta": 0, "price": 0}
+                d_m = shares_held + (c_m["delta"] * calls_contracts * 100.0) + (p_m_res["delta"] * puts_contracts * 100.0)
+                tot_pnl = (shares_held * dS_m) + (calls_contracts * 100.0 * (c_m["price"] - call_base["price"])) + (puts_contracts * 100.0 * (p_m_res["price"] - put_base["price"]))
+            else:
+                d_m = net_delta_0
+                tot_pnl = shares_held * dS_m
+
+            h_m = - (d_m - target_delta)
+            row_cells.append({
+                "volScenario": vs["id"],
+                "volLabel": vs["label"],
+                "priceShockPct": ps,
+                "shockedPrice": round(p_m, 2),
+                "delta": round(d_m, 2),
+                "rehedgeShares": round(h_m, 1),
+                "pnl": round(tot_pnl, 2),
+                "breach": abs(d_m - target_delta) > tolerance_band
+            })
+        stress_matrix.append({
+            "priceShockPct": ps,
+            "shockedPrice": round(p_m, 2),
+            "cells": row_cells
+        })
+
+    return {
+        "success": True,
+        "ticker": clean_ticker,
+        "spotPrice": S0,
+        "positionType": position_type,
+        "quantity": quantity,
+        "sharesHeld": round(shares_held, 1),
+        "targetDelta": target_delta,
+        "toleranceBand": tolerance_band,
+        "baseIv": sigma0,
+        "daysToExpiry": days_to_expiry,
+        "shocks": {
+            "priceShockPct": price_shock_pct,
+            "volShockPct": vol_shock_pct,
+            "shockedPrice": shocked_price,
+            "shockedIv": shocked_iv
+        },
+        "baseGreeks": {
+            "netDelta": round(net_delta_0, 2),
+            "dollarDelta": round(dollar_delta_0, 2),
+            "netGamma": round(net_gamma_0, 4),
+            "dollarGamma1Pct": round(dollar_gamma_1pct, 2),
+            "netVega": round(net_vega_0, 2),
+            "netVanna": round(net_vanna_0, 4)
+        },
+        "shockedGreeks": {
+            "shockedDelta": round(active_shocked_delta, 2),
+            "deltaDrift": round(delta_drift, 2),
+            "deltaDriftPct": round((delta_drift / max(1.0, abs(net_delta_0))) * 100.0, 1) if net_delta_0 != 0 else 0.0
+        },
+        "hedgingRequirement": {
+            "status": hedge_status,
+            "action": hedge_action,
+            "rebalanceShares": round(rebalance_shares_needed, 1),
+            "rebalanceNotional": round(rebalance_notional, 2),
+            "urgency": hedge_urgency,
+            "isOutsideTolerance": is_outside_tolerance
+        },
+        "pnlDecomposition": {
+            "linearDeltaPnl": round(linear_delta_pnl, 2),
+            "gammaConvexityPnl": round(gamma_convexity_pnl, 2),
+            "vegaPnl": round(vega_pnl, 2),
+            "totalTaylorPnl": round(total_taylor_pnl, 2),
+            "convexityAlphaAdvantage": round(gamma_convexity_pnl, 2)
+        },
+        "gammaRisk": {
+            "score": gamma_score,
+            "regime": gamma_regime
+        },
+        "sensitivityCurve": sensitivity_curve,
+        "stressMatrix": stress_matrix,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+

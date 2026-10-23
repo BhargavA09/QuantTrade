@@ -286,3 +286,116 @@ export async function fetchCorrelationMatrix(params: {
   return res.json();
 }
 
+export interface SensitivityCurvePoint {
+  priceShockPct: number;
+  stockPrice: number;
+  positionDelta: number;
+  rehedgeShares: number;
+  linearPnl: number;
+  convexPnl: number;
+  exactPnl: number;
+  convexityGap: number;
+  isBreached: boolean;
+}
+
+export interface StressMatrixCell {
+  volScenario: 'crush' | 'base' | 'spike';
+  volLabel: string;
+  priceShockPct: number;
+  shockedPrice: number;
+  delta: number;
+  rehedgeShares: number;
+  pnl: number;
+  breach: boolean;
+}
+
+export interface StressMatrixRow {
+  priceShockPct: number;
+  shockedPrice: number;
+  cells: StressMatrixCell[];
+}
+
+export interface DeltaGammaSensitivityResult {
+  success: boolean;
+  ticker: string;
+  spotPrice: number;
+  positionType: string;
+  quantity: number;
+  sharesHeld: number;
+  targetDelta: number;
+  toleranceBand: number;
+  baseIv: number;
+  daysToExpiry: number;
+  shocks: {
+    priceShockPct: number;
+    volShockPct: number;
+    shockedPrice: number;
+    shockedIv: number;
+  };
+  baseGreeks: {
+    netDelta: number;
+    dollarDelta: number;
+    netGamma: number;
+    dollarGamma1Pct: number;
+    netVega: number;
+    netVanna: number;
+  };
+  shockedGreeks: {
+    shockedDelta: number;
+    deltaDrift: number;
+    deltaDriftPct: number;
+  };
+  hedgingRequirement: {
+    status: 'IN_TOLERANCE' | 'REHEDGE_BUY' | 'REHEDGE_SELL';
+    action: string;
+    rebalanceShares: number;
+    rebalanceNotional: number;
+    urgency: 'LOW' | 'MODERATE' | 'HIGH';
+    isOutsideTolerance: boolean;
+  };
+  pnlDecomposition: {
+    linearDeltaPnl: number;
+    gammaConvexityPnl: number;
+    vegaPnl: number;
+    totalTaylorPnl: number;
+    convexityAlphaAdvantage: number;
+  };
+  gammaRisk: {
+    score: number;
+    regime: string;
+  };
+  sensitivityCurve: SensitivityCurvePoint[];
+  stressMatrix: StressMatrixRow[];
+  timestamp: string;
+}
+
+export async function fetchDeltaGammaSensitivity(params: {
+  ticker: string;
+  spot: number;
+  positionType?: string;
+  qty?: number;
+  targetDelta?: number;
+  priceShock?: number;
+  volShock?: number;
+  iv?: number;
+  dte?: number;
+  tolerance?: number;
+}): Promise<DeltaGammaSensitivityResult> {
+  const query = new URLSearchParams();
+  query.append('ticker', params.ticker);
+  query.append('spot', String(params.spot));
+  if (params.positionType) query.append('positionType', params.positionType);
+  if (params.qty !== undefined) query.append('qty', String(params.qty));
+  if (params.targetDelta !== undefined) query.append('targetDelta', String(params.targetDelta));
+  if (params.priceShock !== undefined) query.append('priceShock', String(params.priceShock));
+  if (params.volShock !== undefined) query.append('volShock', String(params.volShock));
+  if (params.iv !== undefined) query.append('iv', String(params.iv));
+  if (params.dte !== undefined) query.append('dte', String(params.dte));
+  if (params.tolerance !== undefined) query.append('tolerance', String(params.tolerance));
+
+  const res = await fetch(`${API_BASE}/delta-gamma-sensitivity?${query.toString()}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching delta-gamma sensitivity`);
+  return res.json();
+}
+
+

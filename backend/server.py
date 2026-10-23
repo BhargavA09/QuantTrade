@@ -1186,6 +1186,24 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
                 ticker=ticker, universe_type=universe, lookback_days=lookback
             ))
 
+        # Real-Time Delta-Gamma Risk Sensitivity & Dynamic Hedging Gauge
+        if path.startswith("/api/quant/delta-gamma-sensitivity"):
+            ticker = query.get("ticker", ["NVDA"])[0]
+            spot = float(query.get("spot", [140.0])[0])
+            pos_type = query.get("positionType", ["long_equity"])[0]
+            qty = int(query.get("qty", [100])[0])
+            target_d = float(query.get("targetDelta", [0.0])[0])
+            p_shock = float(query.get("priceShock", [0.0])[0])
+            v_shock = float(query.get("volShock", [0.0])[0])
+            iv = float(query.get("iv", [0.32])[0])
+            dte = int(query.get("dte", [30])[0])
+            tol = float(query.get("tolerance", [5.0])[0])
+            return self._send_json(quant_portfolio_suite.run_delta_gamma_sensitivity(
+                ticker=ticker, spot_price=spot, position_type=pos_type, quantity=qty,
+                target_delta=target_d, price_shock_pct=p_shock, vol_shock_pct=v_shock,
+                base_iv=iv, days_to_expiry=dte, tolerance_band=tol
+            ))
+
         if path.startswith("/api/quant/documentation") or path.startswith("/api/quant/github-repo"):
             return self._send_json(quant_portfolio_suite.get_portfolio_documentation())
 

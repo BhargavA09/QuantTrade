@@ -63,6 +63,7 @@ import {
 import OptionsSimulation from '../OptionsSimulation';
 import { StockSearchScenarioProjection } from './StockSearchScenarioProjection';
 import { TradingTerminalVaRVisualizer } from './TradingTerminalVaRVisualizer';
+import { TradingTerminalDeltaGammaGauge } from './TradingTerminalDeltaGammaGauge';
 
 interface TradingTerminalViewProps {
   selectedTicker: string;
@@ -78,7 +79,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   
   // Terminal Sub-Tabs
-  const [activeSubTab, setActiveSubTab] = useState<'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options'>('chart');
+  const [activeSubTab, setActiveSubTab] = useState<'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma'>('chart');
 
   // Chart state & Indicator toggles
   const [showIndicators, setShowIndicators] = useState({
@@ -482,6 +483,19 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           >
             <Layers className="w-4 h-4 text-purple-400" />
             <span>Options Simulator</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('deltagamma')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'deltagamma'
+                ? 'bg-amber-600 text-white shadow-sm shadow-amber-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Gauge className="w-4 h-4 text-amber-400" />
+            <span>Delta-Gamma Gauge</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans font-bold">HEDGING</span>
           </button>
         </div>
 
@@ -939,6 +953,14 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             portfolioCapital={brainState.stats.capital}
             kellyAllocationPct={quantSignal.halfKellyAllocationPct}
             garchRisk={quantSignal.garchVolatilityRisk}
+          />
+
+          {/* Real-Time Delta-Gamma Risk Sensitivity & Dynamic Hedging Gauge */}
+          <TradingTerminalDeltaGammaGauge
+            selectedTicker={selectedTicker}
+            currentPrice={currentPrice}
+            activeTrades={brainState.activeTrades}
+            onNavigateToBrain={onNavigateToBrain}
           />
 
           {/* Real-Time Live News Wires for Active Asset */}
@@ -1950,6 +1972,18 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             } as any}
           />
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 5: REAL-TIME DELTA-GAMMA RISK SENSITIVITY & DYNAMIC HEDGING GAUGE */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'deltagamma' && (
+        <TradingTerminalDeltaGammaGauge
+          selectedTicker={selectedTicker}
+          currentPrice={currentPrice}
+          activeTrades={brainState.activeTrades}
+          onNavigateToBrain={onNavigateToBrain}
+        />
       )}
 
     </div>
