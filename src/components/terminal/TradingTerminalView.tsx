@@ -28,6 +28,7 @@ import {
   Globe,
   Layers,
   ShieldCheck,
+  ShieldAlert,
   RefreshCw,
   Coins,
   Flame,
@@ -61,6 +62,7 @@ import {
 } from '../../services/api/analysisService';
 import OptionsSimulation from '../OptionsSimulation';
 import { StockSearchScenarioProjection } from './StockSearchScenarioProjection';
+import { TradingTerminalVaRVisualizer } from './TradingTerminalVaRVisualizer';
 
 interface TradingTerminalViewProps {
   selectedTicker: string;
@@ -750,6 +752,10 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                   >
                     Bollinger (2σ)
                   </button>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 font-bold flex items-center gap-1">
+                    <ShieldAlert className="w-3 h-3 text-rose-400" />
+                    VaR Downside Active
+                  </span>
                 </div>
               </div>
 
@@ -922,6 +928,18 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Real-Time Value-at-Risk (VaR) & Downside Risk Metrics Visualizer */}
+          <TradingTerminalVaRVisualizer
+            ticker={selectedTicker}
+            currentPrice={currentPrice}
+            chartBars={chartBars}
+            suggestedStopLoss={quantSignal.stopLoss}
+            suggestedShares={quantSignal.suggestedSharesOrContracts}
+            portfolioCapital={brainState.stats.capital}
+            kellyAllocationPct={quantSignal.halfKellyAllocationPct}
+            garchRisk={quantSignal.garchVolatilityRisk}
+          />
 
           {/* Real-Time Live News Wires for Active Asset */}
           <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-5 space-y-3 shadow-xl">

@@ -146,6 +146,8 @@ export default function App() {
 
         {activeTab === 'brain' && (
           <TraderBrainView
+            selectedTicker={selectedTicker}
+            onSelectTicker={setSelectedTicker}
             onNavigateToTerminal={() => setActiveTab('terminal')}
             onNavigateToNews={() => setActiveTab('news')}
           />

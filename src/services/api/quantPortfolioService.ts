@@ -224,3 +224,65 @@ export async function fetchPortfolioDocumentation(): Promise<PortfolioDocumentat
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching portfolio documentation`);
   return res.json();
 }
+
+export interface CorrelationAssetDetail {
+  ticker: string;
+  name: string;
+  category: string;
+  sector: string;
+  baseBeta: number;
+  baseVol: number;
+}
+
+export interface PrimaryCorrelationItem {
+  ticker: string;
+  name: string;
+  category: string;
+  sector: string;
+  correlation: number;
+  regime: string;
+  description: string;
+}
+
+export interface CorrelationMatrixResult {
+  success: boolean;
+  primaryTicker: string;
+  lookbackDays: number;
+  universeType: string;
+  tickers: string[];
+  assetDetails: CorrelationAssetDetail[];
+  matrix: number[][];
+  primaryCorrelations: PrimaryCorrelationItem[];
+  topDriver: PrimaryCorrelationItem;
+  topHedge: PrimaryCorrelationItem;
+  insights: {
+    betaSPY: number;
+    betaQQQ: number;
+    averageCorrelation: number;
+    systematicFactorExposure: string;
+    pcaFirstComponentVariancePct: number;
+    diversificationScore: number;
+  };
+  rollingTimeline: Array<{
+    date: string;
+    corrSPY: number;
+    corrQQQ: number;
+  }>;
+  timestamp: string;
+}
+
+export async function fetchCorrelationMatrix(params: {
+  ticker?: string;
+  universe?: 'all' | 'indices' | 'sectors' | 'macro';
+  lookback?: number;
+}): Promise<CorrelationMatrixResult> {
+  const query = new URLSearchParams();
+  if (params.ticker) query.append('ticker', params.ticker);
+  if (params.universe) query.append('universe', params.universe);
+  if (params.lookback) query.append('lookback', String(params.lookback));
+
+  const res = await fetch(`${API_BASE}/correlation-matrix?${query.toString()}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching correlation matrix`);
+  return res.json();
+}
+

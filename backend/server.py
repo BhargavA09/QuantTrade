@@ -1177,6 +1177,15 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
                 tickers=tickers_list, risk_free_rate=rf, max_weight=max_w
             ))
 
+        # Dynamic Cross-Asset & Sector Correlation Matrix
+        if path.startswith("/api/quant/correlation-matrix"):
+            ticker = query.get("ticker", ["NVDA"])[0]
+            universe = query.get("universe", ["all"])[0]
+            lookback = int(query.get("lookback", [90])[0])
+            return self._send_json(quant_portfolio_suite.run_dynamic_correlation_matrix(
+                ticker=ticker, universe_type=universe, lookback_days=lookback
+            ))
+
         if path.startswith("/api/quant/documentation") or path.startswith("/api/quant/github-repo"):
             return self._send_json(quant_portfolio_suite.get_portfolio_documentation())
 

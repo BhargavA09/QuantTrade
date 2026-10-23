@@ -18,7 +18,8 @@ import {
   History,
   XCircle,
   Radio,
-  BookOpen
+  BookOpen,
+  Network
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -29,19 +30,24 @@ import {
 } from '../../services/QuantTraderBrain';
 import { continuousLearningService } from '../../services/continuousLearningService';
 import { TraderBrainRiskManagement } from './TraderBrainRiskManagement';
+import { TraderBrainCorrelationMatrix } from './TraderBrainCorrelationMatrix';
 
 interface TraderBrainViewProps {
+  selectedTicker?: string;
+  onSelectTicker?: (ticker: string) => void;
   onNavigateToTerminal?: () => void;
   onNavigateToNews?: () => void;
 }
 
 export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
+  selectedTicker = 'NVDA',
+  onSelectTicker,
   onNavigateToTerminal,
   onNavigateToNews
 }) => {
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   const [activeLedgerTab, setActiveLedgerTab] = useState<'mistakes' | 'successes'>('mistakes');
-  const [activeSection, setActiveSection] = useState<'all' | 'risk' | 'ledger' | 'factors'>('all');
+  const [activeSection, setActiveSection] = useState<'all' | 'correlation' | 'risk' | 'ledger' | 'factors'>('all');
   const [isSimulating, setIsSimulating] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -260,6 +266,18 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
           All Modules
         </button>
         <button
+          onClick={() => setActiveSection('correlation')}
+          className={`px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-2 ${
+            activeSection === 'correlation'
+              ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40'
+              : 'text-emerald-400 hover:text-emerald-300'
+          }`}
+        >
+          <Network className="w-3.5 h-3.5" />
+          <span>Dynamic Correlation Matrix (D3 Heatmap)</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-200">D3.JS</span>
+        </button>
+        <button
           onClick={() => setActiveSection('risk')}
           className={`px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-2 ${
             activeSection === 'risk'
@@ -295,7 +313,15 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
         </button>
       </div>
 
-      {/* 2. D3.js Portfolio Risk Management & Maximum Drawdown Scenarios */}
+      {/* 2. D3.js Dynamic Correlation Matrix Heatmap & Factor Exposure */}
+      {(activeSection === 'all' || activeSection === 'correlation') && (
+        <TraderBrainCorrelationMatrix
+          selectedTicker={selectedTicker}
+          onSelectTicker={onSelectTicker}
+        />
+      )}
+
+      {/* 3. D3.js Portfolio Risk Management & Maximum Drawdown Scenarios */}
       {(activeSection === 'all' || activeSection === 'risk') && (
         <TraderBrainRiskManagement brainState={brainState} />
       )}
