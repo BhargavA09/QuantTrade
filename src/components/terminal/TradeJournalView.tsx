@@ -140,10 +140,10 @@ export const TradeJournalView: React.FC<TradeJournalViewProps> = ({ onSelectTick
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/60">
-              {filteredTrades.map(t => {
+              {filteredTrades.map((t, idx) => {
                 const isWin = t.outcome === 'WIN';
                 return (
-                  <tr key={t.id} className="hover:bg-zinc-800/20 transition-colors">
+                  <tr key={`${t.id || 'tr'}-${idx}`} className="hover:bg-zinc-800/20 transition-colors">
                     <td className="py-2.5 px-3 font-bold text-white">{t.id}</td>
                     <td 
                       className="py-2.5 px-3 font-bold text-emerald-400 cursor-pointer hover:underline"

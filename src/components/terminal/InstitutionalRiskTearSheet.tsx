@@ -490,8 +490,8 @@ export const InstitutionalRiskTearSheet: React.FC<InstitutionalRiskTearSheetProp
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60 print:divide-zinc-200">
-                  {activeTrades.map(trade => (
-                    <tr key={trade.id} className="hover:bg-zinc-900/30">
+                  {activeTrades.map((trade, idx) => (
+                    <tr key={`${trade.id || 'trade'}-${idx}`} className="hover:bg-zinc-900/30">
                       <td className="py-2 px-3 font-bold text-white print:text-black">{trade.ticker}</td>
                       <td className="py-2 px-3">
                         <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${trade.tradeType === 'LONG' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>

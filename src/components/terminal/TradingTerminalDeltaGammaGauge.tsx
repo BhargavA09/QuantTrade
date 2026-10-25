@@ -1387,8 +1387,8 @@ export const TradingTerminalDeltaGammaGauge: React.FC<TradingTerminalDeltaGammaG
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
-                {hedgeAuditLog.slice(0, 10).map((record) => (
-                  <tr key={record.id} className="hover:bg-zinc-900/40 transition-colors">
+                {hedgeAuditLog.slice(0, 10).map((record, idx) => (
+                  <tr key={`${record.id || 'aud'}-${idx}`} className="hover:bg-zinc-900/40 transition-colors">
                     <td className="py-2.5 px-3 text-zinc-400 whitespace-nowrap text-[11px]">
                       {record.timestamp}
                     </td>

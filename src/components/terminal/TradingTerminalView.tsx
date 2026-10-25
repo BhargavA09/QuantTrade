@@ -70,6 +70,10 @@ import { MultiLegOptionsStrategyBuilder } from './MultiLegOptionsStrategyBuilder
 import { MarketMicrostructureVolumeProfile } from './MarketMicrostructureVolumeProfile';
 import { MacroStressTestingEngine } from './MacroStressTestingEngine';
 import { InstitutionalRiskTearSheet } from './InstitutionalRiskTearSheet';
+import { TechnicalPatternScannerUtility } from './TechnicalPatternScannerUtility';
+import { MarketSentimentHeatmap } from './MarketSentimentHeatmap';
+import { StrategyBacktestingModule } from './StrategyBacktestingModule';
+import { detectAutomatedPatterns } from '../../utils/patternRecognition';
 
 interface TradingTerminalViewProps {
   selectedTicker: string;
@@ -86,12 +90,15 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   
   // Terminal Sub-Tabs
   const [activeSubTab, setActiveSubTab] = useState<
-    'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress'
+    'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'backtest'
   >('chart');
 
   // Tear Sheet & Chart Visualizer Toggles
   const [isTearSheetOpen, setIsTearSheetOpen] = useState<boolean>(false);
   const [showChartVolumeProfile, setShowChartVolumeProfile] = useState<boolean>(false);
+  const [showChartPatterns, setShowChartPatterns] = useState<boolean>(false);
+  const [showChartSentimentHeatmap, setShowChartSentimentHeatmap] = useState<boolean>(false);
+  const [showChartBacktest, setShowChartBacktest] = useState<boolean>(false);
 
   // Chart state & Indicator toggles
   const [showIndicators, setShowIndicators] = useState({
@@ -328,6 +335,11 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     );
   }, [currentPrice, stockMeta, brainState]);
 
+  // Automated Technical Pattern Recognition for the current asset
+  const detectedChartPatterns = useMemo(() => {
+    return detectAutomatedPatterns(chartBars);
+  }, [chartBars]);
+
   // Strategy for inspected global market asset in the Global Radar sub-tab
   const inspectedAssetData = useMemo(() => {
     const item = globalUniverse.find(g => g.ticker === inspectedGlobalAsset) || globalUniverse[0];
@@ -550,6 +562,45 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveSubTab('patterns')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'patterns'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-indigo-400" />
+            <span>Chart Patterns</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-sans font-bold">H&S / FLAGS</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('sentiment_heatmap')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'sentiment_heatmap'
+                ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Flame className="w-4 h-4 text-emerald-400" />
+            <span>Sentiment Heatmap</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold">SOCIAL & NEWS</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('backtest')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'backtest'
+                ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+          >
+            <Sliders className="w-4 h-4 text-purple-400" />
+            <span>Strategy Backtest</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-sans font-bold">CUSTOM SIGNALS</span>
+          </button>
+
+          <button
             onClick={() => setIsTearSheetOpen(true)}
             className="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 shadow-sm font-bold"
             title="Open Full Institutional Risk Tear Sheet & Report Generator"
@@ -705,6 +756,22 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             <span className="font-bold">LIVE STREAM</span>
             <span className="text-zinc-500">· {lastLiveSyncTime}</span>
           </div>
+
+          {/* Real-Time Sentiment Heatmap Quick Pill */}
+          <div
+            onClick={() => setActiveSubTab('sentiment_heatmap')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full cursor-pointer transition-all border ${
+              activeSubTab === 'sentiment_heatmap'
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-sm shadow-emerald-950/40'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+            }`}
+            title="Click to view real-time Social & News Sentiment Heatmap"
+          >
+            <Flame className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span className="text-[11px] font-mono font-bold">SENTIMENT HEATMAP</span>
+            <span className="text-zinc-600">|</span>
+            <span className="text-[10px] font-mono text-zinc-300">SOCIAL & NEWS</span>
+          </div>
         </div>
 
         {/* Live Refresh, Auto-Sync Interval & Popular Tickers */}
@@ -836,12 +903,71 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                     <BarChart2 className="w-3 h-3 text-blue-300" />
                     <span>Volume Profile</span>
                   </button>
+                  <button
+                    onClick={() => setShowChartPatterns(!showChartPatterns)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1 ${
+                      showChartPatterns ? 'bg-indigo-600 text-white border border-indigo-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3 text-indigo-300" />
+                    <span>Chart Patterns {detectedChartPatterns.length > 0 ? `(${detectedChartPatterns.length})` : ''}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowChartSentimentHeatmap(!showChartSentimentHeatmap)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1 ${
+                      showChartSentimentHeatmap ? 'bg-emerald-600 text-white border border-emerald-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <Flame className="w-3 h-3 text-emerald-300" />
+                    <span>Sentiment Heatmap</span>
+                  </button>
+                  <button
+                    onClick={() => setShowChartBacktest(!showChartBacktest)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1 ${
+                      showChartBacktest ? 'bg-purple-600 text-white border border-purple-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <Sliders className="w-3 h-3 text-purple-300" />
+                    <span>Backtest Engine</span>
+                  </button>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 font-bold flex items-center gap-1">
                     <ShieldAlert className="w-3 h-3 text-rose-400" />
                     VaR Downside Active
                   </span>
                 </div>
               </div>
+
+              {/* Active Chart Pattern Notification Strip */}
+              {detectedChartPatterns.length > 0 && (
+                <div 
+                  onClick={() => setActiveSubTab('patterns')}
+                  className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 flex items-center justify-between text-xs font-mono cursor-pointer hover:bg-indigo-900/40 transition-all shadow-md group"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse shrink-0" />
+                    <span className="text-zinc-400 text-[11px]">Active Formation:</span>
+                    <strong className="text-white group-hover:text-indigo-300 transition-colors">
+                      {detectedChartPatterns[0].name}
+                    </strong>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-black uppercase ${
+                      detectedChartPatterns[0].bias === 'bullish' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                    }`}>
+                      {detectedChartPatterns[0].bias}
+                    </span>
+                    <span className="text-zinc-500 hidden sm:inline">·</span>
+                    <span className="text-zinc-400 text-[11px] hidden sm:inline">
+                      Target: <strong className={detectedChartPatterns[0].bias === 'bullish' ? 'text-emerald-400' : 'text-rose-400'}>${detectedChartPatterns[0].targetPrice}</strong>
+                    </span>
+                    <span className="text-zinc-500 hidden sm:inline">·</span>
+                    <span className="text-[10px] text-zinc-500 font-sans">
+                      {detectedChartPatterns[0].confidence}% Confidence
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] text-indigo-300 group-hover:translate-x-0.5 transition-transform shrink-0">
+                    <span>Inspect Geometry &rarr;</span>
+                  </div>
+                </div>
+              )}
 
               {/* Interactive Live Recharts Canvas */}
               <div className="h-80 w-full pt-2">
@@ -1031,6 +1157,45 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               selectedTicker={selectedTicker}
               currentPrice={currentPrice}
               chartBars={chartBars}
+            />
+          )}
+
+          {/* Conditional Automated Technical Pattern Scanner Utility (when toggled on chart) */}
+          {showChartPatterns && (
+            <TechnicalPatternScannerUtility
+              selectedTicker={selectedTicker}
+              currentPrice={currentPrice}
+              chartBars={chartBars}
+              onTradePattern={(pattern) => {
+                setTradeMessage(`Executed pattern trade setup from [${pattern.name}] on ${selectedTicker}`);
+                setTimeout(() => setTradeMessage(null), 5000);
+              }}
+            />
+          )}
+
+          {/* Conditional Real-Time Market Sentiment Heatmap (when toggled on chart) */}
+          {showChartSentimentHeatmap && (
+            <MarketSentimentHeatmap
+              selectedTicker={selectedTicker}
+              currentPrice={currentPrice}
+              onSelectTicker={onSelectTicker}
+              onTradeExecuted={(msg) => {
+                setTradeMessage(msg);
+                setTimeout(() => setTradeMessage(null), 5000);
+              }}
+            />
+          )}
+
+          {/* Conditional Strategy Backtest Simulator (when toggled on chart) */}
+          {showChartBacktest && (
+            <StrategyBacktestingModule
+              selectedTicker={selectedTicker}
+              currentPrice={currentPrice}
+              chartBars={chartBars}
+              onDeployToBrain={(cfg) => {
+                setTradeMessage(`Deployed backtested strategy [${cfg.name}] to Brain`);
+                setTimeout(() => setTradeMessage(null), 5000);
+              }}
             />
           )}
 
@@ -2096,6 +2261,51 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
         <MacroStressTestingEngine
           selectedTicker={selectedTicker}
           currentPrice={currentPrice}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 9: AUTOMATED TECHNICAL PATTERN SCANNER & FORMATION VISUALIZER    */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'patterns' && (
+        <TechnicalPatternScannerUtility
+          selectedTicker={selectedTicker}
+          currentPrice={currentPrice}
+          chartBars={chartBars}
+          onTradePattern={(pattern) => {
+            setTradeMessage(`Executed pattern trade setup from [${pattern.name}] on ${selectedTicker}`);
+            setTimeout(() => setTradeMessage(null), 5000);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 10: REAL-TIME MARKET SENTIMENT HEATMAP (SOCIAL & NEWS FEEDS)      */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'sentiment_heatmap' && (
+        <MarketSentimentHeatmap
+          selectedTicker={selectedTicker}
+          currentPrice={currentPrice}
+          onSelectTicker={onSelectTicker}
+          onTradeExecuted={(msg) => {
+            setTradeMessage(msg);
+            setTimeout(() => setTradeMessage(null), 5000);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 11: QUANTITATIVE STRATEGY BACKTESTING & CUSTOM SIGNAL SIMULATOR   */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'backtest' && (
+        <StrategyBacktestingModule
+          selectedTicker={selectedTicker}
+          currentPrice={currentPrice}
+          chartBars={chartBars}
+          onDeployToBrain={(cfg) => {
+            setTradeMessage(`Deployed backtested strategy [${cfg.name}] to Brain`);
+            setTimeout(() => setTradeMessage(null), 5000);
+          }}
         />
       )}
 

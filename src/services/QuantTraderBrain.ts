@@ -165,6 +165,28 @@ export interface TraderBrainState {
   hedgeAuditLog: HedgeAuditRecord[];
 }
 
+let brainIdCounter = 0;
+
+export function generateBrainUniqueId(prefix: string): string {
+  brainIdCounter += 1;
+  const time = Date.now();
+  const rand = Math.random().toString(36).substring(2, 8);
+  return `${prefix}-${time}-${brainIdCounter}-${rand}`;
+}
+
+export function sanitizeUniqueItems<T extends { id?: string }>(items: T[] | undefined, prefix: string): T[] {
+  if (!Array.isArray(items)) return [];
+  const seenIds = new Set<string>();
+  return items.map((item, idx) => {
+    let id = item?.id;
+    if (!id || seenIds.has(id)) {
+      id = `${prefix}-${Date.now()}-${idx + 1}-${Math.random().toString(36).substring(2, 7)}`;
+    }
+    seenIds.add(id);
+    return { ...item, id };
+  });
+}
+
 type BrainListener = (state: TraderBrainState) => void;
 
 class QuantTraderBrainService {
@@ -260,6 +282,14 @@ class QuantTraderBrainService {
           if (!parsed.hedgeAuditLog || !Array.isArray(parsed.hedgeAuditLog)) {
             parsed.hedgeAuditLog = defaultHedgeAuditLogs;
           }
+
+          // Ensure loaded collections have strictly unique IDs (repairs legacy collisions from fast loops)
+          parsed.mistakes = sanitizeUniqueItems(parsed.mistakes, 'MSTK');
+          parsed.successes = sanitizeUniqueItems(parsed.successes, 'SUCC');
+          parsed.closedTrades = sanitizeUniqueItems(parsed.closedTrades, 'TR');
+          parsed.activeTrades = sanitizeUniqueItems(parsed.activeTrades, 'ACT');
+          parsed.hedgeAuditLog = sanitizeUniqueItems(parsed.hedgeAuditLog, 'AUD');
+
           return parsed;
         }
       } catch (e) {
@@ -588,7 +618,7 @@ class QuantTraderBrainService {
       }
 
       createdSuccess = {
-        id: `SUCC-${Date.now() % 100000}`,
+        id: generateBrainUniqueId('SUCC'),
         timestamp: timeStr,
         ticker,
         tradeType,
@@ -643,7 +673,7 @@ class QuantTraderBrainService {
       }
 
       createdMistake = {
-        id: `MSTK-${Date.now() % 100000}`,
+        id: generateBrainUniqueId('MSTK'),
         timestamp: timeStr,
         ticker,
         tradeType,
@@ -673,7 +703,7 @@ class QuantTraderBrainService {
 
     // Record closed trade
     const closed: ClosedTrade = {
-      id: `TR-${Date.now() % 100000}`,
+      id: generateBrainUniqueId('TR'),
       ticker,
       tradeType,
       entryPrice,
@@ -721,7 +751,7 @@ class QuantTraderBrainService {
     const takeProfit2 = isLong ? parseFloat((currentPrice * 1.050).toFixed(2)) : parseFloat((currentPrice * 0.950).toFixed(2));
 
     const trade: ActiveTrade = {
-      id: `ACT-${Date.now() % 100000}`,
+      id: generateBrainUniqueId('ACT'),
       ticker,
       tradeType,
       entryPrice: currentPrice,
@@ -808,7 +838,7 @@ class QuantTraderBrainService {
       }
     } else {
       const hedgeTrade: ActiveTrade = {
-        id: `HDG-${Date.now() % 100000}`,
+        id: generateBrainUniqueId('HDG'),
         ticker,
         tradeType: isBuy ? 'LONG' : 'SHORT',
         entryPrice: executionPrice,
@@ -827,7 +857,7 @@ class QuantTraderBrainService {
     }
 
     const auditRecord: HedgeAuditRecord = {
-      id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: generateBrainUniqueId('AUD'),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       ticker,
       hedgeAction: action,

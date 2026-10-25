@@ -419,9 +419,9 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {brainState.mistakes.map(m => (
+              {brainState.mistakes.map((m, idx) => (
                 <div 
-                  key={m.id}
+                  key={`${m.id || 'mstk'}-${idx}`}
                   className="p-4 rounded-xl bg-zinc-950/80 border border-rose-500/20 hover:border-rose-500/40 transition-colors space-y-3"
                 >
                   <div className="flex items-center justify-between">
@@ -469,9 +469,9 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {brainState.successes.map(s => (
+              {brainState.successes.map((s, idx) => (
                 <div 
-                  key={s.id}
+                  key={`${s.id || 'succ'}-${idx}`}
                   className="p-4 rounded-xl bg-zinc-950/80 border border-emerald-500/20 hover:border-emerald-500/40 transition-colors space-y-3"
                 >
                   <div className="flex items-center justify-between">
