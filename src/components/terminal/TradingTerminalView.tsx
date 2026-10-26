@@ -41,6 +41,7 @@ import {
   Wifi,
   Server,
   Gauge,
+  Waves,
   FileText,
   BarChart2
 } from 'lucide-react';
@@ -72,8 +73,10 @@ import { MacroStressTestingEngine } from './MacroStressTestingEngine';
 import { InstitutionalRiskTearSheet } from './InstitutionalRiskTearSheet';
 import { TechnicalPatternScannerUtility } from './TechnicalPatternScannerUtility';
 import { MarketSentimentHeatmap } from './MarketSentimentHeatmap';
+import { MarketSentimentGauge } from './MarketSentimentGauge';
 import { StrategyBacktestingModule } from './StrategyBacktestingModule';
 import { detectAutomatedPatterns } from '../../utils/patternRecognition';
+import { computeHighFrequencyAnalysis, HighFrequencyMetrics } from '../../services/api/signalProcessing';
 
 interface TradingTerminalViewProps {
   selectedTicker: string;
@@ -90,7 +93,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   
   // Terminal Sub-Tabs
   const [activeSubTab, setActiveSubTab] = useState<
-    'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'backtest'
+    'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'sentiment_gauge' | 'backtest'
   >('chart');
 
   // Tear Sheet & Chart Visualizer Toggles
@@ -99,6 +102,8 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   const [showChartPatterns, setShowChartPatterns] = useState<boolean>(false);
   const [showChartSentimentHeatmap, setShowChartSentimentHeatmap] = useState<boolean>(false);
   const [showChartBacktest, setShowChartBacktest] = useState<boolean>(false);
+  const [showFourierFilter, setShowFourierFilter] = useState<boolean>(true);
+  const [showSentimentGauge, setShowSentimentGauge] = useState<boolean>(true);
 
   // Chart state & Indicator toggles
   const [showIndicators, setShowIndicators] = useState({
@@ -321,6 +326,23 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       };
     });
   }, [liveAssetData, currentPrice]);
+
+  // High-Frequency Discrete Fourier Signal Decomposition
+  const fourierMetrics = useMemo<HighFrequencyMetrics | null>(() => {
+    if (!chartBars || chartBars.length < 6) return null;
+    const prices = chartBars.map(b => b.price);
+    return computeHighFrequencyAnalysis(prices, 0.15);
+  }, [chartBars]);
+
+  // Enriched chart bars with Fourier Low-Pass smoothed baseline & high-pass Z-score
+  const enrichedChartBars = useMemo(() => {
+    if (!fourierMetrics || !fourierMetrics.lowPass.length) return chartBars;
+    return chartBars.map((b, idx) => ({
+      ...b,
+      fourierLowPass: fourierMetrics.lowPass[idx] !== undefined ? parseFloat(fourierMetrics.lowPass[idx].toFixed(2)) : undefined,
+      fourierZScore: fourierMetrics.zScores[idx] !== undefined ? parseFloat(fourierMetrics.zScores[idx].toFixed(2)) : undefined
+    }));
+  }, [chartBars, fourierMetrics]);
 
   // Quant Signal for currently selected ticker based on real live data
   const quantSignal = useMemo(() => {
@@ -585,6 +607,20 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             <Flame className="w-4 h-4 text-emerald-400" />
             <span>Sentiment Heatmap</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold">SOCIAL & NEWS</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('sentiment_gauge')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+              activeSubTab === 'sentiment_gauge'
+                ? 'bg-amber-600 text-white shadow-sm shadow-amber-950/40'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+            title="Fear & Greed Index with Discrete Fourier Signal Confluence"
+          >
+            <Gauge className="w-4 h-4 text-amber-400" />
+            <span>Fear & Greed Gauge</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans font-bold">FOURIER CONFLUENCE</span>
           </button>
 
           <button
@@ -922,6 +958,26 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                     <span>Sentiment Heatmap</span>
                   </button>
                   <button
+                    onClick={() => setShowFourierFilter(!showFourierFilter)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1 ${
+                      showFourierFilter ? 'bg-cyan-600 text-white border border-cyan-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                    title="Toggle Discrete Fourier Low-Pass Filtered Baseline on chart"
+                  >
+                    <Waves className="w-3 h-3 text-cyan-300" />
+                    <span>Fourier Filter</span>
+                  </button>
+                  <button
+                    onClick={() => setShowSentimentGauge(!showSentimentGauge)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1 ${
+                      showSentimentGauge ? 'bg-amber-600 text-white border border-amber-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                    title="Toggle Market Sentiment & Fear/Greed Context Gauge"
+                  >
+                    <Gauge className="w-3 h-3 text-amber-300" />
+                    <span>Fear & Greed Gauge</span>
+                  </button>
+                  <button
                     onClick={() => setShowChartBacktest(!showChartBacktest)}
                     className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors flex items-center gap-1 ${
                       showChartBacktest ? 'bg-purple-600 text-white border border-purple-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'
@@ -972,7 +1028,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               {/* Interactive Live Recharts Canvas */}
               <div className="h-80 w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartBars} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <ComposedChart data={enrichedChartBars} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
@@ -1004,6 +1060,8 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                         if (name === 'ema50') return [`$${val}`, '50-EMA'];
                         if (name === 'bbUpper') return [`$${val}`, 'Upper Band'];
                         if (name === 'bbLower') return [`$${val}`, 'Lower Band'];
+                        if (name === 'fourierLowPass') return [`$${val}`, 'Fourier Low-Pass Baseline'];
+                        if (name === 'fourierZScore') return [`${val}σ`, 'Fourier High-Pass Residual'];
                         return [val, name];
                       }}
                     />
@@ -1019,6 +1077,9 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                     )}
                     {showIndicators.ema50 && (
                       <Line type="monotone" dataKey="ema50" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
+                    )}
+                    {showFourierFilter && (
+                      <Line type="monotone" dataKey="fourierLowPass" stroke="#06b6d4" strokeWidth={2.2} strokeDasharray="4 4" dot={false} />
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -1181,6 +1242,20 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               onSelectTicker={onSelectTicker}
               onTradeExecuted={(msg) => {
                 setTradeMessage(msg);
+                setTimeout(() => setTradeMessage(null), 5000);
+              }}
+            />
+          )}
+
+          {/* Conditional Real-Time Market Sentiment Gauge with Fourier Signal Confluence */}
+          {showSentimentGauge && (
+            <MarketSentimentGauge
+              ticker={selectedTicker}
+              currentPrice={currentPrice}
+              fourierMetrics={fourierMetrics}
+              onTradeSignal={(bias, setupName) => {
+                handleExecute(bias);
+                setTradeMessage(`Executed ${bias} from [${setupName}]`);
                 setTimeout(() => setTradeMessage(null), 5000);
               }}
             />
@@ -2289,6 +2364,22 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           onSelectTicker={onSelectTicker}
           onTradeExecuted={(msg) => {
             setTradeMessage(msg);
+            setTimeout(() => setTradeMessage(null), 5000);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 10B: REAL-TIME MARKET SENTIMENT GAUGE & FOURIER SIGNAL CONFLUENCE  */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'sentiment_gauge' && (
+        <MarketSentimentGauge
+          ticker={selectedTicker}
+          currentPrice={currentPrice}
+          fourierMetrics={fourierMetrics}
+          onTradeSignal={(bias, setupName) => {
+            handleExecute(bias);
+            setTradeMessage(`Executed ${bias} from [${setupName}]`);
             setTimeout(() => setTradeMessage(null), 5000);
           }}
         />
