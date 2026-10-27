@@ -186,7 +186,17 @@ export class ApiClient {
           throw new ApiClientError(`Expected JSON response but received ${contentType}`, response.status);
         }
 
-        return await response.json();
+        const jsonData = await response.json();
+        // Persist verified successful GET responses to the local offline vault
+        if (!fetchOptions.method || fetchOptions.method === 'GET') {
+          try {
+            localStorage.setItem('quant_offline_resp_' + url, JSON.stringify(jsonData));
+          } catch (storageErr) {
+            // Storage quota safety
+          }
+        }
+
+        return jsonData;
       } catch (error: any) {
         clearTimeout(timer);
         if (fetchOptions.signal) {
@@ -204,6 +214,25 @@ export class ApiClient {
           const delay = 200 * Math.pow(1.5, attempt) + Math.random() * 50;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
+      }
+    }
+
+    // Offline / Minimal Internet Resilience Fallback:
+    // If network failed and this is a GET request, serve the latest verified cached response from the offline vault
+    if (!fetchOptions.method || fetchOptions.method === 'GET') {
+      try {
+        const cached = localStorage.getItem('quant_offline_resp_' + url);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          console.info(`[Offline Market Vault] Network offline or minimal internet: Serving cached response for ${url}`);
+          return {
+            ...parsed,
+            _isOfflineCached: true,
+            _cachedAt: Date.now()
+          };
+        }
+      } catch (vaultErr) {
+        console.warn("Offline vault lookup failed:", vaultErr);
       }
     }
 

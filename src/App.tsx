@@ -21,6 +21,8 @@ import { TraderBrainView } from './components/terminal/TraderBrainView';
 import { NewsCatalystView } from './components/terminal/NewsCatalystView';
 import { TradeJournalView } from './components/terminal/TradeJournalView';
 import { InstitutionalRiskTearSheet } from './components/terminal/InstitutionalRiskTearSheet';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { OfflineConnectivityBanner } from './components/OfflineConnectivityBanner';
 import { quantTraderBrain, TraderBrainState } from './services/QuantTraderBrain';
 import { continuousLearningService } from './services/continuousLearningService';
 
@@ -36,18 +38,21 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans antialiased selection:bg-emerald-500 selection:text-white flex flex-col justify-between">
+      {/* Offline Market Vault & Minimal Connectivity Banner */}
+      <OfflineConnectivityBanner />
+
       {/* 1. Global Navigation & Branding Header */}
       <header className="bg-zinc-900/90 border-b border-zinc-800 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between py-3 gap-3">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between py-2.5 sm:py-3 gap-2.5 sm:gap-3">
             
             {/* Brand Logo & Learning Badge */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between sm:justify-start gap-3">
               <div 
                 onClick={() => setActiveTab('terminal')}
                 className="flex items-center gap-2 cursor-pointer select-none group"
               >
-                <div className="bg-emerald-600 text-white font-black text-sm px-2.5 py-1 rounded-lg tracking-tighter shadow-md group-hover:bg-emerald-500 transition-colors flex items-center gap-1.5">
+                <div className="bg-emerald-600 text-white font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg tracking-tighter shadow-md group-hover:bg-emerald-500 transition-colors flex items-center gap-1.5">
                   <Brain className="w-4 h-4" />
                   QUANTTRADE
                 </div>
@@ -56,6 +61,10 @@ export default function App() {
                     LEARNING TRADER <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">PRO</span>
                   </span>
                 </div>
+              </div>
+
+              <div className="flex sm:hidden items-center gap-2">
+                <PWAInstallButton />
               </div>
 
               <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-zinc-800 text-xs">
@@ -70,11 +79,11 @@ export default function App() {
               </div>
             </div>
 
-            {/* Streamlined Primary Navigation (4 Focused Tabs) */}
-            <nav className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-bold uppercase tracking-wider">
+            {/* Streamlined Primary Navigation (4 Focused Tabs with Horizontal Scroll for Mobile) */}
+            <nav className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-bold uppercase tracking-wider overflow-x-auto no-scrollbar scroll-smooth">
               <button
                 onClick={() => setActiveTab('terminal')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                   activeTab === 'terminal'
                     ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -86,7 +95,7 @@ export default function App() {
 
               <button
                 onClick={() => setActiveTab('brain')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 relative ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 relative whitespace-nowrap shrink-0 ${
                   activeTab === 'brain'
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -99,7 +108,7 @@ export default function App() {
 
               <button
                 onClick={() => setActiveTab('news')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                   activeTab === 'news'
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -111,7 +120,7 @@ export default function App() {
 
               <button
                 onClick={() => setActiveTab('journal')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                   activeTab === 'journal'
                     ? 'bg-zinc-800 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -123,23 +132,27 @@ export default function App() {
             </nav>
 
             {/* Global Actions & Portfolio Balance Readout */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between sm:justify-end gap-2.5">
+              <div className="hidden sm:block">
+                <PWAInstallButton />
+              </div>
+
               <button
                 onClick={() => setIsGlobalTearSheetOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 font-mono text-xs flex items-center gap-1.5 transition-colors shadow-sm font-bold"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 font-mono text-xs flex items-center gap-1.5 transition-colors shadow-sm font-bold"
                 title="Open Executive Risk Tear Sheet & Report Generator"
               >
                 <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">Risk Tear Sheet</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold">PDF/CSV</span>
+                <span className="inline">Risk Tear Sheet</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold hidden sm:inline">PDF/CSV</span>
               </button>
 
-              <div className="hidden lg:flex items-center gap-3 pl-2 border-l border-zinc-800">
+              <div className="flex items-center gap-2 sm:gap-3 pl-2 border-l border-zinc-800">
                 <div className="text-right font-mono">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold block">Portfolio Capital</span>
-                  <span className="text-sm font-black text-white">${brainState.stats.capital.toLocaleString()}</span>
+                  <span className="text-[9px] sm:text-[10px] text-zinc-500 uppercase font-bold block">Portfolio</span>
+                  <span className="text-xs sm:text-sm font-black text-white">${brainState.stats.capital.toLocaleString()}</span>
                 </div>
-                <div className={`px-2 py-1 rounded text-xs font-mono font-bold ${brainState.stats.netPnl >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs font-mono font-bold ${brainState.stats.netPnl >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
                   {brainState.stats.netPnl >= 0 ? '+' : ''}${brainState.stats.netPnl.toLocaleString()}
                 </div>
               </div>

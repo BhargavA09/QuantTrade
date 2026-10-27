@@ -1128,7 +1128,7 @@ class QuantTraderBrainService {
   public generateStrategyForAsset(
     ticker: string,
     name: string,
-    category: 'commodity' | 'global_stock' | 'index' | 'forex_crypto',
+    category: 'commodity' | 'global_stock' | 'index' | 'forex_crypto' | 'canadian_tsx',
     price: number,
     changePct: number,
     volatilityPct: number = 22.0
@@ -1155,6 +1155,10 @@ class QuantTraderBrainService {
       setupName = isBullish 
         ? 'Kalman Trend Continuation & Institutional Absorption' 
         : 'Macro Liquidity Exhaustion Sweep';
+    } else if (category === 'canadian_tsx') {
+      setupName = isBullish
+        ? 'TSX Institutional Order Flow & Cross-Border Momentum'
+        : 'Bay Street Liquidity Fade & Rate Sensitivity Short';
     } else {
       setupName = isBullish 
         ? 'Bullish Order Block & Multi-Day Momentum Breakout' 
@@ -1195,6 +1199,8 @@ class QuantTraderBrainService {
       catalystInsight = `Global commodity tape: Real-time physical supply/demand and currency tailwinds tracked.`;
     } else if (category === 'index') {
       catalystInsight = `Broad market macro: Cross-asset breadth and rate expectations confirm systemic bias.`;
+    } else if (category === 'canadian_tsx') {
+      catalystInsight = `Canadian TSX tape: Bank capital ratios, energy export demand, and Bank of Canada liquidity aligned.`;
     } else {
       catalystInsight = `Equities tape: Earnings revision sentiment and institutional dark pool flow aligned.`;
     }
@@ -1227,7 +1233,7 @@ class QuantTraderBrainService {
   }
 
   /**
-   * Comprehensive curated universe of Global Equities, Commodities, Indices, and Currencies.
+   * Comprehensive curated universe of Global Equities, Commodities, Indices, Currencies, and Canadian Market (TSX).
    */
   public getGlobalMarketUniverse() {
     return [
@@ -1240,6 +1246,28 @@ class QuantTraderBrainService {
       { ticker: 'WEAT', name: 'Teucrium Wheat Fund (Agriculture)', category: 'commodity' as const, price: 5.62, change: 0.08, changePercent: 1.44, volatility: 23.5, assetType: 'Wheat / Agriculture' },
       { ticker: 'BNO', name: 'United States Brent Oil Fund', category: 'commodity' as const, price: 28.30, change: -0.35, changePercent: -1.22, volatility: 30.5, assetType: 'Brent Oil / Energy' },
       { ticker: 'URA', name: 'Global X Uranium ETF', category: 'commodity' as const, price: 31.40, change: 1.20, changePercent: 3.97, volatility: 36.2, assetType: 'Uranium / Clean Nuclear' },
+
+      // CANADIAN MARKET (TSX / S&P/TSX 60)
+      { ticker: 'SHOP.TO', name: 'Shopify Inc. (TSX)', category: 'canadian_tsx' as const, price: 108.50, change: 2.40, changePercent: 2.26, volatility: 38.2, assetType: 'Canadian Tech & E-Commerce' },
+      { ticker: 'RY.TO', name: 'Royal Bank of Canada (TSX)', category: 'canadian_tsx' as const, price: 171.20, change: 1.10, changePercent: 0.65, volatility: 14.2, assetType: 'Canadian Financials & Wealth' },
+      { ticker: 'TD.TO', name: 'Toronto-Dominion Bank (TSX)', category: 'canadian_tsx' as const, price: 78.40, change: 0.65, changePercent: 0.84, volatility: 16.5, assetType: 'Canadian Banking' },
+      { ticker: 'ENB.TO', name: 'Enbridge Inc. (TSX)', category: 'canadian_tsx' as const, price: 54.80, change: 0.45, changePercent: 0.83, volatility: 15.8, assetType: 'Canadian Energy Midstream' },
+      { ticker: 'CNR.TO', name: 'Canadian National Railway (TSX)', category: 'canadian_tsx' as const, price: 158.40, change: 1.20, changePercent: 0.76, volatility: 14.0, assetType: 'Transcontinental Freight Rail' },
+      { ticker: 'BMO.TO', name: 'Bank of Montreal (TSX)', category: 'canadian_tsx' as const, price: 128.50, change: 0.90, changePercent: 0.70, volatility: 15.2, assetType: 'Canadian Commercial Banking' },
+      { ticker: 'BNS.TO', name: 'Bank of Nova Scotia (TSX)', category: 'canadian_tsx' as const, price: 72.60, change: 0.55, changePercent: 0.76, volatility: 16.0, assetType: 'Canadian Banking' },
+      { ticker: 'CNQ.TO', name: 'Canadian Natural Resources (TSX)', category: 'canadian_tsx' as const, price: 47.80, change: 0.85, changePercent: 1.81, volatility: 26.4, assetType: 'Canadian Oil Sands' },
+      { ticker: 'BAM.TO', name: 'Brookfield Asset Management (TSX)', category: 'canadian_tsx' as const, price: 68.20, change: 1.30, changePercent: 1.94, volatility: 21.5, assetType: 'Alternative Asset Management' },
+      { ticker: 'CP.TO', name: 'Canadian Pacific Kansas City (TSX)', category: 'canadian_tsx' as const, price: 112.40, change: 0.95, changePercent: 0.85, volatility: 15.5, assetType: 'North American Railroad' },
+      { ticker: 'SU.TO', name: 'Suncor Energy Inc. (TSX)', category: 'canadian_tsx' as const, price: 52.10, change: 0.75, changePercent: 1.46, volatility: 24.2, assetType: 'Canadian Oil Sands & Refining' },
+      { ticker: 'ATD.TO', name: 'Alimentation Couche-Tard (TSX)', category: 'canadian_tsx' as const, price: 76.50, change: 0.40, changePercent: 0.53, volatility: 13.8, assetType: 'Canadian Retail & Convenience' },
+      { ticker: 'CSU.TO', name: 'Constellation Software (TSX)', category: 'canadian_tsx' as const, price: 4450.00, change: 48.00, changePercent: 1.09, volatility: 16.5, assetType: 'Vertical Market Software' },
+      { ticker: 'TRI.TO', name: 'Thomson Reuters Corp (TSX)', category: 'canadian_tsx' as const, price: 234.00, change: 2.10, changePercent: 0.91, volatility: 14.5, assetType: 'Information Services' },
+      { ticker: 'ABX.TO', name: 'Barrick Gold Corporation (TSX)', category: 'canadian_tsx' as const, price: 26.40, change: 0.50, changePercent: 1.93, volatility: 28.0, assetType: 'Gold Mining & Royalty' },
+      { ticker: 'CCO.TO', name: 'Cameco Corporation (TSX)', category: 'canadian_tsx' as const, price: 74.20, change: 2.30, changePercent: 3.20, volatility: 35.4, assetType: 'Uranium Nuclear Fuel' },
+      { ticker: 'DOL.TO', name: 'Dollarama Inc. (TSX)', category: 'canadian_tsx' as const, price: 138.40, change: 1.25, changePercent: 0.91, volatility: 15.0, assetType: 'Canadian Value Retail' },
+      { ticker: 'L.TO', name: 'Loblaw Companies (TSX)', category: 'canadian_tsx' as const, price: 182.50, change: 0.90, changePercent: 0.50, volatility: 12.8, assetType: 'Grocery & Pharmacy Retail' },
+      { ticker: 'XIU.TO', name: 'iShares S&P/TSX 60 Index ETF', category: 'canadian_tsx' as const, price: 37.80, change: 0.25, changePercent: 0.67, volatility: 12.4, assetType: 'S&P/TSX 60 Canadian Benchmark' },
+      { ticker: 'XIC.TO', name: 'iShares Core S&P/TSX Composite', category: 'canadian_tsx' as const, price: 39.20, change: 0.28, changePercent: 0.72, volatility: 12.6, assetType: 'Total Canadian Equity Composite' },
 
       // GLOBAL TECH & EQUITIES
       { ticker: 'NVDA', name: 'NVIDIA Corporation', category: 'global_stock' as const, price: 138.80, change: 4.10, changePercent: 3.04, volatility: 38.4, assetType: 'Semiconductors / AI' },

@@ -63,6 +63,7 @@ import {
   ContinuousCorrectionReport,
   CorrectionSourceItem
 } from '../../services/api/analysisService';
+import { offlineMarketVaultService } from '../../services/offlineMarketVaultService';
 import OptionsSimulation from '../OptionsSimulation';
 import { StockSearchScenarioProjection } from './StockSearchScenarioProjection';
 import { TradingTerminalVaRVisualizer } from './TradingTerminalVaRVisualizer';
@@ -147,9 +148,13 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   } | null>(null);
   const [isResettingRl, setIsResettingRl] = useState(false);
 
-  // Global Market & Commodities Filter
-  const [marketCategoryFilter, setMarketCategoryFilter] = useState<'all' | 'commodity' | 'global_stock' | 'index' | 'forex_crypto'>('all');
+  const [marketCategoryFilter, setMarketCategoryFilter] = useState<'all' | 'commodity' | 'global_stock' | 'index' | 'forex_crypto' | 'canadian_tsx'>('all');
   const [inspectedGlobalAsset, setInspectedGlobalAsset] = useState<string>('GLD');
+  const [networkHealth, setNetworkHealth] = useState(() => offlineMarketVaultService.getNetworkHealth());
+
+  useEffect(() => {
+    return offlineMarketVaultService.subscribe(setNetworkHealth);
+  }, []);
 
   useEffect(() => {
     return quantTraderBrain.subscribe(setBrainState);
@@ -240,7 +245,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     return quantTraderBrain.getGlobalMarketUniverse();
   }, []);
 
-  // Resolve current active stock/asset metadata, prioritizing continuous corrected live quote
+  // Resolve current active stock/asset metadata, prioritizing continuous corrected live quote & offline vault
   const stockMeta = useMemo(() => {
     const liveQ = liveAssetData?.quote;
     const cleanSym = selectedTicker.toUpperCase();
@@ -249,12 +254,13 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     const glob = globalUniverse.find(g => g.ticker.toUpperCase() === cleanSym);
     const exp = EXPANDED_STOCK_DATABASE.find(s => s.ticker.toUpperCase() === cleanSym);
     const fin = FINVIZ_STOCKS.find(s => s.ticker.toUpperCase() === cleanSym);
+    const vaultQuote = offlineMarketVaultService.getQuote(cleanSym);
 
-    const name = correctionReport?.companyName || liveQ?.companyName || glob?.name || exp?.name || fin?.name || `${cleanSym} Asset`;
+    const name = correctionReport?.companyName || liveQ?.companyName || vaultQuote?.name || glob?.name || exp?.name || fin?.name || `${cleanSym} Asset`;
     const sector = glob?.assetType || exp?.sector || fin?.sector || (cleanSym.includes('=F') || cleanSym.includes('XAU') ? 'Commodity Futures' : 'Global Security');
-    const price = correctionReport?.correctedPrice || liveQ?.currentPrice || glob?.price || exp?.price || fin?.price || 150.0;
-    const change = correctionReport?.change ?? liveQ?.change ?? glob?.change ?? exp?.change ?? fin?.change ?? 1.25;
-    const changePercent = correctionReport?.changePercent ?? liveQ?.changePercent ?? glob?.changePercent ?? exp?.changePercent ?? fin?.change ?? 0.85;
+    const price = correctionReport?.correctedPrice || liveQ?.currentPrice || vaultQuote?.price || glob?.price || exp?.price || fin?.price || 150.0;
+    const change = correctionReport?.change ?? liveQ?.change ?? vaultQuote?.change ?? glob?.change ?? exp?.change ?? fin?.change ?? 1.25;
+    const changePercent = correctionReport?.changePercent ?? liveQ?.changePercent ?? vaultQuote?.changePercent ?? glob?.changePercent ?? exp?.changePercent ?? fin?.change ?? 0.85;
 
     return {
       ticker: cleanSym,
@@ -263,9 +269,9 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       price,
       change,
       changePercent,
-      high: correctionReport?.high || liveQ?.high || price * 1.015,
-      low: correctionReport?.low || liveQ?.low || price * 0.985,
-      volume: correctionReport?.volume || liveQ?.volume || 15000000,
+      high: correctionReport?.high || liveQ?.high || vaultQuote?.high || price * 1.015,
+      low: correctionReport?.low || liveQ?.low || vaultQuote?.low || price * 0.985,
+      volume: correctionReport?.volume || liveQ?.volume || vaultQuote?.volume || 15000000,
       isLive: liveAssetData?.isLiveMarketData ?? true,
       category: glob?.category || 'global_stock'
     };
@@ -273,59 +279,21 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
   const currentPrice = stockMeta.price;
 
-  // Chart bars: use real historical daily OHLCV candles from the exchange
+  // Chart bars: use real historical daily OHLCV candles from the exchange or offline vault
   const chartBars = useMemo(() => {
     if (liveAssetData?.bars && liveAssetData.bars.length > 0) {
       return liveAssetData.bars;
     }
 
-    // Fallback smooth anchored bars if loading initial live response
-    const bars: any[] = [];
-    let p = currentPrice * 0.96;
-    const now = Date.now();
-
-    for (let i = 21; i >= 0; i--) {
-      const date = new Date(now - i * 86400000).toLocaleDateString([], { month: 'short', day: 'numeric' });
-      const dailyDrift = (Math.random() - 0.47) * 0.02;
-      p = parseFloat((p * (1 + dailyDrift)).toFixed(2));
-      const high = parseFloat((p * (1 + Math.random() * 0.015)).toFixed(2));
-      const low = parseFloat((p * (1 - Math.random() * 0.015)).toFixed(2));
-      const volume = Math.floor(15000000 * (0.8 + Math.random() * 0.6));
-
-      bars.push({
-        date,
-        price: p,
-        high,
-        low,
-        open: p * 0.995,
-        close: p,
-        volume
-      });
+    const cleanSym = selectedTicker.toUpperCase();
+    const vaultBars = offlineMarketVaultService.getBars(cleanSym);
+    if (vaultBars && vaultBars.length > 0) {
+      return vaultBars;
     }
 
-    bars[bars.length - 1].price = currentPrice;
-    bars[bars.length - 1].close = currentPrice;
-
-    let ema20 = bars[0].price;
-    let ema50 = bars[0].price * 0.98;
-    const k20 = 2 / (20 + 1);
-    const k50 = 2 / (50 + 1);
-
-    return bars.map((b) => {
-      ema20 = (b.price * k20) + (ema20 * (1 - k20));
-      ema50 = (b.price * k50) + (ema50 * (1 - k50));
-      const bbUpper = ema20 * 1.025;
-      const bbLower = ema20 * 0.975;
-
-      return {
-        ...b,
-        ema20: parseFloat(ema20.toFixed(2)),
-        ema50: parseFloat(ema50.toFixed(2)),
-        bbUpper: parseFloat(bbUpper.toFixed(2)),
-        bbLower: parseFloat(bbLower.toFixed(2))
-      };
-    });
-  }, [liveAssetData, currentPrice]);
+    // High fidelity offline generated bars anchored directly to the verified price
+    return offlineMarketVaultService.generateOfflineBars(currentPrice);
+  }, [liveAssetData, currentPrice, selectedTicker]);
 
   // High-Frequency Discrete Fourier Signal Decomposition
   const fourierMetrics = useMemo<HighFrequencyMetrics | null>(() => {
@@ -380,9 +348,36 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     return { item, strategy, actualPrice, actualChangePct, liveQ };
   }, [inspectedGlobalAsset, globalUniverse, liveQuotesMap, brainState]);
 
-  // Filtered global universe list with live quote overlays
+  // Filtered global universe list with live quote overlays and expanded TSX search matches
   const filteredGlobalUniverse = useMemo(() => {
-    return globalUniverse.filter(item => {
+    const list: Array<{ ticker: string; name: string; category: any; price: number; change: number; changePercent: number; volatility: number; assetType: string }> = [...globalUniverse];
+    
+    // If user is searching, also merge matching stocks from EXPANDED_STOCK_DATABASE (including all Canadian TSX tickers)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      EXPANDED_STOCK_DATABASE.forEach(exp => {
+        if (!list.some(g => g.ticker.toUpperCase() === exp.ticker.toUpperCase())) {
+          if (
+            exp.ticker.toLowerCase().includes(q) ||
+            exp.name.toLowerCase().includes(q) ||
+            exp.industry.toLowerCase().includes(q)
+          ) {
+            list.push({
+              ticker: exp.ticker,
+              name: exp.name,
+              category: exp.sector === 'Canadian TSX' ? 'canadian_tsx' : 'global_stock',
+              price: exp.price,
+              change: exp.change,
+              changePercent: exp.changePercent,
+              volatility: parseFloat(exp.volatility.replace('%', '')) || 22.0,
+              assetType: exp.industry
+            });
+          }
+        }
+      });
+    }
+
+    return list.filter(item => {
       const matchesCategory = marketCategoryFilter === 'all' || item.category === marketCategoryFilter;
       const matchesSearch = searchQuery === '' || 
         item.ticker.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -435,15 +430,18 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     }, 600);
   };
 
-  // Quick switch popular tickers & commodities
+  // Quick switch popular tickers & commodities (US & Canadian TSX)
   const popularTickers = [
     { sym: 'NVDA', label: 'NVDA', type: 'Tech' },
+    { sym: 'SHOP.TO', label: 'Shopify', type: 'TSX' },
+    { sym: 'RY.TO', label: 'RBC', type: 'TSX' },
+    { sym: 'TD.TO', label: 'TD Bank', type: 'TSX' },
+    { sym: 'ENB.TO', label: 'Enbridge', type: 'TSX' },
     { sym: 'GLD', label: 'Gold', type: 'Commodity' },
     { sym: 'USO', label: 'Oil', type: 'Commodity' },
+    { sym: 'XIU.TO', label: 'TSX 60', type: 'TSX ETF' },
     { sym: 'SPY', label: 'S&P 500', type: 'Index' },
-    { sym: 'TSM', label: 'TSMC', type: 'Global' },
-    { sym: 'SLV', label: 'Silver', type: 'Commodity' },
-    { sym: 'AAPL', label: 'Apple', type: 'Tech' },
+    { sym: 'CNR.TO', label: 'CNR', type: 'TSX' },
     { sym: 'BTC-USD', label: 'Bitcoin', type: 'Crypto' }
   ];
 
@@ -453,10 +451,10 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl backdrop-blur-md">
         
         {/* Terminal Sub-Tabs */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs font-bold font-mono">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs font-bold font-mono overflow-x-auto no-scrollbar scroll-smooth max-w-full">
           <button
             onClick={() => setActiveSubTab('chart')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeSubTab === 'chart'
                 ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -468,7 +466,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('projection')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'projection'
                 ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -481,7 +479,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('strategy')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'strategy'
                 ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -494,7 +492,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('correction')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'correction'
                 ? 'bg-teal-600 text-white shadow-sm shadow-teal-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -508,7 +506,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('global_radar')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeSubTab === 'global_radar'
                 ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -521,7 +519,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('options')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeSubTab === 'options'
                 ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -533,7 +531,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('deltagamma')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'deltagamma'
                 ? 'bg-amber-600 text-white shadow-sm shadow-amber-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -546,7 +544,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('multileg')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'multileg'
                 ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -559,7 +557,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('volume_profile')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'volume_profile'
                 ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -572,7 +570,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('macro_stress')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'macro_stress'
                 ? 'bg-rose-600 text-white shadow-sm shadow-rose-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -585,7 +583,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('patterns')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'patterns'
                 ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -598,7 +596,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('sentiment_heatmap')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'sentiment_heatmap'
                 ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -611,7 +609,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('sentiment_gauge')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'sentiment_gauge'
                 ? 'bg-amber-600 text-white shadow-sm shadow-amber-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -625,7 +623,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setActiveSubTab('backtest')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative ${
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
               activeSubTab === 'backtest'
                 ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
@@ -638,7 +636,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
           <button
             onClick={() => setIsTearSheetOpen(true)}
-            className="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 shadow-sm font-bold"
+            className="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 shadow-sm font-bold shrink-0 whitespace-nowrap"
             title="Open Full Institutional Risk Tear Sheet & Report Generator"
           >
             <FileText className="w-4 h-4 text-emerald-400" />
@@ -668,7 +666,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                   setSearchQuery('');
                 }
               }}
-              placeholder="Search ANY stock or commodity (e.g. GLD, USO, TSM, NVDA)..."
+              placeholder="Search ANY stock, commodity, or Canadian TSX (e.g. SHOP.TO, RY.TO, NVDA, ENB.TO)..."
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-24 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
             />
             <button
@@ -786,10 +784,24 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             </span>
           </div>
 
-          {/* Live Market Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-bold">LIVE STREAM</span>
+          {/* Live Market & Offline Vault Badge */}
+          <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-mono ${
+            !networkHealth.isOnline 
+              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+              : networkHealth.isMinimalInternet
+              ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              !networkHealth.isOnline ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'
+            }`} />
+            <span className="font-bold">
+              {!networkHealth.isOnline 
+                ? 'OFFLINE VAULT ACTIVE' 
+                : networkHealth.isMinimalInternet 
+                ? 'MINIMAL BANDWIDTH' 
+                : 'LIVE STREAM'}
+            </span>
             <span className="text-zinc-500">· {lastLiveSyncTime}</span>
           </div>
 
@@ -2051,6 +2063,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             <div className="flex items-center gap-1.5 flex-wrap">
               {[
                 { id: 'all', label: 'All Markets' },
+                { id: 'canadian_tsx', label: '🍁 Canadian TSX' },
                 { id: 'commodity', label: 'Commodities (Gold/Oil)' },
                 { id: 'global_stock', label: 'Global Tech & Equities' },
                 { id: 'index', label: 'World Indices' },

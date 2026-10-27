@@ -1,9 +1,10 @@
 /**
  * Ticker Symbol Resolution, Normalization, and Mapping Utilities.
- * Enables user-friendly lookups for company names (e.g. "APPLE" -> "AAPL").
+ * Enables user-friendly lookups for US and Canadian Market (TSX & TSXV) assets.
  */
 
 export const COMMON_TICKER_MAP: Readonly<Record<string, string>> = Object.freeze({
+  // Global & US Tech Titans
   'FORD': 'F',
   'APPLE': 'AAPL',
   'TESLA': 'TSLA',
@@ -22,20 +23,242 @@ export const COMMON_TICKER_MAP: Readonly<Record<string, string>> = Object.freeze
   'OIL': 'CL=F',
   'CRUDE': 'CL=F',
   'NATGAS': 'NG=F',
-  'BPAG': 'BPAG.TO'
+
+  // CANADIAN MARKET (TSX / TSXV / S&P TSX 60)
+  'SHOPIFY': 'SHOP.TO',
+  'SHOP': 'SHOP.TO',
+  'ROYAL BANK': 'RY.TO',
+  'ROYAL BANK OF CANADA': 'RY.TO',
+  'RBC': 'RY.TO',
+  'RY': 'RY.TO',
+  'TD': 'TD.TO',
+  'TD BANK': 'TD.TO',
+  'TORONTO DOMINION': 'TD.TO',
+  'TORONTO-DOMINION': 'TD.TO',
+  'ENBRIDGE': 'ENB.TO',
+  'ENB': 'ENB.TO',
+  'BANK OF MONTREAL': 'BMO.TO',
+  'BMO': 'BMO.TO',
+  'BANK OF NOVA SCOTIA': 'BNS.TO',
+  'SCOTIABANK': 'BNS.TO',
+  'BNS': 'BNS.TO',
+  'CANADIAN IMPERIAL BANK OF COMMERCE': 'CM.TO',
+  'CIBC': 'CM.TO',
+  'CM': 'CM.TO',
+  'CANADIAN NATURAL RESOURCES': 'CNQ.TO',
+  'CANADIAN NATURAL': 'CNQ.TO',
+  'CNQ': 'CNQ.TO',
+  'CANADIAN NATIONAL RAILWAY': 'CNR.TO',
+  'CANADIAN NATIONAL': 'CNR.TO',
+  'CNR': 'CNR.TO',
+  'CANADIAN PACIFIC KANSAS CITY': 'CP.TO',
+  'CANADIAN PACIFIC': 'CP.TO',
+  'CP RAIL': 'CP.TO',
+  'CP': 'CP.TO',
+  'BROOKFIELD ASSET MANAGEMENT': 'BAM.TO',
+  'BROOKFIELD': 'BAM.TO',
+  'BAM': 'BAM.TO',
+  'BROOKFIELD CORPORATION': 'BN.TO',
+  'BN': 'BN.TO',
+  'SUNCOR ENERGY': 'SU.TO',
+  'SUNCOR': 'SU.TO',
+  'SU': 'SU.TO',
+  'ALIMENTATION COUCHE-TARD': 'ATD.TO',
+  'COUCHE-TARD': 'ATD.TO',
+  'COUCHE TARD': 'ATD.TO',
+  'ATD': 'ATD.TO',
+  'CONSTELLATION SOFTWARE': 'CSU.TO',
+  'CONSTELLATION': 'CSU.TO',
+  'CSU': 'CSU.TO',
+  'THOMSON REUTERS': 'TRI.TO',
+  'TRI': 'TRI.TO',
+  'MANULIFE FINANCIAL': 'MFC.TO',
+  'MANULIFE': 'MFC.TO',
+  'MFC': 'MFC.TO',
+  'SUN LIFE FINANCIAL': 'SLF.TO',
+  'SUN LIFE': 'SLF.TO',
+  'SUNLIFE': 'SLF.TO',
+  'SLF': 'SLF.TO',
+  'BARRICK GOLD': 'ABX.TO',
+  'BARRICK': 'ABX.TO',
+  'ABX': 'ABX.TO',
+  'WASTE CONNECTIONS': 'WCN.TO',
+  'WCN': 'WCN.TO',
+  'FRANCO-NEVADA': 'FNV.TO',
+  'FRANCO NEVADA': 'FNV.TO',
+  'FNV': 'FNV.TO',
+  'AGNICO EAGLE MINES': 'AEM.TO',
+  'AGNICO EAGLE': 'AEM.TO',
+  'AEM': 'AEM.TO',
+  'MAGNA INTERNATIONAL': 'MG.TO',
+  'MAGNA': 'MG.TO',
+  'MG': 'MG.TO',
+  'RESTAURANT BRANDS INTERNATIONAL': 'QSR.TO',
+  'RESTAURANT BRANDS': 'QSR.TO',
+  'TIM HORTONS': 'QSR.TO',
+  'QSR': 'QSR.TO',
+  'OPEN TEXT': 'OTEX.TO',
+  'OPENTEXT': 'OTEX.TO',
+  'OTEX': 'OTEX.TO',
+  'IMPERIAL OIL': 'IMO.TO',
+  'IMO': 'IMO.TO',
+  'POWER CORPORATION OF CANADA': 'POW.TO',
+  'POWER CORP': 'POW.TO',
+  'POW': 'POW.TO',
+  'BCE': 'BCE.TO',
+  'BELL': 'BCE.TO',
+  'BELL CANADA': 'BCE.TO',
+  'TELUS': 'T.TO',
+  'TELUS CORPORATION': 'T.TO',
+  'ROGERS COMMUNICATIONS': 'RCI-B.TO',
+  'ROGERS': 'RCI-B.TO',
+  'RCI': 'RCI-B.TO',
+  'NUTRIEN': 'NTR.TO',
+  'NTR': 'NTR.TO',
+  'GFL ENVIRONMENTAL': 'GFL.TO',
+  'GFL': 'GFL.TO',
+  'WHEATON PRECIOUS METALS': 'WPM.TO',
+  'WHEATON': 'WPM.TO',
+  'WPM': 'WPM.TO',
+  'KINROSS GOLD': 'K.TO',
+  'KINROSS': 'K.TO',
+  'FIRST QUANTUM MINERALS': 'FM.TO',
+  'FIRST QUANTUM': 'FM.TO',
+  'CAMECO': 'CCO.TO',
+  'CCO': 'CCO.TO',
+  'DOLLARAMA': 'DOL.TO',
+  'DOL': 'DOL.TO',
+  'LOBLAW COMPANIES': 'L.TO',
+  'LOBLAWS': 'L.TO',
+  'LOBLAW': 'L.TO',
+  'METRO INC': 'MRU.TO',
+  'METRO': 'MRU.TO',
+  'MRU': 'MRU.TO',
+  'EMPIRE COMPANY': 'EMP-A.TO',
+  'SOBEYS': 'EMP-A.TO',
+  'GEORGE WESTON': 'WN.TO',
+  'WESTON': 'WN.TO',
+  'FAIRFAX FINANCIAL': 'FFH.TO',
+  'FAIRFAX': 'FFH.TO',
+  'FFH': 'FFH.TO',
+  'INTACT FINANCIAL': 'IFC.TO',
+  'INTACT': 'IFC.TO',
+  'IFC': 'IFC.TO',
+  'GILDAN ACTIVEWEAR': 'GIL.TO',
+  'GILDAN': 'GIL.TO',
+  'GIL': 'GIL.TO',
+  'CAE': 'CAE.TO',
+  'CAE INC': 'CAE.TO',
+  'TOURMALINE OIL': 'TOU.TO',
+  'TOURMALINE': 'TOU.TO',
+  'TOU': 'TOU.TO',
+  'ARC RESOURCES': 'ARX.TO',
+  'ARX': 'ARX.TO',
+  'CENOVUS ENERGY': 'CVE.TO',
+  'CENOVUS': 'CVE.TO',
+  'CVE': 'CVE.TO',
+  'PEMBINA PIPELINE': 'PPL.TO',
+  'PEMBINA': 'PPL.TO',
+  'PPL': 'PPL.TO',
+  'TC ENERGY': 'TRP.TO',
+  'TRANSCANADA': 'TRP.TO',
+  'TRP': 'TRP.TO',
+  'ALAMAZON GOLD': 'AGI.TO',
+  'ALAMOS GOLD': 'AGI.TO',
+  'AGI': 'AGI.TO',
+  'PAN AMERICAN SILVER': 'PAAS.TO',
+  'PAAS': 'PAAS.TO',
+  'LUNDIN MINING': 'LUN.TO',
+  'LUN': 'LUN.TO',
+  'IVANHOE MINES': 'IVN.TO',
+  'IVN': 'IVN.TO',
+  'TECK RESOURCES': 'TECK-B.TO',
+  'TECK': 'TECK-B.TO',
+  'FORTIS': 'FTS.TO',
+  'FORTIS INC': 'FTS.TO',
+  'FTS': 'FTS.TO',
+  'EMERA': 'EMA.TO',
+  'EMA': 'EMA.TO',
+  'HYDRO ONE': 'H.TO',
+  'ALGONQUIN POWER': 'AQN.TO',
+  'AQN': 'AQN.TO',
+  'CANADIAN APARTMENT PROPERTIES': 'CAR-UN.TO',
+  'CAPREIT': 'CAR-UN.TO',
+  'RIOCAN': 'REI-UN.TO',
+  'GRANITE REIT': 'GRT-UN.TO',
+  'SMARTCENTRES': 'SRU-UN.TO',
+  'BLACKBERRY': 'BB.TO',
+  'BB': 'BB.TO',
+  'LIGHTSPEED': 'LSPD.TO',
+  'LSPD': 'LSPD.TO',
+  'KINAXIS': 'KXS.TO',
+  'KXS': 'KXS.TO',
+  'DESCARTES': 'DSG.TO',
+  'DSG': 'DSG.TO',
+  'CONVERGE TECHNOLOGY': 'CTS.TO',
+  'CTS': 'CTS.TO',
+  'NUVEI': 'NVEI.TO',
+  'NVEI': 'NVEI.TO',
+  'CANADA GOOSE': 'GOOS.TO',
+  'GOOS': 'GOOS.TO',
+  'CANADIAN TIRE': 'CTC-A.TO',
+  'TFI INTERNATIONAL': 'TFII.TO',
+  'TFII': 'TFII.TO',
+  'WSP GLOBAL': 'WSP.TO',
+  'WSP': 'WSP.TO',
+  'STANTEC': 'STN.TO',
+  'STN': 'STN.TO',
+  'TOROMONT': 'TIH.TO',
+  'TIH': 'TIH.TO',
+  'BPAG': 'BPAG.TO',
+
+  // CANADIAN BENCHMARKS & ETFS
+  'TSX': 'XIU.TO',
+  'TSX 60': 'XIU.TO',
+  'TSX60': 'XIU.TO',
+  'S&P/TSX 60': 'XIU.TO',
+  'S&P TSX': 'XIU.TO',
+  'XIU': 'XIU.TO',
+  'XIC': 'XIC.TO',
+  'HXT': 'HXT.TO',
+  'XEG': 'XEG.TO',
+  'XFN': 'XFN.TO',
+  'XGD': 'XGD.TO',
+  'VCE': 'VCE.TO',
+  'VDY': 'VDY.TO'
 });
 
 /**
  * Resolves a potentially mistyped ticker or natural language company name to its standard symbol.
+ * Handles TSX / TSE prefixes (e.g. "TSX:SHOP" -> "SHOP.TO", "TSE:RY" -> "RY.TO", "SHOP-TO" -> "SHOP.TO").
  * 
  * @param input Raw ticker symbol or company name
  * @returns Clean uppercase market ticker symbol
  */
 export const resolveTickerSymbol = (input: string): string => {
   if (!input) return 'SPY';
-  const normalized = input.trim().toUpperCase();
+  let normalized = input.trim().toUpperCase();
+
+  // Strip common prefix/suffix variants used by Canadian investors
+  // e.g. TSX:SHOP -> SHOP.TO, TSE:SHOP -> SHOP.TO, TSXV:XYZ -> XYZ.V
+  if (normalized.startsWith('TSX:') || normalized.startsWith('TSE:')) {
+    const raw = normalized.replace(/^(TSX:|TSE:)/, '').trim();
+    normalized = raw.endsWith('.TO') ? raw : `${raw}.TO`;
+  } else if (normalized.startsWith('TSXV:')) {
+    const raw = normalized.replace(/^TSXV:/, '').trim();
+    normalized = raw.endsWith('.V') ? raw : `${raw}.V`;
+  } else if (normalized.endsWith(':TSX') || normalized.endsWith(':TSE')) {
+    const raw = normalized.replace(/(:TSX|:TSE)$/, '').trim();
+    normalized = raw.endsWith('.TO') ? raw : `${raw}.TO`;
+  } else if (normalized.endsWith('-TO')) {
+    normalized = normalized.replace(/-TO$/, '.TO');
+  } else if (normalized.endsWith('-V')) {
+    normalized = normalized.replace(/-V$/, '.V');
+  }
+
   if (COMMON_TICKER_MAP[normalized]) {
     return COMMON_TICKER_MAP[normalized];
   }
   return normalized;
 };
+

@@ -6,6 +6,7 @@
 import { defaultApiClient } from "./client";
 import { resolveTickerSymbol } from "./symbols";
 import { SentimentResponse, RiskAnalysisResponse } from "./types";
+import { offlineMarketVaultService } from "../offlineMarketVaultService";
 
 /**
  * Fetches real-time sentiment metrics, social volume, and institutional tone.
@@ -326,6 +327,7 @@ export interface LiveAssetDataResponse {
 
 /**
  * Fetches real live market spot quote and real historical daily OHLCV bars directly from exchange feeds.
+ * Seamlessly integrates with the Offline Market Vault for mobile phones on minimal or offline internet.
  */
 export const fetchLiveAssetData = async (ticker: string): Promise<LiveAssetDataResponse | null> => {
   const cleanTicker = resolveTickerSymbol(ticker);
@@ -333,10 +335,17 @@ export const fetchLiveAssetData = async (ticker: string): Promise<LiveAssetDataR
     const res = await defaultApiClient.fetchWithRetry<LiveAssetDataResponse>(
       `/api/stock/live-data/${cleanTicker}`
     );
-    return res;
+    if (res && res.quote && res.quote.currentPrice) {
+      // Save to local vault for immediate offline & minimal bandwidth availability
+      offlineMarketVaultService.saveLiveAssetData(cleanTicker, res);
+      return res;
+    }
+    // If response was invalid, fallback to vault
+    const fallback = offlineMarketVaultService.getLiveAssetDataFallback(cleanTicker);
+    return fallback;
   } catch (err) {
-    console.warn("fetchLiveAssetData fallback:", err);
-    return null;
+    console.warn("fetchLiveAssetData fallback from offline vault:", err);
+    return offlineMarketVaultService.getLiveAssetDataFallback(cleanTicker);
   }
 };
 
@@ -463,17 +472,22 @@ export interface ContinuousCorrectionReport {
 
 /**
  * Fetches real-time multi-source continuous correction telemetry from independent live market APIs.
+ * Caches and serves from the Offline Market Vault when network drops or is restricted.
  */
 export const fetchContinuousCorrection = async (ticker: string): Promise<ContinuousCorrectionReport | null> => {
+  const cleanTicker = resolveTickerSymbol(ticker);
   try {
-    const cleanTicker = resolveTickerSymbol(ticker);
     const res = await defaultApiClient.fetchWithRetry<ContinuousCorrectionReport>(
       `/api/stock/continuous-correction/${encodeURIComponent(cleanTicker)}`
     );
-    return res;
+    if (res && res.success) {
+      offlineMarketVaultService.saveCorrectionReport(cleanTicker, res);
+      return res;
+    }
+    return offlineMarketVaultService.getCorrectionReport(cleanTicker);
   } catch (err) {
-    console.warn("fetchContinuousCorrection error:", err);
-    return null;
+    console.warn("fetchContinuousCorrection fallback from vault:", err);
+    return offlineMarketVaultService.getCorrectionReport(cleanTicker);
   }
 };
 

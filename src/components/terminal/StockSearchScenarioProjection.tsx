@@ -35,7 +35,7 @@ interface StockSearchScenarioProjectionProps {
   onSelectTicker?: (ticker: string) => void;
 }
 
-const QUICK_TICKERS = ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GLD', 'USO', 'AMZN', 'BTC-USD'];
+const QUICK_TICKERS = ['NVDA', 'SHOP.TO', 'RY.TO', 'TD.TO', 'ENB.TO', 'AAPL', 'TSLA', 'GLD', 'XIU.TO', 'BTC-USD'];
 
 export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjectionProps> = ({
   initialTicker = 'NVDA',
@@ -116,7 +116,7 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search ANY stock (e.g. NVDA, AAPL, GLD, TSLA)..."
+                placeholder="Search ANY US or Canadian stock (e.g. SHOP.TO, RY.TO, NVDA, TD.TO, ENB.TO)..."
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
               />
             </div>

@@ -80,7 +80,45 @@ export const EXPANDED_STOCK_CATALOG: Record<string, {
   // Digital Assets (Crypto)
   'BTC-USD': { name: 'Bitcoin USD', sector: 'Cryptocurrency', industry: 'Digital Asset', basePrice: 66200.00, marketCap: 1300000000000, pe: 0, dividendYield: 0.00, beta: 2.80 },
   'ETH-USD': { name: 'Ethereum USD', sector: 'Cryptocurrency', industry: 'Smart Contract Platform', basePrice: 2640.00, marketCap: 318000000000, pe: 0, dividendYield: 0.00, beta: 3.20 },
-  'SOL-USD': { name: 'Solana USD', sector: 'Cryptocurrency', industry: 'Smart Contract Platform', basePrice: 158.40, marketCap: 74000000000, pe: 0, dividendYield: 0.00, beta: 3.90 }
+  'SOL-USD': { name: 'Solana USD', sector: 'Cryptocurrency', industry: 'Smart Contract Platform', basePrice: 158.40, marketCap: 74000000000, pe: 0, dividendYield: 0.00, beta: 3.90 },
+
+  // Canadian Market Listings (Toronto Stock Exchange - TSX & S&P/TSX 60)
+  'SHOP.TO': { name: 'Shopify Inc. (TSX)', sector: 'Technology', industry: 'E-Commerce Platform', basePrice: 108.50, marketCap: 140000000000, pe: 78.4, dividendYield: 0.00, beta: 2.15 },
+  'RY.TO': { name: 'Royal Bank of Canada (TSX)', sector: 'Financials', industry: 'Diversified Banking', basePrice: 171.20, marketCap: 242000000000, pe: 13.8, dividendYield: 3.32, beta: 0.82 },
+  'TD.TO': { name: 'Toronto-Dominion Bank (TSX)', sector: 'Financials', industry: 'Diversified Banking', basePrice: 78.40, marketCap: 138000000000, pe: 10.9, dividendYield: 5.20, beta: 0.88 },
+  'ENB.TO': { name: 'Enbridge Inc. (TSX)', sector: 'Energy', industry: 'Oil & Gas Midstream', basePrice: 54.80, marketCap: 119000000000, pe: 18.2, dividendYield: 6.68, beta: 0.74 },
+  'CNR.TO': { name: 'Canadian National Railway (TSX)', sector: 'Industrials', industry: 'Railroads', basePrice: 158.40, marketCap: 101000000000, pe: 19.5, dividendYield: 2.15, beta: 0.78 },
+  'BMO.TO': { name: 'Bank of Montreal (TSX)', sector: 'Financials', industry: 'Diversified Banking', basePrice: 128.50, marketCap: 94000000000, pe: 12.4, dividendYield: 4.82, beta: 0.89 },
+  'BNS.TO': { name: 'Bank of Nova Scotia (TSX)', sector: 'Financials', industry: 'Diversified Banking', basePrice: 72.60, marketCap: 89000000000, pe: 11.2, dividendYield: 5.84, beta: 0.92 },
+  'CNQ.TO': { name: 'Canadian Natural Resources (TSX)', sector: 'Energy', industry: 'Oil & Gas Exploration', basePrice: 47.80, marketCap: 102000000000, pe: 12.8, dividendYield: 4.39, beta: 1.34 },
+  'BAM.TO': { name: 'Brookfield Asset Management (TSX)', sector: 'Financials', industry: 'Asset Management', basePrice: 68.20, marketCap: 110000000000, pe: 32.5, dividendYield: 3.10, beta: 1.18 },
+  'BN.TO': { name: 'Brookfield Corporation (TSX)', sector: 'Financials', industry: 'Alternative Asset Management', basePrice: 74.50, marketCap: 118000000000, pe: 24.2, dividendYield: 0.65, beta: 1.25 },
+  'CP.TO': { name: 'Canadian Pacific Kansas City (TSX)', sector: 'Industrials', industry: 'Railroads', basePrice: 112.40, marketCap: 104000000000, pe: 26.8, dividendYield: 0.68, beta: 0.84 },
+  'SU.TO': { name: 'Suncor Energy Inc. (TSX)', sector: 'Energy', industry: 'Oil Sands & Integrated', basePrice: 52.10, marketCap: 67000000000, pe: 9.8, dividendYield: 4.22, beta: 1.28 },
+  'ATD.TO': { name: 'Alimentation Couche-Tard (TSX)', sector: 'Consumer & Retail', industry: 'Convenience Stores & Retail', basePrice: 76.50, marketCap: 73000000000, pe: 18.9, dividendYield: 0.92, beta: 0.68 },
+  'CSU.TO': { name: 'Constellation Software (TSX)', sector: 'Technology', industry: 'Vertical Market Software', basePrice: 4450.00, marketCap: 94000000000, pe: 98.2, dividendYield: 0.12, beta: 0.79 },
+  'TRI.TO': { name: 'Thomson Reuters Corp (TSX)', sector: 'Industrials', industry: 'Financial Data & Media', basePrice: 234.00, marketCap: 108000000000, pe: 41.2, dividendYield: 1.25, beta: 0.62 },
+  'MFC.TO': { name: 'Manulife Financial (TSX)', sector: 'Financials', industry: 'Life & Health Insurance', basePrice: 41.50, marketCap: 74000000000, pe: 14.5, dividendYield: 3.86, beta: 0.95 },
+  'ABX.TO': { name: 'Barrick Gold Corporation (TSX)', sector: 'Materials', industry: 'Gold & Precious Metals', basePrice: 26.40, marketCap: 46000000000, pe: 21.4, dividendYield: 2.27, beta: 0.65 },
+  'AEM.TO': { name: 'Agnico Eagle Mines (TSX)', sector: 'Materials', industry: 'Gold Mining', basePrice: 115.80, marketCap: 58000000000, pe: 28.5, dividendYield: 1.86, beta: 0.72 },
+  'WPM.TO': { name: 'Wheaton Precious Metals (TSX)', sector: 'Materials', industry: 'Precious Metals Streaming', basePrice: 88.40, marketCap: 40000000000, pe: 44.2, dividendYield: 1.22, beta: 0.64 },
+  'FNV.TO': { name: 'Franco-Nevada Corporation (TSX)', sector: 'Materials', industry: 'Gold Royalty & Streaming', basePrice: 172.50, marketCap: 33000000000, pe: 38.6, dividendYield: 1.10, beta: 0.58 },
+  'CCO.TO': { name: 'Cameco Corporation (TSX)', sector: 'Energy', industry: 'Uranium Fuel & Clean Nuclear', basePrice: 74.20, marketCap: 32000000000, pe: 68.4, dividendYield: 0.22, beta: 1.28 },
+  'NTR.TO': { name: 'Nutrien Ltd. (TSX)', sector: 'Materials', industry: 'Agricultural Crop Nutrients', basePrice: 65.80, marketCap: 32000000000, pe: 18.2, dividendYield: 4.38, beta: 0.85 },
+  'DOL.TO': { name: 'Dollarama Inc. (TSX)', sector: 'Consumer & Retail', industry: 'Discount Variety Stores', basePrice: 138.40, marketCap: 39000000000, pe: 34.5, dividendYield: 0.32, beta: 0.55 },
+  'L.TO': { name: 'Loblaw Companies (TSX)', sector: 'Consumer & Retail', industry: 'Grocery & Food Retail', basePrice: 182.50, marketCap: 56000000000, pe: 23.4, dividendYield: 1.12, beta: 0.42 },
+  'MRU.TO': { name: 'Metro Inc. (TSX)', sector: 'Consumer & Retail', industry: 'Food & Pharmacy Retail', basePrice: 86.40, marketCap: 20000000000, pe: 20.8, dividendYield: 1.58, beta: 0.48 },
+  'BCE.TO': { name: 'BCE Inc. (TSX)', sector: 'Communication Services', industry: 'Telecom & Wireless', basePrice: 46.20, marketCap: 42000000000, pe: 16.5, dividendYield: 8.65, beta: 0.52 },
+  'T.TO': { name: 'TELUS Corporation (TSX)', sector: 'Communication Services', industry: 'Telecom & Health Solutions', basePrice: 22.80, marketCap: 34000000000, pe: 24.2, dividendYield: 6.84, beta: 0.62 },
+  'RCI-B.TO': { name: 'Rogers Communications (TSX)', sector: 'Communication Services', industry: 'Cable & Wireless Telecom', basePrice: 51.50, marketCap: 27000000000, pe: 15.8, dividendYield: 3.88, beta: 0.72 },
+  'FTS.TO': { name: 'Fortis Inc. (TSX)', sector: 'Utilities', industry: 'Regulated Electric & Gas', basePrice: 58.20, marketCap: 29000000000, pe: 18.6, dividendYield: 4.12, beta: 0.45 },
+  'H.TO': { name: 'Hydro One Limited (TSX)', sector: 'Utilities', industry: 'Transmission & Distribution', basePrice: 43.60, marketCap: 26000000000, pe: 22.4, dividendYield: 2.88, beta: 0.38 },
+  'POW.TO': { name: 'Power Corporation of Canada (TSX)', sector: 'Financials', industry: 'Financial Services Holding', basePrice: 44.50, marketCap: 29000000000, pe: 10.5, dividendYield: 5.04, beta: 0.88 },
+  'FFH.TO': { name: 'Fairfax Financial Holdings (TSX)', sector: 'Financials', industry: 'Property & Casualty Insurance', basePrice: 1650.00, marketCap: 38000000000, pe: 8.4, dividendYield: 1.25, beta: 0.75 },
+  'WCN.TO': { name: 'Waste Connections (TSX)', sector: 'Industrials', industry: 'Waste Management', basePrice: 245.00, marketCap: 63000000000, pe: 46.2, dividendYield: 0.65, beta: 0.72 },
+  'GFL.TO': { name: 'GFL Environmental (TSX)', sector: 'Industrials', industry: 'Environmental Services', basePrice: 56.40, marketCap: 21000000000, pe: 35.0, dividendYield: 0.15, beta: 0.94 },
+  'XIU.TO': { name: 'iShares S&P/TSX 60 Index ETF', sector: 'Index ETF', industry: 'Canadian Large Cap', basePrice: 37.80, marketCap: 12000000000, pe: 15.8, dividendYield: 3.10, beta: 1.00 },
+  'XIC.TO': { name: 'iShares Core S&P/TSX Capped Composite', sector: 'Index ETF', industry: 'Broad Canadian Market', basePrice: 39.20, marketCap: 11000000000, pe: 15.5, dividendYield: 2.95, beta: 1.00 }
 };
 
 // Generate realistic calibrated historical candles
