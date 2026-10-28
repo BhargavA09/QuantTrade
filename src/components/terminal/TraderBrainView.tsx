@@ -31,6 +31,7 @@ import {
 import { continuousLearningService } from '../../services/continuousLearningService';
 import { TraderBrainRiskManagement } from './TraderBrainRiskManagement';
 import { TraderBrainCorrelationMatrix } from './TraderBrainCorrelationMatrix';
+import { TraderBrainIntradayStrategies } from './TraderBrainIntradayStrategies';
 
 interface TraderBrainViewProps {
   selectedTicker?: string;
@@ -47,7 +48,7 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
 }) => {
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   const [activeLedgerTab, setActiveLedgerTab] = useState<'mistakes' | 'successes'>('mistakes');
-  const [activeSection, setActiveSection] = useState<'all' | 'correlation' | 'risk' | 'ledger' | 'factors'>('all');
+  const [activeSection, setActiveSection] = useState<'all' | 'intraday' | 'correlation' | 'risk' | 'ledger' | 'factors'>('all');
   const [isSimulating, setIsSimulating] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -265,6 +266,21 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
         >
           All Modules
         </button>
+
+        {/* Intraday Strategies & Daily Stock Picks (Penny Stocks & All Markets) */}
+        <button
+          onClick={() => setActiveSection('intraday')}
+          className={`px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-2 ${
+            activeSection === 'intraday'
+              ? 'bg-amber-500 text-zinc-950 font-black shadow-md shadow-amber-950/40'
+              : 'text-amber-400 hover:text-amber-300'
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5 text-amber-400" />
+          <span>Intraday Strategies &amp; Daily Stock Picks</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">PENNY + ALL</span>
+        </button>
+
         <button
           onClick={() => setActiveSection('correlation')}
           className={`px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-2 ${
@@ -274,7 +290,7 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
           }`}
         >
           <Network className="w-3.5 h-3.5" />
-          <span>Dynamic Correlation Matrix (D3 Heatmap)</span>
+          <span>Dynamic Correlation Matrix</span>
           <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-200">D3.JS</span>
         </button>
         <button
@@ -286,7 +302,7 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
           }`}
         >
           <ShieldAlert className="w-3.5 h-3.5" />
-          <span>Risk Management (D3 VaR & Drawdown)</span>
+          <span>Risk Management</span>
           <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-200">D3.JS</span>
         </button>
         <button
@@ -312,6 +328,14 @@ export const TraderBrainView: React.FC<TraderBrainViewProps> = ({
           <span>Quant Factors (W_t)</span>
         </button>
       </div>
+
+      {/* 1B. Intraday Algorithmic Strategies & Daily Stock Selection Engine */}
+      {(activeSection === 'all' || activeSection === 'intraday') && (
+        <TraderBrainIntradayStrategies
+          onSelectTicker={onSelectTicker}
+          onNavigateToTerminal={onNavigateToTerminal}
+        />
+      )}
 
       {/* 2. D3.js Dynamic Correlation Matrix Heatmap & Factor Exposure */}
       {(activeSection === 'all' || activeSection === 'correlation') && (

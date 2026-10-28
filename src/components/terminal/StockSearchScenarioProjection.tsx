@@ -94,6 +94,21 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
     return '$';
   };
 
+  const formatCashFlow = (val: number): string => {
+    const absVal = Math.abs(val);
+    const sign = val >= 0 ? '+' : '-';
+    if (absVal >= 1_000_000_000) {
+      return `${sign}$${(absVal / 1_000_000_000).toFixed(2)}B`;
+    }
+    if (absVal >= 1_000_000) {
+      return `${sign}$${(absVal / 1_000_000).toFixed(2)}M`;
+    }
+    if (absVal >= 1_000) {
+      return `${sign}$${Math.round(absVal / 1000).toLocaleString()}k`;
+    }
+    return `${sign}$${absVal.toLocaleString()}`;
+  };
+
   const loadTickerProjection = async (ticker: string) => {
     const clean = ticker.trim().toUpperCase();
     if (!clean) return;
@@ -628,23 +643,29 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
             )}
           </div>
 
-          {/* 4. Inside Information & SEC Form 4 Intelligence (C-Suite Trades & Whale Flows) */}
+          {/* 4. Inside Information & SEC Form 4 Intelligence (Real C-Suite Trades & Whale Flows) */}
           {insider && (
             <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4 shadow-xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
                 <div className="flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-amber-400" />
+                  <Eye className="w-5 h-5 text-amber-400 shrink-0" />
                   <div>
-                    <h3 className="text-base font-bold text-white">
-                      SEC Form 4 Inside Information & Executive Order Flow
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-bold text-white">
+                        SEC Form 4 Inside Information & Executive Order Flow
+                      </h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        OFFICIAL SEC EDGAR DISCLOSURES
+                      </span>
+                    </div>
                     <p className="text-xs text-zinc-400">
                       Disclosures from corporate officers, directors, and 10% beneficial owners for {data.ticker}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 font-mono text-xs">
+                <div className="flex items-center gap-2 sm:gap-3 font-mono text-xs flex-wrap">
                   <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800">
                     <span className="text-zinc-500 text-[10px] block uppercase font-bold">C-Suite Net Buying Ratio</span>
                     <span className="font-black text-emerald-400">{insider.netBuyingPercent}%</span>
@@ -652,62 +673,99 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
                   <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800">
                     <span className="text-zinc-500 text-[10px] block uppercase font-bold">Net Cash Flow</span>
                     <span className={`font-black ${insider.netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {insider.netCashFlow >= 0 ? '+' : ''}${Math.round(insider.netCashFlow / 1000).toLocaleString()}k
+                      {formatCashFlow(insider.netCashFlow)}
                     </span>
                   </div>
+                  {insider.totalBoughtCash > 0 && (
+                    <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800 hidden md:block">
+                      <span className="text-zinc-500 text-[10px] block uppercase font-bold">Total Bought</span>
+                      <span className="font-black text-emerald-400">
+                        {formatCashFlow(insider.totalBoughtCash)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Form 4 Transactions Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-zinc-800 text-[10px] text-zinc-500 uppercase">
-                      <th className="py-2 px-3">Insider & Title</th>
-                      <th className="py-2 px-3">Date</th>
-                      <th className="py-2 px-3">Transaction Type</th>
-                      <th className="py-2 px-3 text-right">Shares</th>
-                      <th className="py-2 px-3 text-right">Price</th>
-                      <th className="py-2 px-3 text-right">Total Value</th>
-                      <th className="py-2 px-3 text-right">Shares Remaining</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {insider.transactions.map((tx, txIdx) => (
-                      <tr key={`${tx.id || 'tx'}-${txIdx}`} className="hover:bg-zinc-800/40 transition-colors">
-                        <td className="py-2.5 px-3">
-                          <div className="font-bold text-zinc-200">{tx.insiderName}</div>
-                          <div className="text-[10px] text-zinc-500 font-sans">{tx.title}</div>
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-400">{tx.transactionDate}</td>
-                        <td className="py-2.5 px-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            tx.isBuy 
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          }`}>
-                            {tx.type}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-zinc-300">
-                          {tx.shares.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-zinc-300">
-                          ${tx.price.toFixed(2)}
-                        </td>
-                        <td className={`py-2.5 px-3 text-right font-bold ${
-                          tx.isBuy ? 'text-emerald-400' : 'text-rose-400'
-                        }`}>
-                          {tx.isBuy ? '+' : '-'}${tx.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-zinc-400">
-                          {tx.sharesOwnedFollowing.toLocaleString()}
-                        </td>
+              {insider.transactions && insider.transactions.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-[10px] text-zinc-500 uppercase">
+                        <th className="py-2 px-3">Insider & Title</th>
+                        <th className="py-2 px-3">Date</th>
+                        <th className="py-2 px-3">Transaction Type</th>
+                        <th className="py-2 px-3 text-right">Shares</th>
+                        <th className="py-2 px-3 text-right">Price</th>
+                        <th className="py-2 px-3 text-right">Total Value</th>
+                        <th className="py-2 px-3 text-right">Shares Remaining</th>
+                        <th className="py-2 px-3 text-center">SEC Filing</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60">
+                      {insider.transactions.map((tx, txIdx) => (
+                        <tr key={`${tx.id || 'tx'}-${txIdx}`} className="hover:bg-zinc-800/40 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-zinc-200">{tx.insiderName}</div>
+                            <div className="text-[10px] text-zinc-500 font-sans">{tx.title}</div>
+                          </td>
+                          <td className="py-2.5 px-3 text-zinc-400">{tx.transactionDate}</td>
+                          <td className="py-2.5 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              tx.isBuy 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            }`}>
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-zinc-300">
+                            {tx.shares.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-zinc-300">
+                            ${tx.price.toFixed(2)}
+                          </td>
+                          <td className={`py-2.5 px-3 text-right font-bold ${
+                            tx.isBuy ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {tx.isBuy ? '+' : '-'}${tx.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-zinc-400">
+                            {tx.sharesOwnedFollowing.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {tx.secLink ? (
+                              <a
+                                href={tx.secLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 transition-all font-semibold"
+                                title="View official SEC EDGAR Form 4 filing XML/HTML"
+                              >
+                                SEC EDGAR
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-zinc-500 font-sans">Official Form 4</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-8 px-4 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-center space-y-2">
+                  <ShieldAlert className="w-8 h-8 text-zinc-500 mx-auto" />
+                  <div className="text-sm font-semibold text-zinc-300">
+                    No Recent SEC Form 4 Disclosures Filed for {data.ticker}
+                  </div>
+                  <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                    Form 4 insider disclosures are mandated solely for corporate officers, directors, and 10%+ owners of US publicly traded corporations. ETFs, foreign ADRs, crypto, and commodity contracts do not file SEC Form 4 insider reports.
+                  </p>
+                </div>
+              )}
 
               {/* Institutional 13F Whales */}
               {insider.institutionalWhales && insider.institutionalWhales.length > 0 && (

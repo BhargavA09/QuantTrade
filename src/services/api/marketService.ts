@@ -346,6 +346,8 @@ export interface StockInsiderTransaction {
   price: number;
   totalValue: number;
   sharesOwnedFollowing: number;
+  secFilingDate?: string;
+  secLink?: string;
 }
 
 export interface InstitutionalWhaleFlow {
@@ -368,6 +370,8 @@ export interface StockInsiderIntelligence {
   darkPoolSentiment: string;
   transactions: StockInsiderTransaction[];
   institutionalWhales: InstitutionalWhaleFlow[];
+  isOfficialSecData?: boolean;
+  source?: string;
 }
 
 export interface StockScenarioDetails {
