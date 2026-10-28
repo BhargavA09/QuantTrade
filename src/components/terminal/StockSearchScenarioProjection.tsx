@@ -35,7 +35,15 @@ interface StockSearchScenarioProjectionProps {
   onSelectTicker?: (ticker: string) => void;
 }
 
-const QUICK_TICKERS = ['NVDA', 'SHOP.TO', 'RY.TO', 'TD.TO', 'ENB.TO', 'AAPL', 'TSLA', 'GLD', 'XIU.TO', 'BTC-USD'];
+const REGIONAL_QUICK_TICKERS: Record<string, { label: string; icon: string; tickers: string[] }> = {
+  'ALL': { label: 'All Global', icon: '🌐', tickers: ['NVDA', 'SHOP.TO', 'SHEL.L', 'ASML.AS', '7203.T', '0700.HK', 'PLUG', 'SNDL', 'BTC-USD', 'GC=F'] },
+  'US': { label: 'US Equities', icon: '🇺🇸', tickers: ['NVDA', 'AAPL', 'MSFT', 'TSLA', 'SPY', 'QQQ', 'PLTR', 'AMD'] },
+  'TSX': { label: 'Canadian (TSX)', icon: '🇨🇦', tickers: ['SHOP.TO', 'RY.TO', 'TD.TO', 'ENB.TO', 'CNR.TO', 'BMO.TO', 'XIU.TO'] },
+  'EUROPE': { label: 'European', icon: '🇪🇺', tickers: ['SHEL.L', 'ASML.AS', 'MC.PA', 'SAP.DE', 'SIE.DE'] },
+  'ASIA': { label: 'Asia-Pacific', icon: '🌏', tickers: ['7203.T', '0700.HK', '9988.HK', 'BHP.AX', 'CBA.AX'] },
+  'PENNY': { label: 'Penny Stocks (< $5)', icon: '🪙', tickers: ['PLUG', 'SNDL', 'SOFI', 'MARA', 'DNA', 'LCID', 'RIOT', 'CLOV', 'OPEN'] },
+  'CRYPTO': { label: 'Crypto & Commodities', icon: '⚡', tickers: ['BTC-USD', 'ETH-USD', 'GC=F', 'SI=F', 'CL=F'] }
+};
 
 export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjectionProps> = ({
   initialTicker = 'NVDA',
@@ -43,16 +51,31 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
 }) => {
   const [searchInput, setSearchInput] = useState(initialTicker);
   const [activeTicker, setActiveTicker] = useState(initialTicker);
+  const [activeRegion, setActiveRegion] = useState<string>('ALL');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<StockProjectionIntelligence | null>(null);
   const [activeScenarioTab, setActiveScenarioTab] = useState<'baseCase' | 'bullCase' | 'bearCase'>('baseCase');
+
+  const getCurrencySymbol = (ticker: string): string => {
+    if (ticker.endsWith('.TO') || ticker.endsWith('.V')) return 'C$';
+    if (ticker.endsWith('.L')) return '£';
+    if (ticker.endsWith('.AS') || ticker.endsWith('.PA') || ticker.endsWith('.DE')) return '€';
+    if (ticker.endsWith('.T')) return '¥';
+    if (ticker.endsWith('.HK')) return 'HK$';
+    if (ticker.endsWith('.AX')) return 'A$';
+    if (ticker.endsWith('.NS')) return '₹';
+    return '$';
+  };
 
   const loadTickerProjection = async (ticker: string) => {
     const clean = ticker.trim().toUpperCase();
     if (!clean) return;
     setLoading(true);
     setError(null);
+    setSearchResults([]);
     try {
       const result = await fetchStockProjectionIntelligence(clean);
       setData(result);
@@ -65,6 +88,29 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
       setError(`Failed to fetch live projection intelligence for ${clean}.`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Auto-search any ticker across global exchanges via /api/stock/search
+  const handleInputChange = async (val: string) => {
+    setSearchInput(val);
+    if (!val || val.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      setIsSearching(true);
+      const res = await fetch(`/api/stock/search?q=${encodeURIComponent(val.trim())}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.quotes && Array.isArray(json.quotes)) {
+          setSearchResults(json.quotes.slice(0, 8));
+        }
+      }
+    } catch {
+      // ignore search error
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -83,77 +129,125 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
   const mc = data?.monteCarloProjection;
   const insider = data?.insiderIntelligence;
   const scenarios = data?.scenarioOverview;
+  const currSym = getCurrencySymbol(activeTicker);
 
   return (
     <div className="space-y-6">
-      {/* 1. Search Bar & Quick Ticker Selector Header */}
+      {/* 1. Search Bar & Global Quick Ticker Selector Header */}
       <div className="rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900/90 to-zinc-950 border border-zinc-800 p-6 shadow-2xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono flex items-center gap-1.5">
                 <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
-                SEARCH PROJECTION ENGINE
+                GLOBAL PROJECTION ENGINE
               </span>
               <span className="text-xs text-zinc-500 font-mono">
-                Multi-Scenario · SEC Form 4 Insiders · Live News Catalysts
+                Worldwide Exchanges · Penny Stocks · SEC Form 4 Insiders · Live News Catalysts
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
               <Target className="w-6 h-6 text-emerald-400 shrink-0" />
-              <span>Stock Projection, Inside Information & Scenario Overview</span>
+              <span>Global Stock Projection & Forward Scenario Intelligence</span>
             </h2>
             <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
-              Search any equity, ETF, or commodity to run real-time Monte Carlo forward projections, analyze C-suite Form 4 insider transactions, scan live news wires, and review the current scenario shaping future price trajectory.
+              Search ANY equity, penny stock, Canadian TSX, or international stock from any market in the world to run dynamic 30-day forward Monte Carlo simulations, inspect C-suite Form 4 insider transactions, scan live news wires, and review future price trajectories.
             </p>
           </div>
 
-          {/* Search Form */}
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-md w-full">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search ANY US or Canadian stock (e.g. SHOP.TO, RY.TO, NVDA, TD.TO, ENB.TO)..."
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !searchInput.trim()}
-              className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition-all shadow-md shadow-emerald-950/40 disabled:opacity-50 shrink-0"
-            >
-              {loading ? (
-                <span className="animate-spin">⏳</span>
-              ) : (
-                <ArrowUpRight className="w-4 h-4" />
-              )}
-              <span>Project ↵</span>
-            </button>
-          </form>
+          {/* Search Form with Auto-Search */}
+          <div className="relative max-w-md w-full">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  placeholder="Type ANY ticker or company (e.g. SHOP.TO, NVDA, PLUG, SNDL, SHEL.L, 7203.T)..."
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || !searchInput.trim()}
+                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition-all shadow-md shadow-emerald-950/40 disabled:opacity-50 shrink-0"
+              >
+                {loading ? (
+                  <span className="animate-spin">⏳</span>
+                ) : (
+                  <ArrowUpRight className="w-4 h-4" />
+                )}
+                <span>Project ↵</span>
+              </button>
+            </form>
+
+            {/* Auto-suggest dropdown across all global markets */}
+            {searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 p-2 space-y-1">
+                <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-1">Global Exchange Matches</div>
+                {searchResults.map((q, idx) => (
+                  <div
+                    key={`${q.symbol}-${idx}`}
+                    onClick={() => {
+                      setSearchInput(q.symbol);
+                      loadTickerProjection(q.symbol);
+                    }}
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-800 cursor-pointer text-xs font-mono"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white">{q.symbol}</span>
+                      <span className="text-zinc-400 truncate max-w-[150px] text-[11px]">{q.shortname || q.longname}</span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-sans">
+                      {q.exchange || 'EXCHANGE'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Quick Tickers Strip */}
-        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-zinc-800/80 text-xs font-mono">
-          <span className="text-[10px] text-zinc-500 uppercase font-bold">Quick Assets:</span>
-          {QUICK_TICKERS.map(t => (
-            <button
-              key={t}
-              onClick={() => {
-                setSearchInput(t);
-                loadTickerProjection(t);
-              }}
-              className={`px-2.5 py-1 rounded-lg border transition-all ${
-                activeTicker === t
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold'
-                  : 'bg-zinc-950/60 text-zinc-400 border-zinc-800 hover:text-white'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        {/* Global Market Filter Switcher */}
+        <div className="space-y-2 pt-2 border-t border-zinc-800/80">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-xs font-mono">
+            {Object.entries(REGIONAL_QUICK_TICKERS).map(([key, reg]) => (
+              <button
+                key={key}
+                onClick={() => setActiveRegion(key)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  activeRegion === key
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60 border border-transparent'
+                }`}
+              >
+                <span>{reg.icon}</span>
+                <span>{reg.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Quick Tickers for Selected Region */}
+          <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
+            <span className="text-[10px] text-zinc-500 uppercase font-bold">Quick Assets:</span>
+            {REGIONAL_QUICK_TICKERS[activeRegion].tickers.map(t => (
+              <button
+                key={t}
+                onClick={() => {
+                  setSearchInput(t);
+                  loadTickerProjection(t);
+                }}
+                className={`px-2.5 py-1 rounded-lg border transition-all ${
+                  activeTicker === t
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold'
+                    : 'bg-zinc-950/60 text-zinc-400 border-zinc-800 hover:text-white'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -179,7 +273,7 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
             <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-1">
               <span className="text-[10px] text-zinc-500 uppercase font-bold block">Live Quote ({data.ticker})</span>
               <div className="text-2xl font-black text-white font-mono">
-                ${data.currentPrice.toFixed(2)}
+                {currSym}{data.currentPrice.toFixed(data.currentPrice < 5 ? 3 : 2)}
               </div>
               <span className="text-[10px] text-zinc-400 truncate block">{data.companyName}</span>
             </div>
@@ -187,7 +281,7 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
             <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-1">
               <span className="text-[10px] text-zinc-500 uppercase font-bold block">30D Expected Median</span>
               <div className="text-2xl font-black text-emerald-400 font-mono">
-                ${mc?.expectedPriceMedian.toFixed(2)}
+                {currSym}{mc?.expectedPriceMedian ? mc.expectedPriceMedian.toFixed(data.currentPrice < 5 ? 3 : 2) : '---'}
               </div>
               <span className="text-[10px] text-emerald-400 block font-mono">
                 {mc?.expectedReturnPct && mc.expectedReturnPct >= 0 ? '+' : ''}{mc?.expectedReturnPct.toFixed(2)}% Expected
@@ -221,7 +315,7 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
               <div className="text-2xl font-black text-rose-400 font-mono">
                 {mc?.var95Pct.toFixed(1)}%
               </div>
-              <span className="text-[10px] text-zinc-400 block">Lower bound: ${mc?.targetLow95.toFixed(2)}</span>
+              <span className="text-[10px] text-zinc-400 block">Lower bound: {currSym}{mc?.targetLow95 ? mc.targetLow95.toFixed(data.currentPrice < 5 ? 3 : 2) : '---'}</span>
             </div>
           </div>
 

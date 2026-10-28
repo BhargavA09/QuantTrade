@@ -212,20 +212,47 @@ export const COMMON_TICKER_MAP: Readonly<Record<string, string>> = Object.freeze
   'TIH': 'TIH.TO',
   'BPAG': 'BPAG.TO',
 
-  // CANADIAN BENCHMARKS & ETFS
-  'TSX': 'XIU.TO',
-  'TSX 60': 'XIU.TO',
-  'TSX60': 'XIU.TO',
-  'S&P/TSX 60': 'XIU.TO',
-  'S&P TSX': 'XIU.TO',
-  'XIU': 'XIU.TO',
-  'XIC': 'XIC.TO',
-  'HXT': 'HXT.TO',
-  'XEG': 'XEG.TO',
-  'XFN': 'XFN.TO',
-  'XGD': 'XGD.TO',
-  'VCE': 'VCE.TO',
-  'VDY': 'VDY.TO'
+  // EUROPEAN TICKER MAPPINGS
+  'SHELL': 'SHEL.L',
+  'SHEL': 'SHEL.L',
+  'ASTRAZENECA': 'AZN.L',
+  'AZN': 'AZN.L',
+  'ASML': 'ASML.AS',
+  'LVMH': 'MC.PA',
+  'LOUIS VUITTON': 'MC.PA',
+  'MC': 'MC.PA',
+  'SAP': 'SAP.DE',
+  'SIEMENS': 'SIE.DE',
+  'SIE': 'SIE.DE',
+
+  // ASIA-PACIFIC TICKER MAPPINGS
+  'TOYOTA': '7203.T',
+  'TM': '7203.T',
+  'SONY': '6758.T',
+  'SNE': '6758.T',
+  'SOFTBANK': '9984.T',
+  'TENCENT': '0700.HK',
+  'ALIBABA HK': '9988.HK',
+  'BHP': 'BHP.AX',
+  'COMMONWEALTH BANK': 'CBA.AX',
+  'CBA': 'CBA.AX',
+
+  // PENNY STOCKS & MICRO-CAPS
+  'PLUG POWER': 'PLUG',
+  'SNDL INC': 'SNDL',
+  'SUNDIAL': 'SNDL',
+  'GINKGO': 'DNA',
+  'GINKGO BIOWORKS': 'DNA',
+  'LUCID': 'LCID',
+  'LUCID MOTORS': 'LCID',
+  'CLOVER': 'CLOV',
+  'CLOVER HEALTH': 'CLOV',
+  'OPENDOOR': 'OPEN',
+  'MARA HOLDINGS': 'MARA',
+  'MARATHON DIGITAL': 'MARA',
+  'RIOT PLATFORMS': 'RIOT',
+  'HUT 8': 'HUT',
+  'BITFARMS': 'BITF'
 });
 
 /**

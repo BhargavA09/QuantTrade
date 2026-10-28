@@ -1252,46 +1252,54 @@ class QuantTraderBrainService {
       { ticker: 'RY.TO', name: 'Royal Bank of Canada (TSX)', category: 'canadian_tsx' as const, price: 171.20, change: 1.10, changePercent: 0.65, volatility: 14.2, assetType: 'Canadian Financials & Wealth' },
       { ticker: 'TD.TO', name: 'Toronto-Dominion Bank (TSX)', category: 'canadian_tsx' as const, price: 78.40, change: 0.65, changePercent: 0.84, volatility: 16.5, assetType: 'Canadian Banking' },
       { ticker: 'ENB.TO', name: 'Enbridge Inc. (TSX)', category: 'canadian_tsx' as const, price: 54.80, change: 0.45, changePercent: 0.83, volatility: 15.8, assetType: 'Canadian Energy Midstream' },
+      // CANADIAN MARKET (TSX)
+      { ticker: 'SHOP.TO', name: 'Shopify Inc. (TSX)', category: 'canadian_tsx' as const, price: 232.93, change: 3.80, changePercent: 1.66, volatility: 32.4, assetType: 'E-Commerce Platform' },
+      { ticker: 'RY.TO', name: 'Royal Bank of Canada (TSX)', category: 'canadian_tsx' as const, price: 285.46, change: 1.90, changePercent: 0.67, volatility: 11.2, assetType: 'Canadian Major Bank' },
+      { ticker: 'TD.TO', name: 'Toronto-Dominion Bank (TSX)', category: 'canadian_tsx' as const, price: 86.50, change: 0.75, changePercent: 0.88, volatility: 12.8, assetType: 'Retail & Commercial Banking' },
+      { ticker: 'ENB.TO', name: 'Enbridge Inc. (TSX)', category: 'canadian_tsx' as const, price: 54.80, change: 0.45, changePercent: 0.83, volatility: 14.2, assetType: 'Energy Pipeline Infrastructure' },
       { ticker: 'CNR.TO', name: 'Canadian National Railway (TSX)', category: 'canadian_tsx' as const, price: 158.40, change: 1.20, changePercent: 0.76, volatility: 14.0, assetType: 'Transcontinental Freight Rail' },
       { ticker: 'BMO.TO', name: 'Bank of Montreal (TSX)', category: 'canadian_tsx' as const, price: 128.50, change: 0.90, changePercent: 0.70, volatility: 15.2, assetType: 'Canadian Commercial Banking' },
-      { ticker: 'BNS.TO', name: 'Bank of Nova Scotia (TSX)', category: 'canadian_tsx' as const, price: 72.60, change: 0.55, changePercent: 0.76, volatility: 16.0, assetType: 'Canadian Banking' },
-      { ticker: 'CNQ.TO', name: 'Canadian Natural Resources (TSX)', category: 'canadian_tsx' as const, price: 47.80, change: 0.85, changePercent: 1.81, volatility: 26.4, assetType: 'Canadian Oil Sands' },
-      { ticker: 'BAM.TO', name: 'Brookfield Asset Management (TSX)', category: 'canadian_tsx' as const, price: 68.20, change: 1.30, changePercent: 1.94, volatility: 21.5, assetType: 'Alternative Asset Management' },
-      { ticker: 'CP.TO', name: 'Canadian Pacific Kansas City (TSX)', category: 'canadian_tsx' as const, price: 112.40, change: 0.95, changePercent: 0.85, volatility: 15.5, assetType: 'North American Railroad' },
-      { ticker: 'SU.TO', name: 'Suncor Energy Inc. (TSX)', category: 'canadian_tsx' as const, price: 52.10, change: 0.75, changePercent: 1.46, volatility: 24.2, assetType: 'Canadian Oil Sands & Refining' },
-      { ticker: 'ATD.TO', name: 'Alimentation Couche-Tard (TSX)', category: 'canadian_tsx' as const, price: 76.50, change: 0.40, changePercent: 0.53, volatility: 13.8, assetType: 'Canadian Retail & Convenience' },
-      { ticker: 'CSU.TO', name: 'Constellation Software (TSX)', category: 'canadian_tsx' as const, price: 4450.00, change: 48.00, changePercent: 1.09, volatility: 16.5, assetType: 'Vertical Market Software' },
-      { ticker: 'TRI.TO', name: 'Thomson Reuters Corp (TSX)', category: 'canadian_tsx' as const, price: 234.00, change: 2.10, changePercent: 0.91, volatility: 14.5, assetType: 'Information Services' },
-      { ticker: 'ABX.TO', name: 'Barrick Gold Corporation (TSX)', category: 'canadian_tsx' as const, price: 26.40, change: 0.50, changePercent: 1.93, volatility: 28.0, assetType: 'Gold Mining & Royalty' },
-      { ticker: 'CCO.TO', name: 'Cameco Corporation (TSX)', category: 'canadian_tsx' as const, price: 74.20, change: 2.30, changePercent: 3.20, volatility: 35.4, assetType: 'Uranium Nuclear Fuel' },
-      { ticker: 'DOL.TO', name: 'Dollarama Inc. (TSX)', category: 'canadian_tsx' as const, price: 138.40, change: 1.25, changePercent: 0.91, volatility: 15.0, assetType: 'Canadian Value Retail' },
-      { ticker: 'L.TO', name: 'Loblaw Companies (TSX)', category: 'canadian_tsx' as const, price: 182.50, change: 0.90, changePercent: 0.50, volatility: 12.8, assetType: 'Grocery & Pharmacy Retail' },
       { ticker: 'XIU.TO', name: 'iShares S&P/TSX 60 Index ETF', category: 'canadian_tsx' as const, price: 37.80, change: 0.25, changePercent: 0.67, volatility: 12.4, assetType: 'S&P/TSX 60 Canadian Benchmark' },
       { ticker: 'XIC.TO', name: 'iShares Core S&P/TSX Composite', category: 'canadian_tsx' as const, price: 39.20, change: 0.28, changePercent: 0.72, volatility: 12.6, assetType: 'Total Canadian Equity Composite' },
 
-      // GLOBAL TECH & EQUITIES
-      { ticker: 'NVDA', name: 'NVIDIA Corporation', category: 'global_stock' as const, price: 138.80, change: 4.10, changePercent: 3.04, volatility: 38.4, assetType: 'Semiconductors / AI' },
-      { ticker: 'AAPL', name: 'Apple Inc.', category: 'global_stock' as const, price: 234.20, change: 1.60, changePercent: 0.69, volatility: 18.2, assetType: 'Consumer Tech US' },
-      { ticker: 'TSLA', name: 'Tesla, Inc.', category: 'global_stock' as const, price: 224.80, change: -3.20, changePercent: -1.40, volatility: 46.5, assetType: 'EV / Autonomy US' },
-      { ticker: 'MSFT', name: 'Microsoft Corporation', category: 'global_stock' as const, price: 428.60, change: -0.90, changePercent: -0.21, volatility: 20.4, assetType: 'Cloud & AI US' },
+      // GLOBAL TECH & US EQUITIES
+      { ticker: 'NVDA', name: 'NVIDIA Corporation', category: 'global_stock' as const, price: 217.94, change: 1.94, changePercent: 0.90, volatility: 38.4, assetType: 'Semiconductors / AI' },
+      { ticker: 'AAPL', name: 'Apple Inc.', category: 'global_stock' as const, price: 234.80, change: 1.85, changePercent: 0.79, volatility: 18.2, assetType: 'Consumer Tech US' },
+      { ticker: 'TSLA', name: 'Tesla, Inc.', category: 'global_stock' as const, price: 248.50, change: 4.20, changePercent: 1.72, volatility: 46.5, assetType: 'EV / Autonomy US' },
+      { ticker: 'MSFT', name: 'Microsoft Corporation', category: 'global_stock' as const, price: 428.20, change: 3.40, changePercent: 0.80, volatility: 20.4, assetType: 'Cloud & AI US' },
       { ticker: 'TSM', name: 'Taiwan Semiconductor Mfg.', category: 'global_stock' as const, price: 192.50, change: 3.80, changePercent: 2.01, volatility: 34.2, assetType: 'Global Foundry Taiwan' },
-      { ticker: 'ASML', name: 'ASML Holding N.V.', category: 'global_stock' as const, price: 745.00, change: 14.50, changePercent: 1.99, volatility: 36.8, assetType: 'EUV Lithography Netherlands' },
-      { ticker: 'BABA', name: 'Alibaba Group Holding', category: 'global_stock' as const, price: 98.60, change: 2.40, changePercent: 2.49, volatility: 42.0, assetType: 'E-Commerce & Cloud China' },
       { ticker: 'PLTR', name: 'Palantir Technologies', category: 'global_stock' as const, price: 44.60, change: 1.85, changePercent: 4.33, volatility: 49.5, assetType: 'Enterprise & Defense AI' },
-      { ticker: 'AMZN', name: 'Amazon.com, Inc.', category: 'global_stock' as const, price: 188.40, change: 2.30, changePercent: 1.24, volatility: 26.5, assetType: 'Cloud & Commerce US' },
+      { ticker: 'AMZN', name: 'Amazon.com, Inc.', category: 'global_stock' as const, price: 196.25, change: 2.10, changePercent: 1.08, volatility: 26.5, assetType: 'Cloud & Commerce US' },
+
+      // EUROPEAN MARKETS (LSE, Euronext, Frankfurt XETRA)
+      { ticker: 'SHEL.L', name: 'Shell plc (LSE)', category: 'global_stock' as const, price: 3927.50, change: 24.50, changePercent: 0.63, volatility: 22.5, assetType: 'Integrated Energy UK' },
+      { ticker: 'ASML.AS', name: 'ASML Holding NV (Euronext)', category: 'global_stock' as const, price: 1470.00, change: 28.00, changePercent: 1.94, volatility: 36.8, assetType: 'EUV Lithography Netherlands' },
+      { ticker: 'MC.PA', name: 'LVMH Moët Hennessy (Euronext)', category: 'global_stock' as const, price: 625.40, change: 8.20, changePercent: 1.33, volatility: 24.0, assetType: 'Luxury Conglomerate France' },
+      { ticker: 'SAP.DE', name: 'SAP SE (XETRA)', category: 'global_stock' as const, price: 214.50, change: 2.80, changePercent: 1.32, volatility: 21.0, assetType: 'Enterprise Cloud Germany' },
+
+      // ASIA-PACIFIC MARKETS (Tokyo TSE, Hong Kong HKEX, Australia ASX)
+      { ticker: '7203.T', name: 'Toyota Motor Corp (Tokyo)', category: 'global_stock' as const, price: 3086.00, change: 32.00, changePercent: 1.05, volatility: 18.5, assetType: 'Automotive Manufacturing Japan' },
+      { ticker: '0700.HK', name: 'Tencent Holdings (Hong Kong)', category: 'global_stock' as const, price: 387.40, change: 5.60, changePercent: 1.47, volatility: 31.0, assetType: 'Internet & Gaming China' },
+      { ticker: 'BHP.AX', name: 'BHP Group Limited (ASX)', category: 'global_stock' as const, price: 58.18, change: 0.65, changePercent: 1.13, volatility: 22.0, assetType: 'Mining & Natural Resources Australia' },
+
+      // PENNY STOCKS & MICRO-CAPS (< $5.00)
+      { ticker: 'PLUG', name: 'Plug Power Inc.', category: 'global_stock' as const, price: 1.40, change: 0.05, changePercent: 3.70, volatility: 68.0, assetType: 'Hydrogen Energy Micro-Cap' },
+      { ticker: 'SNDL', name: 'SNDL Inc.', category: 'global_stock' as const, price: 1.30, change: 0.04, changePercent: 3.17, volatility: 62.0, assetType: 'Consumer & Cannabis Micro-Cap' },
+      { ticker: 'MARA', name: 'MARA Holdings Inc.', category: 'global_stock' as const, price: 16.20, change: 0.85, changePercent: 5.54, volatility: 74.0, assetType: 'Compute & Mining Infrastructure' },
+      { ticker: 'DNA', name: 'Ginkgo Bioworks Holdings', category: 'global_stock' as const, price: 6.40, change: 0.18, changePercent: 2.89, volatility: 58.0, assetType: 'Synthetic Biology Small-Cap' },
+      { ticker: 'LCID', name: 'Lucid Group Inc.', category: 'global_stock' as const, price: 3.42, change: 0.11, changePercent: 3.32, volatility: 64.0, assetType: 'Electric Vehicles Penny Stock' },
+      { ticker: 'SOFI', name: 'SoFi Technologies Inc.', category: 'global_stock' as const, price: 8.85, change: 0.28, changePercent: 3.27, volatility: 48.0, assetType: 'Fintech & Digital Banking' },
 
       // GLOBAL MARKET INDICES
-      { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', category: 'index' as const, price: 585.40, change: 2.10, changePercent: 0.36, volatility: 12.4, assetType: 'US Large Cap S&P 500' },
-      { ticker: 'QQQ', name: 'Invesco QQQ Trust', category: 'index' as const, price: 494.60, change: 3.80, changePercent: 0.77, volatility: 16.8, assetType: 'US Tech Nasdaq 100' },
+      { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', category: 'index' as const, price: 769.66, change: 4.85, changePercent: 0.63, volatility: 12.4, assetType: 'US Large Cap S&P 500' },
+      { ticker: 'QQQ', name: 'Invesco QQQ Trust', category: 'index' as const, price: 494.50, change: 4.10, changePercent: 0.84, volatility: 16.8, assetType: 'US Tech Nasdaq 100' },
       { ticker: 'IWM', name: 'iShares Russell 2000 ETF', category: 'index' as const, price: 223.40, change: -0.65, changePercent: -0.29, volatility: 20.5, assetType: 'US Small Cap Russell' },
-      { ticker: 'EWJ', name: 'iShares MSCI Japan ETF (Nikkei)', category: 'index' as const, price: 72.40, change: 0.85, changePercent: 1.19, volatility: 17.2, assetType: 'Japan Nikkei Equities' },
-      { ticker: 'EWG', name: 'iShares MSCI Germany ETF (DAX)', category: 'index' as const, price: 33.80, change: 0.28, changePercent: 0.84, volatility: 16.4, assetType: 'Germany DAX Equities' },
-      { ticker: 'EWU', name: 'iShares MSCI UK ETF (FTSE)', category: 'index' as const, price: 36.20, change: 0.15, changePercent: 0.42, volatility: 14.1, assetType: 'United Kingdom FTSE' },
-      { ticker: 'FXI', name: 'iShares China Large-Cap ETF', category: 'index' as const, price: 31.50, change: 0.72, changePercent: 2.34, volatility: 33.8, assetType: 'China Large Cap' },
-      { ticker: 'INDA', name: 'iShares MSCI India ETF (Nifty)', category: 'index' as const, price: 55.10, change: 0.45, changePercent: 0.82, volatility: 18.0, assetType: 'India Nifty Equities' },
 
-      // DIGITAL & FIXED INCOME
-      { ticker: 'BTC-USD', name: 'Bitcoin (USD)', category: 'forex_crypto' as const, price: 67450.00, change: 1420.00, changePercent: 2.15, volatility: 54.0, assetType: 'Digital Store of Value' },
+      // COMMODITIES, DIGITAL & FIXED INCOME
+      { ticker: 'GC=F', name: 'Gold Futures (COMEX)', category: 'forex_crypto' as const, price: 4061.80, change: 18.50, changePercent: 0.46, volatility: 14.5, assetType: 'Precious Metals Gold' },
+      { ticker: 'SI=F', name: 'Silver Futures (COMEX)', category: 'forex_crypto' as const, price: 54.15, change: 0.85, changePercent: 1.60, volatility: 26.5, assetType: 'Precious Metals Silver' },
+      { ticker: 'CL=F', name: 'Crude Oil WTI (NYMEX)', category: 'forex_crypto' as const, price: 101.15, change: 1.20, changePercent: 1.20, volatility: 32.0, assetType: 'Energy Commodities WTI' },
+      { ticker: 'BTC-USD', name: 'Bitcoin (USD)', category: 'forex_crypto' as const, price: 80827.00, change: 1650.00, changePercent: 2.08, volatility: 54.0, assetType: 'Digital Store of Value' },
       { ticker: 'ETH-USD', name: 'Ethereum (USD)', category: 'forex_crypto' as const, price: 2640.00, change: 54.00, changePercent: 2.09, volatility: 62.0, assetType: 'Smart Contract Infrastructure' },
       { ticker: 'TLT', name: 'iShares 20+ Year Treasury Bond ETF', category: 'index' as const, price: 94.50, change: -0.45, changePercent: -0.47, volatility: 15.2, assetType: 'US Sovereign Long Bonds' }
     ];

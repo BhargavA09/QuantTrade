@@ -66,44 +66,63 @@ except ImportError:
 
 # Baseline Market Prices for instant ultra-low latency response
 BASELINE_MARKET_PRICES = {
-    'SPY': {'price': 585.40, 'change': 2.10, 'changePercent': 0.36, 'name': 'SPDR S&P 500 ETF Trust', 'pe': 27.5, 'high': 588.20, 'low': 581.30, 'volume': 48500000},
-    'QQQ': {'price': 494.60, 'change': 3.80, 'changePercent': 0.77, 'name': 'Invesco QQQ Trust', 'pe': 31.8, 'high': 496.80, 'low': 490.10, 'volume': 36200000},
+    'SPY': {'price': 769.66, 'change': 4.85, 'changePercent': 0.63, 'name': 'SPDR S&P 500 ETF Trust', 'pe': 26.5, 'high': 772.10, 'low': 766.40, 'volume': 52000000},
+    'QQQ': {'price': 494.50, 'change': 4.10, 'changePercent': 0.84, 'name': 'Invesco QQQ Trust', 'pe': 32.1, 'high': 496.80, 'low': 490.10, 'volume': 38200000},
     'DIA': {'price': 428.90, 'change': 1.45, 'changePercent': 0.34, 'name': 'SPDR Dow Jones Industrial ETF', 'pe': 22.4, 'high': 430.10, 'low': 426.50, 'volume': 3900000},
     'IWM': {'price': 223.40, 'change': -0.65, 'changePercent': -0.29, 'name': 'iShares Russell 2000 ETF', 'pe': 24.1, 'high': 225.00, 'low': 221.80, 'volume': 22100000},
-    'NVDA': {'price': 138.80, 'change': 4.10, 'changePercent': 3.04, 'name': 'NVIDIA Corporation', 'pe': 52.4, 'high': 140.20, 'low': 134.10, 'volume': 65400000},
-    'AAPL': {'price': 234.20, 'change': 1.60, 'changePercent': 0.69, 'name': 'Apple Inc.', 'pe': 34.2, 'high': 236.00, 'low': 232.10, 'volume': 42100000},
-    'TSLA': {'price': 224.80, 'change': -3.20, 'changePercent': -1.40, 'name': 'Tesla, Inc.', 'pe': 68.5, 'high': 229.50, 'low': 221.00, 'volume': 55800000},
-    'MSFT': {'price': 428.60, 'change': -0.90, 'changePercent': -0.21, 'name': 'Microsoft Corporation', 'pe': 35.6, 'high': 431.00, 'low': 425.40, 'volume': 18900000},
-    'AMZN': {'price': 188.40, 'change': 2.30, 'changePercent': 1.24, 'name': 'Amazon.com, Inc.', 'pe': 44.1, 'high': 190.10, 'low': 185.30, 'volume': 31200000},
-    'GOOGL': {'price': 166.20, 'change': 1.10, 'changePercent': 0.67, 'name': 'Alphabet Inc.', 'pe': 24.8, 'high': 167.80, 'low': 164.50, 'volume': 21400000},
-    'META': {'price': 588.50, 'change': 6.20, 'changePercent': 1.07, 'name': 'Meta Platforms, Inc.', 'pe': 28.9, 'high': 592.40, 'low': 580.10, 'volume': 14800000},
-    'PLTR': {'price': 44.60, 'change': 1.85, 'changePercent': 4.33, 'name': 'Palantir Technologies', 'pe': 112.0, 'high': 45.40, 'low': 42.10, 'volume': 48900000},
-    'AMD': {'price': 156.40, 'change': 2.40, 'changePercent': 1.56, 'name': 'Advanced Micro Devices', 'pe': 84.5, 'high': 158.50, 'low': 153.20, 'volume': 38700000},
-    'COIN': {'price': 215.30, 'change': 7.60, 'changePercent': 3.66, 'name': 'Coinbase Global, Inc.', 'pe': 38.2, 'high': 219.00, 'low': 207.50, 'volume': 12400000},
-    'BTC-USD': {'price': 67450.00, 'change': 1420.00, 'changePercent': 2.15, 'name': 'Bitcoin USD', 'pe': 0, 'high': 68200.00, 'low': 65800.00, 'volume': 28500000000},
-    'ETH-USD': {'price': 2640.00, 'change': 54.00, 'changePercent': 2.09, 'name': 'Ethereum USD', 'pe': 0, 'high': 2690.00, 'low': 2580.00, 'volume': 14200000000},
-    'ZIM': {'price': 24.80, 'change': 1.65, 'changePercent': 7.13, 'name': 'ZIM Integrated Shipping', 'pe': 4.2, 'high': 25.40, 'low': 23.00, 'volume': 8900000},
-    '^TNX': {'price': 4.14, 'change': 0.02, 'changePercent': 0.48, 'name': '10Y Treasury Yield', 'pe': 0, 'high': 4.18, 'low': 4.10, 'volume': 0},
-    'TLT': {'price': 94.50, 'change': -0.45, 'changePercent': -0.47, 'name': '20Y Treasury Bond ETF', 'pe': 0, 'high': 95.20, 'low': 94.10, 'volume': 19500000},
-    # Commodities
-    'GLD': {'price': 246.50, 'change': 1.85, 'changePercent': 0.76, 'name': 'SPDR Gold Shares', 'pe': 0, 'high': 247.20, 'low': 245.10, 'volume': 8500000},
-    'SLV': {'price': 29.40, 'change': 0.62, 'changePercent': 2.15, 'name': 'iShares Silver Trust', 'pe': 0, 'high': 29.80, 'low': 28.90, 'volume': 18500000},
+    'NVDA': {'price': 217.94, 'change': 1.94, 'changePercent': 0.90, 'name': 'NVIDIA Corporation', 'pe': 48.5, 'high': 219.19, 'low': 215.53, 'volume': 84300000},
+    'AAPL': {'price': 234.80, 'change': 1.85, 'changePercent': 0.79, 'name': 'Apple Inc.', 'pe': 34.2, 'high': 236.10, 'low': 232.80, 'volume': 42100000},
+    'TSLA': {'price': 248.50, 'change': 4.20, 'changePercent': 1.72, 'name': 'Tesla, Inc.', 'pe': 64.2, 'high': 252.00, 'low': 244.50, 'volume': 68000000},
+    'MSFT': {'price': 428.20, 'change': 3.40, 'changePercent': 0.80, 'name': 'Microsoft Corporation', 'pe': 35.8, 'high': 431.00, 'low': 425.40, 'volume': 22000000},
+    'AMZN': {'price': 196.25, 'change': 2.10, 'changePercent': 1.08, 'name': 'Amazon.com, Inc.', 'pe': 43.6, 'high': 198.00, 'low': 194.20, 'volume': 34000000},
+    'GOOGL': {'price': 178.40, 'change': 1.60, 'changePercent': 0.91, 'name': 'Alphabet Inc.', 'pe': 24.1, 'high': 180.50, 'low': 176.80, 'volume': 25000000},
+    'META': {'price': 585.20, 'change': 7.40, 'changePercent': 1.28, 'name': 'Meta Platforms, Inc.', 'pe': 28.4, 'high': 589.00, 'low': 580.10, 'volume': 18000000},
+    'PLTR': {'price': 44.60, 'change': 1.85, 'changePercent': 4.33, 'name': 'Palantir Technologies', 'pe': 88.5, 'high': 45.40, 'low': 43.10, 'volume': 62000000},
+    'AMD': {'price': 156.40, 'change': 2.30, 'changePercent': 1.49, 'name': 'Advanced Micro Devices', 'pe': 98.4, 'high': 158.80, 'low': 154.20, 'volume': 42000000},
+    'COIN': {'price': 214.80, 'change': 7.20, 'changePercent': 3.47, 'name': 'Coinbase Global, Inc.', 'pe': 38.2, 'high': 218.00, 'low': 208.50, 'volume': 11000000},
+
+    # Canadian Market (TSX) Listings
+    'SHOP.TO': {'price': 232.93, 'change': 3.80, 'changePercent': 1.66, 'name': 'Shopify Inc. (TSX)', 'pe': 78.4, 'high': 235.40, 'low': 230.10, 'volume': 4200000},
+    'RY.TO': {'price': 285.46, 'change': 1.90, 'changePercent': 0.67, 'name': 'Royal Bank of Canada (TSX)', 'pe': 13.8, 'high': 287.50, 'low': 283.80, 'volume': 3100000},
+    'TD.TO': {'price': 86.50, 'change': 0.75, 'changePercent': 0.88, 'name': 'Toronto-Dominion Bank (TSX)', 'pe': 10.9, 'high': 87.20, 'low': 85.80, 'volume': 5400000},
+    'ENB.TO': {'price': 54.80, 'change': 0.45, 'changePercent': 0.83, 'name': 'Enbridge Inc. (TSX)', 'pe': 18.2, 'high': 55.20, 'low': 54.30, 'volume': 6800000},
+    'CNR.TO': {'price': 158.40, 'change': 1.20, 'changePercent': 0.76, 'name': 'Canadian National Railway (TSX)', 'pe': 19.5, 'high': 159.80, 'low': 157.20, 'volume': 1800000},
+    'BMO.TO': {'price': 128.50, 'change': 0.90, 'changePercent': 0.70, 'name': 'Bank of Montreal (TSX)', 'pe': 12.4, 'high': 129.40, 'low': 127.60, 'volume': 2200000},
+    'XIU.TO': {'price': 37.80, 'change': 0.25, 'changePercent': 0.67, 'name': 'iShares S&P/TSX 60 Index ETF', 'pe': 15.8, 'high': 38.00, 'low': 37.55, 'volume': 5600000},
+
+    # European Markets (LSE, Euronext, Frankfurt XETRA)
+    'SHEL.L': {'price': 3927.50, 'change': 24.50, 'changePercent': 0.63, 'name': 'Shell plc (LSE)', 'pe': 11.2, 'high': 3950.00, 'low': 3910.00, 'volume': 12000000},
+    'AZN.L': {'price': 12450.00, 'change': 110.00, 'changePercent': 0.89, 'name': 'AstraZeneca PLC (LSE)', 'pe': 34.0, 'high': 12520.00, 'low': 12380.00, 'volume': 1800000},
+    'ASML.AS': {'price': 1470.00, 'change': 28.00, 'changePercent': 1.94, 'name': 'ASML Holding NV (Euronext)', 'pe': 41.2, 'high': 1485.00, 'low': 1450.00, 'volume': 950000},
+    'MC.PA': {'price': 625.40, 'change': 8.20, 'changePercent': 1.33, 'name': 'LVMH Moët Hennessy (Euronext)', 'pe': 22.4, 'high': 631.00, 'low': 620.00, 'volume': 650000},
+    'SAP.DE': {'price': 214.50, 'change': 2.80, 'changePercent': 1.32, 'name': 'SAP SE (XETRA)', 'pe': 38.5, 'high': 216.00, 'low': 212.50, 'volume': 1400000},
+
+    # Asia-Pacific Markets (Tokyo TSE, Hong Kong HKEX, Australia ASX)
+    '7203.T': {'price': 3086.00, 'change': 32.00, 'changePercent': 1.05, 'name': 'Toyota Motor Corp (Tokyo)', 'pe': 8.5, 'high': 3110.00, 'low': 3065.00, 'volume': 22000000},
+    '0700.HK': {'price': 387.40, 'change': 5.60, 'changePercent': 1.47, 'name': 'Tencent Holdings (Hong Kong)', 'pe': 21.0, 'high': 391.00, 'low': 384.20, 'volume': 18000000},
+    '9988.HK': {'price': 98.20, 'change': 2.10, 'changePercent': 2.19, 'name': 'Alibaba Group (Hong Kong)', 'pe': 14.5, 'high': 99.80, 'low': 96.50, 'volume': 28000000},
+    'BHP.AX': {'price': 58.18, 'change': 0.65, 'changePercent': 1.13, 'name': 'BHP Group Limited (ASX)', 'pe': 11.5, 'high': 58.70, 'low': 57.80, 'volume': 7500000},
+
+    # Penny Stocks & Micro-Caps (< $5.00)
+    'PLUG': {'price': 1.40, 'change': 0.05, 'changePercent': 3.70, 'name': 'Plug Power Inc.', 'pe': 0, 'high': 1.45, 'low': 1.36, 'volume': 48000000},
+    'SNDL': {'price': 1.30, 'change': 0.04, 'changePercent': 3.17, 'name': 'SNDL Inc.', 'pe': 0, 'high': 1.34, 'low': 1.27, 'volume': 12000000},
+    'SOFI': {'price': 8.85, 'change': 0.28, 'changePercent': 3.27, 'name': 'SoFi Technologies Inc.', 'pe': 34.0, 'high': 9.02, 'low': 8.65, 'volume': 38000000},
+    'MARA': {'price': 16.20, 'change': 0.85, 'changePercent': 5.54, 'name': 'MARA Holdings Inc.', 'pe': 0, 'high': 16.70, 'low': 15.60, 'volume': 29000000},
+    'DNA': {'price': 6.40, 'change': 0.18, 'changePercent': 2.89, 'name': 'Ginkgo Bioworks Holdings', 'pe': 0, 'high': 6.62, 'low': 6.25, 'volume': 16000000},
+    'LCID': {'price': 3.42, 'change': 0.11, 'changePercent': 3.32, 'name': 'Lucid Group Inc.', 'pe': 0, 'high': 3.52, 'low': 3.35, 'volume': 24000000},
+    'RIOT': {'price': 8.95, 'change': 0.42, 'changePercent': 4.92, 'name': 'Riot Platforms Inc.', 'pe': 0, 'high': 9.20, 'low': 8.65, 'volume': 22000000},
+    'CLOV': {'price': 2.75, 'change': 0.08, 'changePercent': 3.00, 'name': 'Clover Health Investments', 'pe': 0, 'high': 2.84, 'low': 2.68, 'volume': 9000000},
+    'OPEN': {'price': 1.85, 'change': 0.06, 'changePercent': 3.35, 'name': 'Opendoor Technologies', 'pe': 0, 'high': 1.91, 'low': 1.80, 'volume': 14000000},
+
+    # Commodities & Crypto
+    'GC=F': {'price': 4061.80, 'change': 18.50, 'changePercent': 0.46, 'name': 'Gold Futures (COMEX)', 'pe': 0, 'high': 4075.00, 'low': 4048.00, 'volume': 220000},
+    'SI=F': {'price': 54.15, 'change': 0.85, 'changePercent': 1.60, 'name': 'Silver Futures (COMEX)', 'pe': 0, 'high': 54.60, 'low': 53.50, 'volume': 140000},
+    'CL=F': {'price': 101.15, 'change': 1.20, 'changePercent': 1.20, 'name': 'Crude Oil WTI (NYMEX)', 'pe': 0, 'high': 102.30, 'low': 99.80, 'volume': 380000},
+    'GLD': {'price': 245.80, 'change': 1.40, 'changePercent': 0.57, 'name': 'SPDR Gold Shares', 'pe': 0, 'high': 246.90, 'low': 244.20, 'volume': 8500000},
+    'SLV': {'price': 29.80, 'change': 0.45, 'changePercent': 1.53, 'name': 'iShares Silver Trust', 'pe': 0, 'high': 30.10, 'low': 29.40, 'volume': 16000000},
     'USO': {'price': 74.20, 'change': -1.10, 'changePercent': -1.46, 'name': 'United States Oil Fund', 'pe': 0, 'high': 75.80, 'low': 73.60, 'volume': 6400000},
-    'UNG': {'price': 12.80, 'change': 0.45, 'changePercent': 3.64, 'name': 'United States Natural Gas', 'pe': 0, 'high': 13.10, 'low': 12.40, 'volume': 11200000},
-    'CPER': {'price': 26.10, 'change': 0.38, 'changePercent': 1.48, 'name': 'United States Copper Index', 'pe': 0, 'high': 26.40, 'low': 25.80, 'volume': 1400000},
-    'WEAT': {'price': 5.62, 'change': 0.08, 'changePercent': 1.44, 'name': 'Teucrium Wheat Fund', 'pe': 0, 'high': 5.70, 'low': 5.55, 'volume': 980000},
-    'BNO': {'price': 28.30, 'change': -0.35, 'changePercent': -1.22, 'name': 'United States Brent Oil', 'pe': 0, 'high': 28.80, 'low': 28.10, 'volume': 1100000},
-    'URA': {'price': 31.40, 'change': 1.20, 'changePercent': 3.97, 'name': 'Global X Uranium ETF', 'pe': 0, 'high': 31.90, 'low': 30.50, 'volume': 4200000},
-    # Global Equities & International Markets
-    'TSM': {'price': 192.50, 'change': 3.80, 'changePercent': 2.01, 'name': 'Taiwan Semiconductor Mfg', 'pe': 29.4, 'high': 194.20, 'low': 189.50, 'volume': 18500000},
-    'ASML': {'price': 745.00, 'change': 14.50, 'changePercent': 1.99, 'name': 'ASML Holding N.V.', 'pe': 39.8, 'high': 752.00, 'low': 736.00, 'volume': 2100000},
-    'BABA': {'price': 98.60, 'change': 2.40, 'changePercent': 2.49, 'name': 'Alibaba Group Holding', 'pe': 18.2, 'high': 100.20, 'low': 96.80, 'volume': 24500000},
-    'EWJ': {'price': 72.40, 'change': 0.85, 'changePercent': 1.19, 'name': 'iShares MSCI Japan ETF', 'pe': 16.5, 'high': 72.90, 'low': 71.80, 'volume': 7200000},
-    'EWG': {'price': 33.80, 'change': 0.28, 'changePercent': 0.84, 'name': 'iShares MSCI Germany ETF', 'pe': 14.2, 'high': 34.10, 'low': 33.50, 'volume': 3400000},
-    'EWU': {'price': 36.20, 'change': 0.15, 'changePercent': 0.42, 'name': 'iShares MSCI United Kingdom ETF', 'pe': 13.8, 'high': 36.50, 'low': 35.90, 'volume': 2800000},
-    'FXI': {'price': 31.50, 'change': 0.72, 'changePercent': 2.34, 'name': 'iShares China Large-Cap ETF', 'pe': 11.4, 'high': 32.00, 'low': 30.90, 'volume': 38000000},
-    'INDA': {'price': 55.10, 'change': 0.45, 'changePercent': 0.82, 'name': 'iShares MSCI India ETF', 'pe': 24.6, 'high': 55.60, 'low': 54.80, 'volume': 4900000},
-    'EEM': {'price': 44.80, 'change': 0.65, 'changePercent': 1.47, 'name': 'iShares MSCI Emerging Markets ETF', 'pe': 15.1, 'high': 45.20, 'low': 44.30, 'volume': 31000000}
+    'BTC-USD': {'price': 80827.00, 'change': 1650.00, 'changePercent': 2.08, 'name': 'Bitcoin USD', 'pe': 0, 'high': 81400.00, 'low': 79500.00, 'volume': 38000000000},
+    'ETH-USD': {'price': 2640.00, 'change': 54.00, 'changePercent': 2.09, 'name': 'Ethereum USD', 'pe': 0, 'high': 2680.00, 'low': 2580.00, 'volume': 14000000000}
 }
 
 
@@ -1256,6 +1275,35 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
         if path in ["/api/market/global-live-quotes", "/api/market/live-quotes"]:
             return self._send_json({"success": True, "quotes": get_cached_global_live_quotes()})
 
+        # 2d. Multi-API Live Stream Ticks
+        if path.startswith("/api/market/live-stream-ticks"):
+            tickers_param = query.get("tickers", [""])[0]
+            ticker_list = [t.strip().upper() for t in tickers_param.split(",") if t.strip()]
+            if not ticker_list:
+                ticker_list = ["NVDA", "SHOP.TO", "PLUG", "SNDL", "ASML.AS", "SHEL.L", "7203.T", "BTC-USD", "GC=F"]
+            ticks = []
+            for sym in ticker_list[:15]:
+                try:
+                    quote = fetch_live_yahoo_quote(sym)
+                    curr = "CAD" if sym.endswith(".TO") else ("GBP" if sym.endswith(".L") else ("EUR" if sym.endswith(".AS") or sym.endswith(".PA") or sym.endswith(".DE") else ("JPY" if sym.endswith(".T") else ("HKD" if sym.endswith(".HK") else ("AUD" if sym.endswith(".AX") else "USD")))))
+                    exch = "TSX" if sym.endswith(".TO") else ("LSE" if sym.endswith(".L") else ("AMS" if sym.endswith(".AS") else ("TSE" if sym.endswith(".T") else "US")))
+                    price_val = float(quote.get("currentPrice") or quote.get("price") or 150.0)
+                    ticks.append({
+                        "ticker": sym,
+                        "name": quote.get("companyName") or quote.get("name") or sym,
+                        "price": price_val,
+                        "change": float(quote.get("change") or 0.0),
+                        "changePercent": float(quote.get("changePercent") or 0.0),
+                        "volume": int(quote.get("volume") or 15000000),
+                        "currency": curr,
+                        "exchange": exch,
+                        "latencyMs": int(quote.get("activeSources", [{}])[0].get("latency_ms", 35)),
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    })
+                except Exception:
+                    pass
+            return self._send_json({"success": True, "count": len(ticks), "ticks": ticks})
+
         # 3. Batch Quotes
         if path in ["/api/stock/quotes", "/api/quotes"]:
             tickers_param = query.get("tickers", [""])[0]
@@ -1295,12 +1343,14 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
                         results.append({
                             'symbol': k,
                             'name': v['name'],
+                            'shortname': v['name'],
                             'price': v['price'],
-                            'changePercent': v['changePercent']
+                            'changePercent': v['changePercent'],
+                            'exchange': 'TSX' if k.endswith('.TO') else ('LSE' if k.endswith('.L') else ('AMS' if k.endswith('.AS') else ('TSE' if k.endswith('.T') else 'US')))
                         })
                 # Query Yahoo Finance search API
                 try:
-                    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={urllib.parse.quote(q)}&quotesCount=6"
+                    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={urllib.parse.quote(q)}&quotesCount=8"
                     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                     with urllib.request.urlopen(req, timeout=3.0) as resp:
                         data = json.loads(resp.read().decode())
@@ -1310,11 +1360,12 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
                                 results.append({
                                     'symbol': sym,
                                     'name': item.get('shortname') or item.get('longname') or sym,
+                                    'shortname': item.get('shortname') or item.get('longname') or sym,
                                     'exchange': item.get('exchange', 'US')
                                 })
                 except Exception:
                     pass
-            return self._send_json({"results": results[:10]})
+            return self._send_json({"results": results[:12], "quotes": results[:12]})
 
         # 6. Options Chain & Greeks
         if path.startswith("/api/stock/options/"):

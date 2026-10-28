@@ -145,7 +145,7 @@ export default defineConfig(({mode}) => {
           changeOrigin: true,
         },
       },
-      hmr: process.env.DISABLE_HMR !== 'true',
+      hmr: false,
       watch: {
         ignored: ['**/android/**', '**/dist/**']
       }

@@ -32,7 +32,7 @@ interface MarketSentimentGaugeProps {
 
 export const MarketSentimentGauge: React.FC<MarketSentimentGaugeProps> = ({
   ticker = 'NVDA',
-  currentPrice = 138.80,
+  currentPrice = 217.94,
   fourierMetrics = null,
   onTradeSignal,
   compact = false
