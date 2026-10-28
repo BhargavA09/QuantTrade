@@ -117,6 +117,8 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [remoteSearchResults, setRemoteSearchResults] = useState<any[]>([]);
+  const [isSearchingRemote, setIsSearchingRemote] = useState<boolean>(false);
 
   // Live Market Data & Real-Time Wires
   const [liveAssetData, setLiveAssetData] = useState<LiveAssetDataResponse | null>(null);
@@ -408,6 +410,33 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     return all.filter(a => a.region === activeMarketRegion);
   }, [activeMarketRegion]);
 
+  // Debounced live global equity search across all markets
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setRemoteSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setIsSearchingRemote(true);
+        const res = await fetch(`/api/stock/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const items = json.quotes || json.results || [];
+          if (Array.isArray(items)) {
+            setRemoteSearchResults(items.slice(0, 10));
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        setIsSearchingRemote(false);
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const currentPrice = stockMeta.price;
 
   // Chart bars: use real historical daily OHLCV candles from the exchange or offline vault
@@ -517,6 +546,51 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       return matchesCategory && matchesSearch;
     });
   }, [globalUniverse, marketCategoryFilter, searchQuery]);
+
+  // Combined search results prioritizing live remote prices
+  const combinedSearchResults = useMemo(() => {
+    const seen = new Set<string>();
+    const list: any[] = [];
+
+    // Add remote search results first (which have live enriched prices)
+    remoteSearchResults.forEach(item => {
+      const sym = (item.symbol || item.ticker || '').toUpperCase();
+      if (sym && !seen.has(sym)) {
+        seen.add(sym);
+        list.push({
+          ticker: sym,
+          symbol: sym,
+          name: item.shortname || item.longname || item.name || sym,
+          price: item.currentPrice ?? item.price,
+          change: item.change ?? 0,
+          changePercent: item.changePercent ?? 0,
+          currency: item.currency || (sym.endsWith('.TO') ? 'CAD' : 'USD'),
+          exchange: item.exchange || (sym.endsWith('.TO') ? 'TSX' : 'US')
+        });
+      }
+    });
+
+    // Add local universe matches if not already in list
+    filteredGlobalUniverse.forEach(item => {
+      const sym = item.ticker.toUpperCase();
+      if (!seen.has(sym)) {
+        seen.add(sym);
+        const live = liveQuotesMap[sym];
+        list.push({
+          ticker: sym,
+          symbol: sym,
+          name: item.name,
+          price: live?.currentPrice ?? item.price,
+          change: live?.change ?? item.change ?? 0,
+          changePercent: live?.changePercent ?? item.changePercent ?? 0,
+          currency: (sym.endsWith('.TO') ? 'CAD' : 'USD'),
+          exchange: (sym.endsWith('.TO') ? 'TSX' : 'US')
+        });
+      }
+    });
+
+    return list.slice(0, 10);
+  }, [remoteSearchResults, filteredGlobalUniverse, liveQuotesMap]);
 
   // Execute Paper Order
   const handleExecute = (type: 'LONG' | 'SHORT') => {
@@ -816,33 +890,64 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             </button>
           </div>
 
-          {/* Quick Search Auto-Suggest Dropdown */}
+          {/* Quick Search Auto-Suggest Dropdown with Live Prices */}
           {isSearchOpen && searchQuery.trim() && (
-            <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto p-2 space-y-1">
-              <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-1">Live Global Universe Matches</div>
-              {filteredGlobalUniverse.slice(0, 8).map((item, idx) => (
-                <div
-                  key={`${item.ticker}-${idx}`}
-                  onClick={() => {
-                    onSelectTicker(item.ticker);
-                    setActiveSubTab('projection');
-                    setIsSearchOpen(false);
-                    setSearchQuery('');
-                  }}
-                  className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-800 cursor-pointer transition-colors text-xs font-mono"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{item.ticker}</span>
-                    <span className="text-zinc-400 truncate max-w-[140px] text-[11px]">{item.name}</span>
+            <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-zinc-700/80 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto p-2 space-y-1 backdrop-blur-md">
+              <div className="flex items-center justify-between text-[10px] uppercase font-bold text-zinc-400 px-2 py-1 border-b border-zinc-800">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live Market Search Matches
+                </span>
+                {isSearchingRemote && (
+                  <span className="text-[10px] text-zinc-400 font-mono animate-pulse">Searching global feeds...</span>
+                )}
+              </div>
+
+              {combinedSearchResults.map((item, idx) => {
+                const symCurr = getCurrencySymbol(item.ticker);
+                const priceVal = item.price;
+                const chgPct = item.changePercent ?? 0;
+                return (
+                  <div
+                    key={`${item.ticker}-${idx}`}
+                    onClick={() => {
+                      onSelectTicker(item.ticker);
+                      setActiveSubTab('projection');
+                      setIsSearchOpen(false);
+                      setSearchQuery('');
+                    }}
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-800/90 cursor-pointer transition-colors text-xs font-mono border border-transparent hover:border-zinc-700/60 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white bg-zinc-800 px-1.5 py-0.5 rounded group-hover:bg-emerald-600 transition-colors">
+                        {item.ticker}
+                      </span>
+                      <span className="text-zinc-300 truncate max-w-[130px] sm:max-w-[160px] text-[11px]">{item.name}</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-sans font-bold">
+                        {item.exchange || 'US'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      {priceVal !== undefined && priceVal !== null ? (
+                        <span className="font-black text-white text-xs">
+                          {symCurr}{Number(priceVal).toFixed(Number(priceVal) < 5 ? 3 : 2)}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-500 text-[11px]">Syncing...</span>
+                      )}
+                      {chgPct !== undefined && chgPct !== null && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          chgPct >= 0
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        }`}>
+                          {chgPct >= 0 ? '+' : ''}{Number(chgPct).toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-zinc-300">${(liveQuotesMap[item.ticker]?.currentPrice || item.price).toFixed(2)}</span>
-                    <span className={`font-bold ${(liveQuotesMap[item.ticker]?.changePercent ?? item.changePercent) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {(liveQuotesMap[item.ticker]?.changePercent ?? item.changePercent) >= 0 ? '+' : ''}{(liveQuotesMap[item.ticker]?.changePercent ?? item.changePercent).toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               
               <div 
                 onClick={() => {

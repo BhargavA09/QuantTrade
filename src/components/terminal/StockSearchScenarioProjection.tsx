@@ -21,7 +21,8 @@ import {
   Lock,
   ArrowUpRight,
   ArrowDownRight,
-  Compass
+  Compass,
+  RotateCw
 } from 'lucide-react';
 import { 
   fetchStockProjectionIntelligence, 
@@ -49,8 +50,23 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
   initialTicker = 'NVDA',
   onSelectTicker
 }) => {
-  const [searchInput, setSearchInput] = useState(initialTicker);
-  const [activeTicker, setActiveTicker] = useState(initialTicker);
+  const getSavedTicker = (): string => {
+    try {
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlTicker = urlParams.get('ticker') || urlParams.get('symbol');
+        if (urlTicker && urlTicker.trim()) return urlTicker.trim().toUpperCase();
+
+        const saved = localStorage.getItem('quant_terminal_active_ticker');
+        if (saved && saved.trim()) return saved.trim().toUpperCase();
+      }
+    } catch {}
+    return initialTicker;
+  };
+
+  const startingTicker = getSavedTicker();
+  const [searchInput, setSearchInput] = useState(startingTicker);
+  const [activeTicker, setActiveTicker] = useState(startingTicker);
   const [activeRegion, setActiveRegion] = useState<string>('ALL');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -58,6 +74,14 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<StockProjectionIntelligence | null>(null);
   const [activeScenarioTab, setActiveScenarioTab] = useState<'baseCase' | 'bullCase' | 'bearCase'>('baseCase');
+  const [lastRefreshedTime, setLastRefreshedTime] = useState<string>('Live Connected');
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('quant_recent_searches');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return ['NVDA', 'SHOP.TO', 'AAPL', 'PLUG', 'SNDL'];
+  });
 
   const getCurrencySymbol = (ticker: string): string => {
     if (ticker.endsWith('.TO') || ticker.endsWith('.V')) return 'C$';
@@ -80,6 +104,23 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
       const result = await fetchStockProjectionIntelligence(clean);
       setData(result);
       setActiveTicker(clean);
+      setSearchInput(clean);
+      setLastRefreshedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+      try {
+        localStorage.setItem('quant_terminal_active_ticker', clean);
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.set('ticker', clean);
+          window.history.replaceState({}, '', url.toString());
+        }
+        setRecentSearches(prev => {
+          const updated = [clean, ...prev.filter(t => t !== clean)].slice(0, 8);
+          localStorage.setItem('quant_recent_searches', JSON.stringify(updated));
+          return updated;
+        });
+      } catch {}
+
       if (onSelectTicker) {
         onSelectTicker(clean);
       }
@@ -91,10 +132,10 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
     }
   };
 
-  // Auto-search any ticker across global exchanges via /api/stock/search
+  // Auto-search any ticker across global exchanges via /api/stock/search with live prices
   const handleInputChange = async (val: string) => {
     setSearchInput(val);
-    if (!val || val.trim().length < 2) {
+    if (!val || val.trim().length < 1) {
       setSearchResults([]);
       return;
     }
@@ -103,8 +144,9 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
       const res = await fetch(`/api/stock/search?q=${encodeURIComponent(val.trim())}`);
       if (res.ok) {
         const json = await res.json();
-        if (json.quotes && Array.isArray(json.quotes)) {
-          setSearchResults(json.quotes.slice(0, 8));
+        const quotes = json.quotes || json.results || [];
+        if (Array.isArray(quotes)) {
+          setSearchResults(quotes.slice(0, 10));
         }
       }
     } catch {
@@ -115,7 +157,8 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
   };
 
   useEffect(() => {
-    loadTickerProjection(initialTicker);
+    const target = initialTicker || getSavedTicker();
+    loadTickerProjection(target);
   }, [initialTicker]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
@@ -182,27 +225,88 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
               </button>
             </form>
 
-            {/* Auto-suggest dropdown across all global markets */}
+            {/* Auto-suggest dropdown across all global markets with LIVE SPOT PRICES */}
             {searchResults.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 p-2 space-y-1">
-                <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-1">Global Exchange Matches</div>
-                {searchResults.map((q, idx) => (
-                  <div
-                    key={`${q.symbol}-${idx}`}
-                    onClick={() => {
-                      setSearchInput(q.symbol);
-                      loadTickerProjection(q.symbol);
-                    }}
-                    className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-800 cursor-pointer text-xs font-mono"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white">{q.symbol}</span>
-                      <span className="text-zinc-400 truncate max-w-[150px] text-[11px]">{q.shortname || q.longname}</span>
+              <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-zinc-700/80 rounded-xl shadow-2xl z-50 p-2 space-y-1 backdrop-blur-md max-h-80 overflow-y-auto">
+                <div className="flex items-center justify-between text-[10px] uppercase font-bold text-zinc-400 px-2 py-1 border-b border-zinc-800">
+                  <span>Global Exchange Matches</span>
+                  <span className="text-emerald-400 font-mono flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live Streaming Prices
+                  </span>
+                </div>
+                {searchResults.map((q, idx) => {
+                  const sym = q.symbol || q.ticker;
+                  const symCurr = getCurrencySymbol(sym);
+                  const priceVal = q.currentPrice ?? q.price;
+                  const chgPct = q.changePercent ?? 0;
+                  return (
+                    <div
+                      key={`${sym}-${idx}`}
+                      onClick={() => {
+                        setSearchInput(sym);
+                        loadTickerProjection(sym);
+                      }}
+                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-zinc-800/90 cursor-pointer text-xs font-mono transition-colors border border-transparent hover:border-zinc-700/80 group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white bg-zinc-800 px-1.5 py-0.5 rounded group-hover:bg-emerald-600 transition-colors">
+                          {sym}
+                        </span>
+                        <span className="text-zinc-300 truncate max-w-[130px] sm:max-w-[160px] text-[11px]">
+                          {q.shortname || q.longname || q.name}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-sans font-bold">
+                          {q.exchange || 'EXCHANGE'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {priceVal !== undefined && priceVal !== null ? (
+                          <span className="font-black text-white text-xs">
+                            {symCurr}{Number(priceVal).toFixed(Number(priceVal) < 5 ? 3 : 2)}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-500 text-[11px]">Syncing...</span>
+                        )}
+                        {chgPct !== undefined && chgPct !== null && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            chgPct >= 0
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          }`}>
+                            {chgPct >= 0 ? '+' : ''}{Number(chgPct).toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-sans">
-                      {q.exchange || 'EXCHANGE'}
-                    </span>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Recently Searched Equities with Real-Time Quick Access */}
+            {recentSearches.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px] font-mono">
+                <span className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-zinc-500" />
+                  Recent:
+                </span>
+                {recentSearches.map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      setSearchInput(t);
+                      loadTickerProjection(t);
+                    }}
+                    className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono transition-all ${
+                      activeTicker === t
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold'
+                        : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                    }`}
+                  >
+                    {t}
+                  </button>
                 ))}
               </div>
             )}
@@ -270,10 +374,26 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
           
           {/* 2. Top Metric Snapshot for Searched Stock */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-1">
-              <span className="text-[10px] text-zinc-500 uppercase font-bold block">Live Quote ({data.ticker})</span>
-              <div className="text-2xl font-black text-white font-mono">
-                {currSym}{data.currentPrice.toFixed(data.currentPrice < 5 ? 3 : 2)}
+            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-1 relative group">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live Quote ({data.ticker})
+                </span>
+                <button
+                  onClick={() => loadTickerProjection(data.ticker)}
+                  disabled={loading}
+                  title="Refresh Live Price for Searched Stock"
+                  className="text-zinc-400 hover:text-emerald-400 transition-colors p-1 rounded hover:bg-zinc-800"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+                </button>
+              </div>
+              <div className="text-2xl font-black text-white font-mono flex items-baseline gap-1.5">
+                <span>{currSym}{data.currentPrice.toFixed(data.currentPrice < 5 ? 3 : 2)}</span>
+                <span className="text-[10px] text-zinc-500 font-sans font-normal">
+                  {lastRefreshedTime}
+                </span>
               </div>
               <span className="text-[10px] text-zinc-400 truncate block">{data.companyName}</span>
             </div>

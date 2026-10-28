@@ -26,11 +26,44 @@ import { OfflineConnectivityBanner } from './components/OfflineConnectivityBanne
 import { quantTraderBrain, TraderBrainState } from './services/QuantTraderBrain';
 import { continuousLearningService } from './services/continuousLearningService';
 
+const getInitialTicker = (): string => {
+  try {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTicker = urlParams.get('ticker') || urlParams.get('symbol');
+      if (urlTicker && urlTicker.trim()) {
+        return urlTicker.trim().toUpperCase();
+      }
+      const saved = localStorage.getItem('quant_terminal_active_ticker');
+      if (saved && saved.trim()) {
+        return saved.trim().toUpperCase();
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return 'NVDA';
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'terminal' | 'brain' | 'news' | 'journal'>('terminal');
-  const [selectedTicker, setSelectedTicker] = useState<string>('NVDA');
+  const [selectedTicker, setSelectedTicker] = useState<string>(getInitialTicker);
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   const [isGlobalTearSheetOpen, setIsGlobalTearSheetOpen] = useState<boolean>(false);
+
+  const handleSelectTicker = (ticker: string) => {
+    const clean = ticker.trim().toUpperCase();
+    if (!clean) return;
+    setSelectedTicker(clean);
+    try {
+      localStorage.setItem('quant_terminal_active_ticker', clean);
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('ticker', clean);
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     return quantTraderBrain.subscribe(setBrainState);
@@ -167,7 +200,7 @@ export default function App() {
         {activeTab === 'terminal' && (
           <TradingTerminalView
             selectedTicker={selectedTicker}
-            onSelectTicker={setSelectedTicker}
+            onSelectTicker={handleSelectTicker}
             onNavigateToBrain={() => setActiveTab('brain')}
           />
         )}
@@ -175,7 +208,7 @@ export default function App() {
         {activeTab === 'brain' && (
           <TraderBrainView
             selectedTicker={selectedTicker}
-            onSelectTicker={setSelectedTicker}
+            onSelectTicker={handleSelectTicker}
             onNavigateToTerminal={() => setActiveTab('terminal')}
             onNavigateToNews={() => setActiveTab('news')}
           />
@@ -184,7 +217,7 @@ export default function App() {
         {activeTab === 'news' && (
           <NewsCatalystView
             onSelectTicker={(ticker) => {
-              setSelectedTicker(ticker);
+              handleSelectTicker(ticker);
               setActiveTab('terminal');
             }}
           />
@@ -193,7 +226,7 @@ export default function App() {
         {activeTab === 'journal' && (
           <TradeJournalView
             onSelectTicker={(ticker) => {
-              setSelectedTicker(ticker);
+              handleSelectTicker(ticker);
               setActiveTab('terminal');
             }}
           />
