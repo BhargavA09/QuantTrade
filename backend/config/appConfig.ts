@@ -11,13 +11,17 @@ export const corsConfig: CorsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 };
 
-// Rate limiter for general public API endpoints
+// Rate limiter for general public API endpoints with generous capacity for real-time quant streaming
 export const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 2000,
+  max: 100000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many requests from this IP, please try again after 60 seconds." }
+  skip: (req) => {
+    const ip = req.ip || req.socket.remoteAddress || "";
+    return ip.includes("127.0.0.1") || ip.includes("::1") || ip === "localhost";
+  },
+  message: { error: "Too many requests, please try again shortly." }
 });
 
 // Stricter rate limiter for expensive AI endpoints

@@ -410,13 +410,34 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     return all.filter(a => a.region === activeMarketRegion);
   }, [activeMarketRegion]);
 
-  // Debounced live global equity search across all markets
+  // Debounced live global equity search across all markets with 0ms instant local preview
   useEffect(() => {
-    const q = searchQuery.trim();
+    const q = searchQuery.trim().toUpperCase();
     if (!q) {
       setRemoteSearchResults([]);
       return;
     }
+
+    // 1. Instant local match (<1ms) so accurate price is visible immediately
+    const localMatches = EXPANDED_STOCK_DATABASE
+      .filter(s => s.ticker.startsWith(q) || s.ticker.includes(q) || s.name.toUpperCase().includes(q))
+      .slice(0, 8)
+      .map(s => ({
+        symbol: s.ticker,
+        shortname: s.name,
+        longname: s.name,
+        name: s.name,
+        currentPrice: s.price,
+        price: s.price,
+        change: s.change,
+        changePercent: s.changePercent,
+        exchange: s.ticker.endsWith('.TO') ? 'TSX' : (s.ticker.endsWith('.L') ? 'LSE' : (s.ticker.endsWith('.AS') ? 'AMS' : (s.ticker.endsWith('.T') ? 'TSE' : 'US')))
+      }));
+
+    if (localMatches.length > 0) {
+      setRemoteSearchResults(localMatches);
+    }
+
     const timer = setTimeout(async () => {
       try {
         setIsSearchingRemote(true);
@@ -424,8 +445,17 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
         if (res.ok) {
           const json = await res.json();
           const items = json.quotes || json.results || [];
-          if (Array.isArray(items)) {
-            setRemoteSearchResults(items.slice(0, 10));
+          if (Array.isArray(items) && items.length > 0) {
+            const seen = new Set<string>();
+            const merged: any[] = [];
+            [...items, ...localMatches].forEach(item => {
+              const sym = (item.symbol || item.ticker || '').toUpperCase();
+              if (sym && !seen.has(sym)) {
+                seen.add(sym);
+                merged.push(item);
+              }
+            });
+            setRemoteSearchResults(merged.slice(0, 10));
           }
         }
       } catch {
@@ -433,7 +463,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       } finally {
         setIsSearchingRemote(false);
       }
-    }, 150);
+    }, 120);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 

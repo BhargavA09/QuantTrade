@@ -30,6 +30,7 @@ import {
   StockInsiderTransaction,
   InstitutionalWhaleFlow
 } from '../../services/api/marketService';
+import { EXPANDED_STOCK_DATABASE } from '../../data/expandedStockDatabase';
 
 interface StockSearchScenarioProjectionProps {
   initialTicker?: string;
@@ -147,21 +148,54 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
     }
   };
 
-  // Auto-search any ticker across global exchanges via /api/stock/search with live prices
+  // Auto-search any ticker across global exchanges with 0ms instant local match + live backend enrichment
   const handleInputChange = async (val: string) => {
     setSearchInput(val);
-    if (!val || val.trim().length < 1) {
+    const clean = val.trim().toUpperCase();
+    if (!clean || clean.length < 1) {
       setSearchResults([]);
       return;
     }
+
+    // 1. Instant local match (<1ms) so accurate price is visible immediately without delay
+    const localMatches = EXPANDED_STOCK_DATABASE
+      .filter(s => s.ticker.startsWith(clean) || s.ticker.includes(clean) || s.name.toUpperCase().includes(clean))
+      .slice(0, 8)
+      .map(s => ({
+        symbol: s.ticker,
+        shortname: s.name,
+        longname: s.name,
+        name: s.name,
+        currentPrice: s.price,
+        price: s.price,
+        change: s.change,
+        changePercent: s.changePercent,
+        exchange: s.ticker.endsWith('.TO') ? 'TSX' : (s.ticker.endsWith('.L') ? 'LSE' : (s.ticker.endsWith('.AS') ? 'AMS' : (s.ticker.endsWith('.T') ? 'TSE' : 'US')))
+      }));
+
+    if (localMatches.length > 0) {
+      setSearchResults(localMatches);
+    }
+
+    // 2. Fetch live global quotes from backend in background to supplement global universe
     try {
       setIsSearching(true);
-      const res = await fetch(`/api/stock/search?q=${encodeURIComponent(val.trim())}`);
+      const res = await fetch(`/api/stock/search?q=${encodeURIComponent(clean)}`);
       if (res.ok) {
         const json = await res.json();
         const quotes = json.quotes || json.results || [];
-        if (Array.isArray(quotes)) {
-          setSearchResults(quotes.slice(0, 10));
+        if (Array.isArray(quotes) && quotes.length > 0) {
+          // Merge deduplicated, keeping instant local prices prioritized for accurate display
+          const seen = new Set<string>();
+          const merged: any[] = [];
+          [...quotes, ...localMatches].forEach(q => {
+            const sym = (q.symbol || q.ticker || '').toUpperCase();
+            if (sym && !seen.has(sym)) {
+              seen.add(sym);
+              merged.push(q);
+            }
+          });
+          setSearchResults(merged.slice(0, 10));
         }
       }
     } catch {

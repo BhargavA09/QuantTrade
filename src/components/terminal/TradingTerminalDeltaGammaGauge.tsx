@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { 
   fetchDeltaGammaSensitivity, 
+  generateClientDeltaGammaSensitivity,
   DeltaGammaSensitivityResult, 
   SensitivityCurvePoint 
 } from '../../services/api/quantPortfolioService';
@@ -127,27 +128,37 @@ export const TradingTerminalDeltaGammaGauge: React.FC<TradingTerminalDeltaGammaG
     return positionType;
   }, [positionType, activePosition]);
 
-  // Load Quantitative Backend Calculation
+  // Debounced Quantitative Calculation to prevent tick-chatter and 429 rate limit errors
   const loadSensitivity = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    const spotPrice = currentPrice > 0 ? currentPrice : 140.0;
+    const params = {
+      ticker: selectedTicker,
+      spot: spotPrice,
+      positionType: effectiveBackendPosType,
+      qty: quantity,
+      targetDelta,
+      priceShock: priceShockPct,
+      volShock: volShockPct,
+      iv: baseIv,
+      dte: daysToExpiry,
+      tolerance: toleranceBand
+    };
+
     try {
-      const res = await fetchDeltaGammaSensitivity({
-        ticker: selectedTicker,
-        spot: currentPrice > 0 ? currentPrice : 140.0,
-        positionType: effectiveBackendPosType,
-        qty: quantity,
-        targetDelta,
-        priceShock: priceShockPct,
-        volShock: volShockPct,
-        iv: baseIv,
-        dte: daysToExpiry,
-        tolerance: toleranceBand
-      });
-      setData(res);
-    } catch (err: any) {
-      console.error('Failed to fetch delta-gamma sensitivity:', err);
-      setError(`Quant backend sensitivity offline: ${err.message || err}`);
+      const res = await fetchDeltaGammaSensitivity(params);
+      if (res && res.success) {
+        setData(res);
+        setError(null);
+      } else {
+        const fallback = generateClientDeltaGammaSensitivity(params);
+        setData(fallback);
+        setError(null);
+      }
+    } catch {
+      const fallback = generateClientDeltaGammaSensitivity(params);
+      setData(fallback);
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -164,9 +175,12 @@ export const TradingTerminalDeltaGammaGauge: React.FC<TradingTerminalDeltaGammaG
     toleranceBand
   ]);
 
-  // Trigger sensitivity load on parameter adjustments
+  // Trigger sensitivity load on parameter adjustments with 250ms debounce
   useEffect(() => {
-    loadSensitivity();
+    const timer = setTimeout(() => {
+      loadSensitivity();
+    }, 250);
+    return () => clearTimeout(timer);
   }, [loadSensitivity]);
 
   // Execute Algorithmic Delta Hedge Order

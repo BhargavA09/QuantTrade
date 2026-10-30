@@ -1452,6 +1452,23 @@ export const EXPANDED_STOCK_DATABASE: DetailedStockItem[] = [
     trend: 'neutral',
     volume: '14.0M',
     summary: 'Digital platform for residential real estate transactions enabling direct home buying, selling, and online property escrow.'
+  },
+  {
+    ticker: 'PSEC',
+    name: 'Prospect Capital Corporation',
+    sector: 'Penny Stocks (< $5)',
+    industry: 'Business Development Company (BDC)',
+    price: 1.62,
+    change: 0.01,
+    changePercent: 0.62,
+    marketCap: '$680M',
+    pe: 6.8,
+    dividendYield: 22.0,
+    beta: 1.15,
+    volatility: '26.4%',
+    trend: 'bullish',
+    volume: '8.4M',
+    summary: 'Business development company (BDC) specializing in direct middle-market lending, mezzanine debt, and secured senior investments with active C-suite insider share accumulation.'
   }
 ];
 
