@@ -842,11 +842,14 @@ REAL_INSIDER_CACHE = {
     "timestamp": {}
 }
 
+SEC_CIK_CACHE = {}
+
 def fetch_real_sec_form4_insiders(ticker: str) -> list:
     """
-    Fetches 100% authentic, accurate SEC Form 4 insider transactions from official SEC disclosures.
-    Returns real officers, exact transaction dates, real buy/sell types, real share counts,
-    real transaction prices, total dollar values, total shares owned, and direct SEC EDGAR filing URLs.
+    Fetches 100% authentic, verified SEC Form 4 insider transactions directly from the official
+    U.S. Securities and Exchange Commission (SEC) EDGAR database.
+    If no official Form 4 disclosures are filed for this specific ticker, returns an empty list
+    without fabricating or synthesizing any data.
     """
     clean = ticker.strip().upper()
     search_sym = clean.split(".")[0] if "." in clean else clean
@@ -855,163 +858,169 @@ def fetch_real_sec_form4_insiders(ticker: str) -> list:
     if clean in REAL_INSIDER_CACHE["data"] and (now - REAL_INSIDER_CACHE["timestamp"].get(clean, 0)) < 600:
         return REAL_INSIDER_CACHE["data"][clean]
 
-    # Source 1: Finviz Real-Time Official SEC Form 4 Table
-    url = f"https://finviz.com/quote.ashx?t={search_sym}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    # Non-equity assets (Indices, Futures, Commodities, Cryptos) do not file SEC Form 4s
+    if any(ch in clean for ch in ["=", "-", "^"]) or clean in ["GLD", "SLV", "USO", "BTC-USD", "ETH-USD"]:
+        REAL_INSIDER_CACHE["data"][clean] = []
+        REAL_INSIDER_CACHE["timestamp"][clean] = now
+        return []
+
+    sec_headers = {
+        "User-Agent": "QuantTradeResearch compliance@quanttrade.io",
+        "Accept-Encoding": "gzip, deflate",
+        "Host": "data.sec.gov"
     }
+    sec_base_headers = {
+        "User-Agent": "QuantTradeResearch compliance@quanttrade.io",
+        "Accept-Encoding": "gzip, deflate"
+    }
+
     txs = []
     try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=4.5) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
-            table = re.search(r"<table[^>]*body-table[^>]*>(.*?)</table>", html, re.DOTALL)
-            if table:
-                trs = re.findall(r"<tr[^>]*>(.*?)</tr>", table.group(1), re.DOTALL)
-                for tr in trs[1:]:
-                    tds = re.findall(r"<td[^>]*>(.*?)</td>", tr, re.DOTALL)
-                    if len(tds) >= 8:
-                        cols = [re.sub(r"<[^>]+>", "", c).strip() for c in tds]
-                        sec_link_m = re.search(r'href=\"([^\"]*sec\.gov[^\"]*)\"', tds[-1]) or re.search(r'href=\"([^\"]*)\"', tds[-1])
-                        sec_link = sec_link_m.group(1) if sec_link_m else ""
-                        if sec_link and not sec_link.startswith("http"):
-                            sec_link = "https://www.sec.gov" + (sec_link if sec_link.startswith("/") else "/" + sec_link)
+        # Step 1: Resolve authentic SEC Central Index Key (CIK)
+        global SEC_CIK_CACHE
+        cik_str = SEC_CIK_CACHE.get(search_sym)
+        company_title = search_sym
 
-                        raw_type = cols[3].strip()
-                        is_buy = "buy" in raw_type.lower() or "purchase" in raw_type.lower()
-                        try:
-                            price_val = float(cols[4].replace(",", ""))
-                        except Exception:
-                            price_val = 0.0
-                        try:
-                            shares_val = int(cols[5].replace(",", ""))
-                        except Exception:
-                            shares_val = 0
-                        try:
-                            total_val = float(cols[6].replace(",", ""))
-                        except Exception:
-                            total_val = round(price_val * shares_val, 2)
-                        try:
-                            owned_val = int(cols[7].replace(",", ""))
-                        except Exception:
-                            owned_val = 0
-
-                        if is_buy:
-                            tx_type_label = "Open Market Purchase (Code P)"
-                        elif "opt" in raw_type.lower():
-                            tx_type_label = "Option Exercise (Code M)"
-                        elif "gift" in raw_type.lower():
-                            tx_type_label = "Bona Fide Gift (Code G)"
-                        else:
-                            tx_type_label = "Open Market Sale (Code S)"
-
-                        txs.append({
-                            "id": f"SEC-{clean}-{len(txs)+1}",
-                            "insiderName": cols[0],
-                            "title": cols[1],
-                            "transactionDate": cols[2],
-                            "type": tx_type_label,
-                            "isBuy": is_buy,
-                            "shares": shares_val,
-                            "price": price_val,
-                            "totalValue": total_val,
-                            "sharesOwnedFollowing": owned_val,
-                            "secFilingDate": cols[8] if len(cols) > 8 else "",
-                            "secLink": sec_link
-                        })
-    except Exception:
-        pass
-
-    # Source 2: Official SEC EDGAR Submissions API fallback
-    if not txs:
-        try:
-            sec_headers = {"User-Agent": "QuantTradeResearch contact@quanttrade.io"}
-            map_req = urllib.request.Request("https://www.sec.gov/files/company_tickers.json", headers=sec_headers)
-            with urllib.request.urlopen(map_req, timeout=3.5) as m_resp:
-                ticker_map = json.loads(m_resp.read().decode())
-                cik_str = None
-                company_title = None
+        if not cik_str:
+            map_req = urllib.request.Request("https://www.sec.gov/files/company_tickers.json", headers=sec_base_headers)
+            with urllib.request.urlopen(map_req, timeout=4.0) as m_resp:
+                import gzip
+                raw_bytes = m_resp.read()
+                if raw_bytes[:2] == b'\x1f\x8b':
+                    raw_data = gzip.decompress(raw_bytes).decode("utf-8")
+                else:
+                    raw_data = raw_bytes.decode("utf-8")
+                ticker_map = json.loads(raw_data)
                 for _, item in ticker_map.items():
-                    if item.get("ticker", "").upper() == search_sym:
-                        cik_str = str(item["cik_str"]).zfill(10)
-                        company_title = item.get("title", "")
-                        break
-                if cik_str:
-                    sub_req = urllib.request.Request(f"https://data.sec.gov/submissions/CIK{cik_str}.json", headers=sec_headers)
-                    with urllib.request.urlopen(sub_req, timeout=3.5) as s_resp:
-                        sub_data = json.loads(s_resp.read().decode())
-                        recent = sub_data.get("filings", {}).get("recent", {})
-                        forms = recent.get("form", [])
-                        f4_indices = [i for i, f in enumerate(forms) if f in ("4", "4/A")][:8]
-                        for idx in f4_indices:
-                            f_date = recent.get("filingDate", [])[idx]
-                            acc_num = recent.get("accessionNumber", [])[idx]
-                            doc_name = recent.get("primaryDocument", [])[idx]
-                            clean_acc = acc_num.replace("-", "")
-                            edgar_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik_str)}/{clean_acc}/{doc_name}"
-                            txs.append({
-                                "id": f"SEC-EDGAR-{clean}-{idx+1}",
-                                "insiderName": recent.get("reportDate", [])[idx] or company_title or f"{clean} Officer",
-                                "title": "SEC Form 4 Official EDGAR Disclosure",
-                                "transactionDate": f_date,
-                                "type": "Open Market Purchase (Code P)",
-                                "isBuy": True,
-                                "shares": 5000,
-                                "price": 0.0,
-                                "totalValue": 0.0,
-                                "sharesOwnedFollowing": 0,
-                                "secFilingDate": f_date,
-                                "secLink": edgar_url
-                            })
-        except Exception:
-            pass
+                    sym_key = str(item.get("ticker", "")).upper()
+                    if sym_key:
+                        SEC_CIK_CACHE[sym_key] = str(item["cik_str"]).zfill(10)
+                        if sym_key == search_sym:
+                            cik_str = str(item["cik_str"]).zfill(10)
+                            company_title = item.get("title", search_sym)
 
-    if not txs and clean == "PSEC":
-        txs = [
-            {
-                "id": "SEC-PSEC-1",
-                "insiderName": "Barry John F",
-                "title": "Chairman & Chief Executive Officer",
-                "transactionDate": "2026-09-04",
-                "type": "Open Market Purchase (Code P)",
-                "isBuy": True,
-                "shares": 121700,
-                "price": 1.62,
-                "totalValue": 197154.0,
-                "sharesOwnedFollowing": 71200000,
-                "secFilingDate": "2026-09-05",
-                "secLink": "https://www.sec.gov/edgar/browse/?CIK=0001287032"
-            },
-            {
-                "id": "SEC-PSEC-2",
-                "insiderName": "Eliasek M Grier",
-                "title": "President & Chief Operating Officer",
-                "transactionDate": "2026-08-18",
-                "type": "Open Market Purchase (Code P)",
-                "isBuy": True,
-                "shares": 25000,
-                "price": 1.62,
-                "totalValue": 40500.0,
-                "sharesOwnedFollowing": 1850000,
-                "secFilingDate": "2026-08-19",
-                "secLink": "https://www.sec.gov/edgar/browse/?CIK=0001287032"
-            },
-            {
-                "id": "SEC-PSEC-3",
-                "insiderName": "Van Dask Kristin",
-                "title": "Chief Financial Officer & CCO",
-                "transactionDate": "2026-07-25",
-                "type": "Open Market Purchase (Code P)",
-                "isBuy": True,
-                "shares": 10000,
-                "price": 1.62,
-                "totalValue": 16200.0,
-                "sharesOwnedFollowing": 420000,
-                "secFilingDate": "2026-07-26",
-                "secLink": "https://www.sec.gov/edgar/browse/?CIK=0001287032"
-            }
-        ]
+        # If ticker is not registered in SEC EDGAR (e.g. Foreign ADR / Non-SEC Filer)
+        if not cik_str:
+            REAL_INSIDER_CACHE["data"][clean] = []
+            REAL_INSIDER_CACHE["timestamp"][clean] = now
+            return []
+
+        # Step 2: Fetch official submissions feed from data.sec.gov
+        sub_req = urllib.request.Request(f"https://data.sec.gov/submissions/CIK{cik_str}.json", headers=sec_headers)
+        with urllib.request.urlopen(sub_req, timeout=4.0) as s_resp:
+            import gzip
+            raw_sub_bytes = s_resp.read()
+            if raw_sub_bytes[:2] == b'\x1f\x8b':
+                raw_sub = gzip.decompress(raw_sub_bytes).decode("utf-8")
+            else:
+                raw_sub = raw_sub_bytes.decode("utf-8")
+            sub_data = json.loads(raw_sub)
+
+        recent = sub_data.get("filings", {}).get("recent", {})
+        forms = recent.get("form", [])
+        f4_indices = [i for i, f in enumerate(forms) if f in ("4", "4/A")][:5]
+
+        # If no Form 4 filings exist in recent history
+        if not f4_indices:
+            REAL_INSIDER_CACHE["data"][clean] = []
+            REAL_INSIDER_CACHE["timestamp"][clean] = now
+            return []
+
+        cik_int = int(cik_str)
+        import xml.etree.ElementTree as ET
+
+        for idx in f4_indices:
+            acc_num = recent.get("accessionNumber", [])[idx]
+            clean_acc = acc_num.replace("-", "")
+            doc_name = recent.get("primaryDocument", [])[idx]
+            filing_date = recent.get("filingDate", [])[idx]
+
+            # Direct SEC URLs
+            xml_doc = doc_name.split("/")[-1]
+            xml_url = f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{clean_acc}/{xml_doc}"
+            html_url = f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{clean_acc}/{doc_name}"
+
+            try:
+                x_req = urllib.request.Request(xml_url, headers=sec_base_headers)
+                with urllib.request.urlopen(x_req, timeout=3.0) as xr:
+                    raw_xml = xr.read()
+                    if raw_xml[:2] == b'\x1f\x8b':
+                        import gzip
+                        xml_content = gzip.decompress(raw_xml).decode("utf-8", errors="ignore")
+                    else:
+                        xml_content = raw_xml.decode("utf-8", errors="ignore")
+
+                    root = ET.fromstring(xml_content)
+
+                    # Extract verified reporting owner name
+                    owner_name = (
+                        root.findtext(".//rptOwnerName") or 
+                        root.findtext(".//reportingOwnerName") or 
+                        root.findtext(".//signatureName") or 
+                        f"{clean} Executive"
+                    ).replace("/s/", "").strip()
+
+                    # Extract officer title or relationship
+                    title = root.findtext(".//officerTitle")
+                    if not title:
+                        is_10pct = root.findtext(".//isTenPercentOwner")
+                        is_dir = root.findtext(".//isDirector")
+                        if is_10pct in ("1", "true", "True"):
+                            title = "10% Beneficial Owner"
+                        elif is_dir in ("1", "true", "True"):
+                            title = "Director / Board Member"
+                        else:
+                            title = "Reporting Insider"
+
+                    # Parse non-derivative transactions (equities / common stock)
+                    for nnd in root.findall(".//nonDerivativeTransaction")[:3]:
+                        t_date = nnd.findtext(".//transactionDate/value") or filing_date
+                        t_code = nnd.findtext(".//transactionCoding/transactionCode") or "P"
+                        acquired = nnd.findtext(".//transactionAmounts/transactionAcquiredDisposedCode/value") or "A"
+                        shares_str = nnd.findtext(".//transactionAmounts/transactionShares/value") or "0"
+                        price_str = nnd.findtext(".//transactionAmounts/transactionPricePerShare/value") or "0"
+                        following_str = nnd.findtext(".//postTransactionAmounts/sharesOwnedFollowingTransaction/value") or "0"
+
+                        shares = int(float(shares_str)) if shares_str else 0
+                        price = float(price_str) if price_str else 0.0
+                        total_val = round(shares * price, 2)
+                        is_buy = (acquired == "A" and t_code in ("P", "M", "A"))
+
+                        if t_code == "P":
+                            type_label = "Open Market Purchase (Code P)"
+                        elif t_code == "M":
+                            type_label = "Option Exercise (Code M)"
+                        elif t_code == "A":
+                            type_label = "Grant / Award (Code A)"
+                        elif t_code == "G":
+                            type_label = "Bona Fide Gift (Code G)"
+                        else:
+                            type_label = "Open Market Sale (Code S)"
+
+                        if shares > 0:
+                            txs.append({
+                                "id": f"SEC-{clean}-{len(txs)+1}",
+                                "insiderName": owner_name,
+                                "title": title,
+                                "transactionDate": t_date,
+                                "type": type_label,
+                                "isBuy": is_buy,
+                                "shares": shares,
+                                "price": price,
+                                "totalValue": total_val,
+                                "sharesOwnedFollowing": int(float(following_str)) if following_str else 0,
+                                "secFilingDate": filing_date,
+                                "secLink": html_url
+                            })
+            except Exception:
+                continue
+
+    except Exception as e:
+        # On connection failure or API block, return empty list - do not fabricate data
+        txs = []
+
+    # Sort verified transactions by transaction date descending
+    txs.sort(key=lambda x: str(x.get("transactionDate", "")), reverse=True)
 
     REAL_INSIDER_CACHE["data"][clean] = txs
     REAL_INSIDER_CACHE["timestamp"][clean] = now
@@ -1071,14 +1080,15 @@ def generate_stock_insider_intelligence(ticker: str) -> dict:
             "clusterBuyingDetected": net_score > 20,
             "darkPoolSentiment": "ACCUMULATION_BLOCKS" if net_score >= 0 else "DISTRIBUTION_BLOCKS",
             "transactions": real_txs,
+            "hasOfficialFilings": True,
             "institutionalWhales": whales,
             "isOfficialSecData": True,
             "source": "Official SEC EDGAR Form 4 Disclosures"
         }
     else:
-        # If no SEC Form 4 filings exist (e.g. Commodity, Crypto, Foreign Non-Filer)
-        is_crypto_or_commodity = ("=" in clean or "-USD" in clean or clean in ["GLD", "SLV", "USO", "BTC-USD", "ETH-USD"])
-        disclaimer_text = "No SEC Form 4 Corporate Insider Disclosures Applicable (Commodity / Crypto / Index Asset)" if is_crypto_or_commodity else f"No recent SEC Form 4 insider transactions filed in the last 12 months for {clean}."
+        # If no SEC Form 4 filings exist (e.g. Commodity, Crypto, Foreign Non-Filer, or no recent trades)
+        is_crypto_or_commodity = any(ch in clean for ch in ["=", "-", "^"]) or clean in ["GLD", "SLV", "USO", "BTC-USD", "ETH-USD"]
+        disclaimer_text = f"No SEC Form 4 Corporate Insider Disclosures Applicable (Commodity / Crypto / Index Asset: {clean})" if is_crypto_or_commodity else f"No official insider transaction disclosures filed at the moment for {clean}."
         
         return {
             "ticker": clean,
@@ -1092,9 +1102,8 @@ def generate_stock_insider_intelligence(ticker: str) -> dict:
             "clusterBuyingDetected": False,
             "darkPoolSentiment": "NEUTRAL_ORDER_FLOW",
             "transactions": [],
-            "institutionalWhales": [
-                {"fund": "Regulatory Record", "shares": "N/A", "pctHeld": "N/A", "action": disclaimer_text}
-            ],
+            "hasOfficialFilings": False,
+            "institutionalWhales": [],
             "isOfficialSecData": True,
             "source": "Official SEC EDGAR",
             "disclaimer": disclaimer_text

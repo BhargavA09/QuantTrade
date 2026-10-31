@@ -84,6 +84,72 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
     return ['NVDA', 'SHOP.TO', 'AAPL', 'PLUG', 'SNDL'];
   });
 
+  // Real-Time Market Noise & News Radar State
+  const [newsFilter, setNewsFilter] = useState<'all' | 'catalyst' | 'noise' | 'analyst'>('all');
+  const [isAutoScanningNoise, setIsAutoScanningNoise] = useState<boolean>(true);
+  const [noiseScanTick, setNoiseScanTick] = useState<number>(0);
+  const [isRefreshingNews, setIsRefreshingNews] = useState<boolean>(false);
+  const [lastNoiseScanTime, setLastNoiseScanTime] = useState<string>('Live Streaming');
+
+  const refreshMarketNoise = async (ticker: string) => {
+    if (!ticker) return;
+    try {
+      setIsRefreshingNews(true);
+      const res = await fetch(`/api/news?ticker=${encodeURIComponent(ticker)}`);
+      if (res.ok) {
+        const json = await res.json();
+        const incomingEvents = json.events || [];
+        if (incomingEvents.length > 0) {
+          setData(prev => {
+            if (!prev) return prev;
+            const existing = prev.newsEvents || [];
+            const seen = new Set(existing.map(e => e.title.toLowerCase().trim()));
+            const newItems = incomingEvents.filter((e: any) => !seen.has(e.title.toLowerCase().trim()));
+            return {
+              ...prev,
+              newsCount: existing.length + newItems.length,
+              newsEvents: [...newItems, ...existing].slice(0, 15)
+            };
+          });
+        }
+        setLastNoiseScanTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (err) {
+      console.warn('Continuous noise scanning poll error:', err);
+    } finally {
+      setIsRefreshingNews(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAutoScanningNoise) return;
+    const interval = setInterval(() => {
+      setNoiseScanTick(t => t + 1);
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [isAutoScanningNoise]);
+
+  useEffect(() => {
+    if (noiseScanTick > 0 && activeTicker) {
+      refreshMarketNoise(activeTicker);
+    }
+  }, [noiseScanTick, activeTicker]);
+
+  const formatTxDate = (dStr: string): string => {
+    if (!dStr) return '-';
+    const cleanStr = dStr.replace(/'/g, '').trim();
+    if (cleanStr.includes('-')) {
+      const parts = cleanStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(cleanStr);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        }
+      }
+    }
+    return cleanStr;
+  };
+
   const getCurrencySymbol = (ticker: string): string => {
     if (ticker.endsWith('.TO') || ticker.endsWith('.V')) return 'C$';
     if (ticker.endsWith('.L')) return '£';
@@ -678,209 +744,346 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
           </div>
 
           {/* 4. Inside Information & SEC Form 4 Intelligence (Real C-Suite Trades & Whale Flows) */}
-          {insider && (
-            <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4 shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-amber-400 shrink-0" />
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-bold text-white">
-                        SEC Form 4 Inside Information & Executive Order Flow
-                      </h3>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        OFFICIAL SEC EDGAR DISCLOSURES
-                      </span>
+          {insider && (() => {
+            const hasTransactions = Boolean(insider.transactions && insider.transactions.length > 0);
+            return (
+              <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-white">
+                          SEC Form 4 Inside Information & Executive Order Flow
+                        </h3>
+                        {hasTransactions ? (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            OFFICIAL SEC EDGAR DISCLOSURES
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 font-bold flex items-center gap-1">
+                            <Lock className="w-3 h-3 text-zinc-500" />
+                            NO ACTIVE DISCLOSURES AT THE MOMENT
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-400">
+                        Disclosures from corporate officers, directors, and 10% beneficial owners for {data.ticker}
+                      </p>
                     </div>
-                    <p className="text-xs text-zinc-400">
-                      Disclosures from corporate officers, directors, and 10% beneficial owners for {data.ticker}
-                    </p>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 sm:gap-3 font-mono text-xs flex-wrap">
-                  <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-500 text-[10px] block uppercase font-bold">C-Suite Net Buying Ratio</span>
-                    <span className="font-black text-emerald-400">{insider.netBuyingPercent}%</span>
-                  </div>
-                  <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-500 text-[10px] block uppercase font-bold">Net Cash Flow</span>
-                    <span className={`font-black ${insider.netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {formatCashFlow(insider.netCashFlow)}
-                    </span>
-                  </div>
-                  {insider.totalBoughtCash > 0 && (
-                    <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800 hidden md:block">
-                      <span className="text-zinc-500 text-[10px] block uppercase font-bold">Total Bought</span>
-                      <span className="font-black text-emerald-400">
-                        {formatCashFlow(insider.totalBoughtCash)}
-                      </span>
+                  {hasTransactions ? (
+                    <div className="flex items-center gap-2 sm:gap-3 font-mono text-xs flex-wrap">
+                      <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 text-[10px] block uppercase font-bold">C-Suite Net Buying Ratio</span>
+                        <span className="font-black text-emerald-400">{insider.netBuyingPercent}%</span>
+                      </div>
+                      <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 text-[10px] block uppercase font-bold">Net Cash Flow</span>
+                        <span className={`font-black ${insider.netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {formatCashFlow(insider.netCashFlow)}
+                        </span>
+                      </div>
+                      {insider.totalBoughtCash > 0 && (
+                        <div className="px-3 py-1 rounded-xl bg-zinc-950 border border-zinc-800 hidden md:block">
+                          <span className="text-zinc-500 text-[10px] block uppercase font-bold">Total Bought</span>
+                          <span className="font-black text-emerald-400">
+                            {formatCashFlow(insider.totalBoughtCash)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-400 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-zinc-500" />
+                      <span>Zero Form 4 Transactions Filed</span>
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Form 4 Transactions Table */}
-              {insider.transactions && insider.transactions.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead>
-                      <tr className="border-b border-zinc-800 text-[10px] text-zinc-500 uppercase">
-                        <th className="py-2 px-3">Insider & Title</th>
-                        <th className="py-2 px-3">Date</th>
-                        <th className="py-2 px-3">Transaction Type</th>
-                        <th className="py-2 px-3 text-right">Shares</th>
-                        <th className="py-2 px-3 text-right">Price</th>
-                        <th className="py-2 px-3 text-right">Total Value</th>
-                        <th className="py-2 px-3 text-right">Shares Remaining</th>
-                        <th className="py-2 px-3 text-center">SEC Filing</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800/60">
-                      {insider.transactions.map((tx, txIdx) => (
-                        <tr key={`${tx.id || 'tx'}-${txIdx}`} className="hover:bg-zinc-800/40 transition-colors">
-                          <td className="py-2.5 px-3">
-                            <div className="font-bold text-zinc-200">{tx.insiderName}</div>
-                            <div className="text-[10px] text-zinc-500 font-sans">{tx.title}</div>
-                          </td>
-                          <td className="py-2.5 px-3 text-zinc-400">{tx.transactionDate}</td>
-                          <td className="py-2.5 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              tx.isBuy 
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            }`}>
-                              {tx.type}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-zinc-300">
-                            {tx.shares.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-zinc-300">
-                            ${tx.price.toFixed(2)}
-                          </td>
-                          <td className={`py-2.5 px-3 text-right font-bold ${
-                            tx.isBuy ? 'text-emerald-400' : 'text-rose-400'
-                          }`}>
-                            {tx.isBuy ? '+' : '-'}${tx.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-zinc-400">
-                            {tx.sharesOwnedFollowing.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            {tx.secLink ? (
-                              <a
-                                href={tx.secLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 transition-all font-semibold"
-                                title="View official SEC EDGAR Form 4 filing XML/HTML"
-                              >
-                                SEC EDGAR
-                                <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
-                            ) : (
-                              <span className="text-[10px] text-zinc-500 font-sans">Official Form 4</span>
-                            )}
-                          </td>
+                {/* Form 4 Transactions Table or "No Information" Truthful Banner */}
+                {hasTransactions ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-zinc-800 text-[10px] text-zinc-500 uppercase">
+                          <th className="py-2 px-3">Insider & Title</th>
+                          <th className="py-2 px-3">Date</th>
+                          <th className="py-2 px-3">Transaction Type</th>
+                          <th className="py-2 px-3 text-right">Shares</th>
+                          <th className="py-2 px-3 text-right">Price</th>
+                          <th className="py-2 px-3 text-right">Total Value</th>
+                          <th className="py-2 px-3 text-right">Shares Remaining</th>
+                          <th className="py-2 px-3 text-center">SEC Filing</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-8 px-4 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-center space-y-2">
-                  <ShieldAlert className="w-8 h-8 text-zinc-500 mx-auto" />
-                  <div className="text-sm font-semibold text-zinc-300">
-                    No Recent SEC Form 4 Disclosures Filed for {data.ticker}
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60">
+                        {insider.transactions.map((tx, txIdx) => (
+                          <tr key={`${tx.id || 'tx'}-${txIdx}`} className="hover:bg-zinc-800/40 transition-colors">
+                            <td className="py-2.5 px-3">
+                              <div className="font-bold text-zinc-200">{tx.insiderName}</div>
+                              <div className="text-[10px] text-zinc-500 font-sans">{tx.title}</div>
+                            </td>
+                            <td className="py-2.5 px-3 text-zinc-400 font-semibold">{formatTxDate(tx.transactionDate)}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                tx.isBuy 
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              }`}>
+                                {tx.type}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-zinc-300">
+                              {tx.shares.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-zinc-300">
+                              ${tx.price.toFixed(2)}
+                            </td>
+                            <td className={`py-2.5 px-3 text-right font-bold ${
+                              tx.isBuy ? 'text-emerald-400' : 'text-rose-400'
+                            }`}>
+                              {tx.isBuy ? '+' : '-'}${tx.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-zinc-400">
+                              {tx.sharesOwnedFollowing.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {tx.secLink ? (
+                                <a
+                                  href={tx.secLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 transition-all font-semibold"
+                                  title="View official SEC EDGAR Form 4 filing XML/HTML"
+                                >
+                                  SEC EDGAR
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-zinc-500 font-sans">Official Form 4</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                    Form 4 insider disclosures are mandated solely for corporate officers, directors, and 10%+ owners of US publicly traded corporations. ETFs, foreign ADRs, crypto, and commodity contracts do not file SEC Form 4 insider reports.
+                ) : (
+                  <div className="py-8 px-5 rounded-xl bg-zinc-950/60 border border-zinc-850 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
+                      <ShieldAlert className="w-6 h-6 text-zinc-400" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-zinc-200">
+                        No information at the moment
+                      </h4>
+                      <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
+                        No official SEC Form 4 insider transactions are available at the moment for {data.ticker}. We only display legally verified SEC EDGAR disclosures with zero synthetic placeholders.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1 font-mono text-[10px]">
+                      <span className="px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-400 border border-zinc-800">
+                        SEC EDGAR Database Polled
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-400 border border-zinc-800">
+                        Zero Synthetic Fillers
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-400 border border-zinc-800">
+                        Active Reporting Window
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Institutional 13F Whales */}
+                {insider.institutionalWhales && insider.institutionalWhales.length > 0 && (
+                  <div className="pt-2 border-t border-zinc-800/80 space-y-2">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">
+                      Institutional Whale Concentration (13F Filings):
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs font-mono">
+                      {insider.institutionalWhales.map((whale, idx) => (
+                        <div key={idx} className="p-2.5 rounded-lg bg-zinc-950/70 border border-zinc-800/70 space-y-0.5">
+                          <div className="text-zinc-300 font-bold truncate">{whale.fund}</div>
+                          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+                            <span>{whale.shares} ({whale.pctHeld})</span>
+                            <span className="text-emerald-400 font-bold">{whale.action}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 5. Real-Time Continuous Market Noise & News Catalyst Scanner */}
+          <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Radio className="w-4 h-4 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      Continuous Market Noise & News Catalyst Scanner ({data.ticker})
+                    </h3>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      AUTO-STREAMING (12s)
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500 hidden sm:inline">
+                      Last Scan: {lastNoiseScanTime}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Real-time automated scanning of market noise, news catalysts, rumors, and analyst wires for {data.ticker}
                   </p>
                 </div>
-              )}
+              </div>
 
-              {/* Institutional 13F Whales */}
-              {insider.institutionalWhales && insider.institutionalWhales.length > 0 && (
-                <div className="pt-2 border-t border-zinc-800/80 space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">
-                    Institutional Whale Concentration (13F Filings):
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs font-mono">
-                    {insider.institutionalWhales.map((whale, idx) => (
-                      <div key={idx} className="p-2.5 rounded-lg bg-zinc-950/70 border border-zinc-800/70 space-y-0.5">
-                        <div className="text-zinc-300 font-bold truncate">{whale.fund}</div>
-                        <div className="flex items-center justify-between text-[10px] text-zinc-500">
-                          <span>{whale.shares} ({whale.pctHeld})</span>
-                          <span className="text-emerald-400 font-bold">{whale.action}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Instant Manual Scan Button */}
+                <button
+                  onClick={() => refreshMarketNoise(activeTicker)}
+                  disabled={isRefreshingNews}
+                  className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 font-mono text-xs flex items-center gap-1.5 transition-all disabled:opacity-50 font-bold"
+                  title="Force instant market noise wire re-scan"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 text-indigo-400 ${isRefreshingNews ? 'animate-spin' : ''}`} />
+                  <span>{isRefreshingNews ? 'Scanning...' : 'Scan Now'}</span>
+                </button>
+
+                {/* Noise Filtering Tabs */}
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono overflow-x-auto no-scrollbar">
+                <button
+                  onClick={() => setNewsFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
+                    newsFilter === 'all'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  All Signals ({data.newsEvents?.length || 0})
+                </button>
+                <button
+                  onClick={() => setNewsFilter('catalyst')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
+                    newsFilter === 'catalyst'
+                      ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Catalysts (High Impact)
+                </button>
+                <button
+                  onClick={() => setNewsFilter('noise')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
+                    newsFilter === 'noise'
+                      ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Market Noise & Rumors
+                </button>
+                <button
+                  onClick={() => setNewsFilter('analyst')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
+                    newsFilter === 'analyst'
+                      ? 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/40'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Analyst Wires
+                </button>
+              </div>
+            </div>
+          </div>
+
+            {/* Filtered News List */}
+            {(() => {
+              const events = (data.newsEvents || []).map(item => {
+                const lower = item.title.toLowerCase();
+                const isAnalyst = lower.includes('analyst') || lower.includes('rating') || lower.includes('target') || lower.includes('reiterate') || lower.includes('downgrade') || lower.includes('upgrade');
+                const isCatalyst = Math.abs(item.sentiment_score) >= 0.28 || lower.includes('earnings') || lower.includes('contract') || lower.includes('revenue') || lower.includes('fda') || lower.includes('sec');
+                const noiseType: 'catalyst' | 'analyst' | 'noise' = isAnalyst ? 'analyst' : (isCatalyst ? 'catalyst' : 'noise');
+                return { ...item, noiseType };
+              });
+
+              const filtered = events.filter(e => {
+                if (newsFilter === 'all') return true;
+                return e.noiseType === newsFilter;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-8 px-4 rounded-xl bg-zinc-950/50 border border-zinc-850 text-center space-y-2">
+                    <Radio className="w-6 h-6 text-indigo-400 animate-pulse mx-auto" />
+                    <div className="text-sm font-semibold text-zinc-300">
+                      Scanning live news wires for {data.ticker}...
+                    </div>
+                    <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                      Noise scanner continuously listening to market wires, SEC 8-K disclosures, and news streams.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filtered.map((item, idx) => {
+                    const isHighImpact = item.noiseType === 'catalyst';
+                    const isNoise = item.noiseType === 'noise';
+
+                    return (
+                      <div 
+                        key={`${item.id || 'news'}-${idx}`}
+                        className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800/80 flex flex-col justify-between space-y-2.5 hover:border-zinc-750 transition-colors"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] font-mono">
+                            <span className="text-zinc-400 font-bold truncate max-w-[130px]">{item.source}</span>
+                            <span className={`px-1.5 py-0.2 rounded font-bold uppercase text-[9px] ${
+                              isHighImpact
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : isNoise
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                            }`}>
+                              {isHighImpact ? 'CATALYST' : (isNoise ? 'MARKET NOISE' : 'ANALYST')} ({item.sentiment_score > 0 ? '+' : ''}{item.sentiment_score.toFixed(2)})
+                            </span>
+                          </div>
+                          <h4 className="text-xs font-bold text-zinc-200 line-clamp-2 leading-snug">
+                            {item.title}
+                          </h4>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-[10px] font-mono text-zinc-500">
+                          <span>{item.pubDate ? new Date(item.pubDate).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Live Tape'}</span>
+                          {item.link ? (
+                            <a 
+                              href={item.link} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-bold"
+                            >
+                              Source <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          ) : (
+                            <span className="text-zinc-600">Verified Wire</span>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* 5. Real-Time Related News & Catalyst Impact Wires */}
-          <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Newspaper className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-base font-bold text-white">
-                  Related News Catalysts & Market Pulse ({data.ticker})
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                {data.newsCount} WIRE SIGNALS
-              </span>
-            </div>
-
-            {(!data.newsEvents || data.newsEvents.length === 0) ? (
-              <div className="text-xs text-zinc-500 font-mono py-4 text-center">
-                No active news catalysts detected in the current window for {data.ticker}.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {data.newsEvents.map((item, idx) => (
-                  <div 
-                    key={`${item.id || 'news'}-${idx}`}
-                    className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800/80 flex flex-col justify-between space-y-2 hover:border-zinc-700 transition-colors"
-                  >
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] font-mono">
-                        <span className="text-zinc-400 font-bold truncate max-w-[130px]">{item.source}</span>
-                        <span className={`px-1.5 py-0.2 rounded font-bold uppercase text-[9px] ${
-                          item.sentiment_score > 0.1 
-                            ? 'bg-emerald-500/20 text-emerald-300' 
-                            : (item.sentiment_score < -0.1 ? 'bg-rose-500/20 text-rose-300' : 'bg-zinc-800 text-zinc-400')
-                        }`}>
-                          {item.trade_bias || (item.sentiment_score > 0 ? 'BULLISH' : 'BEARISH')} ({item.sentiment_score > 0 ? '+' : ''}{item.sentiment_score.toFixed(2)})
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-zinc-200 line-clamp-2 leading-snug">
-                        {item.title}
-                      </h4>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-[10px] font-mono text-zinc-500">
-                      <span>{item.pubDate ? new Date(item.pubDate).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent'}</span>
-                      {item.link && (
-                        <a 
-                          href={item.link} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                        >
-                          Source <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* 6. Upcoming Future Milestones & Catalyst Timeline */}

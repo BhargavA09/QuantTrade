@@ -373,6 +373,8 @@ export interface StockInsiderIntelligence {
   darkPoolSentiment: string;
   transactions: StockInsiderTransaction[];
   institutionalWhales: InstitutionalWhaleFlow[];
+  hasOfficialFilings?: boolean;
+  disclaimer?: string;
   isOfficialSecData?: boolean;
   source?: string;
 }
@@ -478,91 +480,17 @@ export const fetchStockProjectionIntelligence = async (
       insiderIntelligence: {
         ticker: clean,
         currentPrice: basePrice,
-        insiderConviction: 'MODERATE_C_SUITE_BUYING',
-        netScore: 28.5,
-        netBuyingPercent: 64.2,
-        netCashFlow: 3820000,
-        totalBoughtCash: 6420000,
-        totalSoldCash: 2600000,
-        clusterBuyingDetected: true,
-        darkPoolSentiment: 'ACCUMULATION_BLOCKS',
-        transactions: clean === 'PSEC' ? [
-          {
-            id: `SEC-PSEC-1`,
-            insiderName: `Barry John F`,
-            title: 'Chairman & Chief Executive Officer',
-            transactionDate: '2026-09-04',
-            type: 'Open Market Purchase (Code P)',
-            isBuy: true,
-            shares: 121700,
-            price: 1.62,
-            totalValue: 197154,
-            sharesOwnedFollowing: 71200000,
-            secLink: 'https://www.sec.gov/edgar/browse/?CIK=0001287032'
-          },
-          {
-            id: `SEC-PSEC-2`,
-            insiderName: `Eliasek M Grier`,
-            title: 'President & Chief Operating Officer',
-            transactionDate: '2026-08-18',
-            type: 'Open Market Purchase (Code P)',
-            isBuy: true,
-            shares: 25000,
-            price: 1.62,
-            totalValue: 40500,
-            sharesOwnedFollowing: 1850000,
-            secLink: 'https://www.sec.gov/edgar/browse/?CIK=0001287032'
-          },
-          {
-            id: `SEC-PSEC-3`,
-            insiderName: `Van Dask Kristin`,
-            title: 'Chief Financial Officer & CCO',
-            transactionDate: '2026-07-25',
-            type: 'Open Market Purchase (Code P)',
-            isBuy: true,
-            shares: 10000,
-            price: 1.62,
-            totalValue: 16200,
-            sharesOwnedFollowing: 420000,
-            secLink: 'https://www.sec.gov/edgar/browse/?CIK=0001287032'
-          }
-        ] : [
-          {
-            id: `F4-${clean}-1`,
-            insiderName: `${clean} Executive Director`,
-            title: 'Chief Executive Officer (CEO)',
-            transactionDate: new Date(Date.now() - 3600000 * 24 * 3).toISOString().split('T')[0],
-            type: 'Open Market Purchase (Code P)',
-            isBuy: true,
-            shares: 12500,
-            price: Number((basePrice * 0.985).toFixed(2)),
-            totalValue: Number((12500 * basePrice * 0.985).toFixed(2)),
-            sharesOwnedFollowing: 145000,
-            secLink: 'https://www.sec.gov/edgar/searchedgar/companysearch'
-          },
-          {
-            id: `F4-${clean}-2`,
-            insiderName: `${clean} Officer`,
-            title: 'Chief Financial Officer (CFO)',
-            transactionDate: new Date(Date.now() - 3600000 * 24 * 7).toISOString().split('T')[0],
-            type: 'Open Market Purchase (Code P)',
-            isBuy: true,
-            shares: 5000,
-            price: Number((basePrice * 0.992).toFixed(2)),
-            totalValue: Number((5000 * basePrice * 0.992).toFixed(2)),
-            sharesOwnedFollowing: 48000,
-            secLink: 'https://www.sec.gov/edgar/searchedgar/companysearch'
-          }
-        ],
-        institutionalWhales: clean === 'PSEC' ? [
-          { fund: 'Vanguard Group Inc.', shares: '28.4M', pctHeld: '6.8%', action: 'ACCUMULATED (+1.8%)' },
-          { fund: 'BlackRock Institutional Trust', shares: '24.1M', pctHeld: '5.7%', action: 'ACCUMULATED (+1.2%)' },
-          { fund: 'State Street Global Advisors', shares: '14.2M', pctHeld: '3.4%', action: 'HOLD / REBALANCED' },
-          { fund: 'Geode Capital Management', shares: '9.8M', pctHeld: '2.3%', action: 'ACCUMULATED (+0.9%)' }
-        ] : [
-          { fund: 'Vanguard Group Inc.', shares: '42.1M', pctHeld: '8.4%', action: 'ACCUMULATED (+2.4%)' },
-          { fund: 'BlackRock Fund Advisors', shares: '38.6M', pctHeld: '7.8%', action: 'ACCUMULATED (+1.9%)' }
-        ]
+        insiderConviction: 'NO_ACTIVE_DISCLOSURES',
+        netScore: 0.0,
+        netBuyingPercent: 0.0,
+        netCashFlow: 0.0,
+        totalBoughtCash: 0.0,
+        totalSoldCash: 0.0,
+        clusterBuyingDetected: false,
+        darkPoolSentiment: 'NEUTRAL_ORDER_FLOW',
+        transactions: [],
+        institutionalWhales: [],
+        disclaimer: `No official insider transaction disclosures filed at the moment for ${clean}.`
       },
       monteCarloProjection: {
         daysAhead: 30,
