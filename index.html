@@ -17,6 +17,88 @@
     <meta property="og:description" content="Advanced mobile trading platform with Monte Carlo simulations, Fuzzy Logic projections, Fourier signal filtering, and global trade tracking." />
     <script>
       (function() {
+        // Intercept and cleanly handle Vite HMR WebSocket when HMR is disabled in cloud/iframe runtime
+        if (typeof window !== 'undefined') {
+          var OriginalWebSocket = window.WebSocket;
+          if (OriginalWebSocket) {
+            window.WebSocket = function(url, protocols) {
+              var isViteHmr = false;
+              if (protocols === 'vite-hmr') isViteHmr = true;
+              if (Array.isArray(protocols) && protocols.indexOf('vite-hmr') !== -1) isViteHmr = true;
+              if (typeof url === 'string' && (url.indexOf('vite-hmr') !== -1 || (protocols && String(protocols).indexOf('vite-hmr') !== -1))) isViteHmr = true;
+
+              if (isViteHmr) {
+                return {
+                  readyState: 1, // OPEN
+                  url: url,
+                  protocol: 'vite-hmr',
+                  binaryType: 'blob',
+                  bufferedAmount: 0,
+                  extensions: '',
+                  onopen: null,
+                  onclose: null,
+                  onerror: null,
+                  onmessage: null,
+                  addEventListener: function(type, listener) {
+                    if (type === 'open') {
+                      setTimeout(function() {
+                        try { listener({ type: 'open' }); } catch (e) {}
+                      }, 10);
+                    }
+                  },
+                  removeEventListener: function() {},
+                  dispatchEvent: function() { return true; },
+                  send: function() {},
+                  close: function(code, reason) {
+                    this.readyState = 3; // CLOSED
+                    if (typeof this.onclose === 'function') {
+                      this.onclose({ wasClean: true, code: code || 1000, reason: reason || '' });
+                    }
+                  }
+                };
+              }
+              return new OriginalWebSocket(url, protocols);
+            };
+
+            window.WebSocket.prototype = OriginalWebSocket.prototype;
+            window.WebSocket.CONNECTING = OriginalWebSocket.CONNECTING;
+            window.WebSocket.OPEN = OriginalWebSocket.OPEN;
+            window.WebSocket.CLOSING = OriginalWebSocket.CLOSING;
+            window.WebSocket.CLOSED = OriginalWebSocket.CLOSED;
+          }
+
+          var origError = console.error;
+          console.error = function() {
+            var args = Array.prototype.slice.call(arguments);
+            var str = args.map(function(a) { return typeof a === 'string' ? a : (a && a.message) || ''; }).join(' ');
+            if (str.indexOf('WebSocket closed without opened') !== -1 || (str.indexOf('[vite]') !== -1 && str.indexOf('WebSocket') !== -1)) {
+              return;
+            }
+            return origError.apply(console, args);
+          };
+
+          window.addEventListener('error', function(event) {
+            var msg = (event && event.message) || '';
+            if (msg.indexOf('WebSocket closed without opened') !== -1 || (msg.indexOf('vite') !== -1 && msg.indexOf('WebSocket') !== -1)) {
+              if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+              if (typeof event.preventDefault === 'function') event.preventDefault();
+              return true;
+            }
+          }, true);
+
+          window.addEventListener('unhandledrejection', function(event) {
+            var reason = event && event.reason ? (event.reason.message || String(event.reason)) : '';
+            if (reason.indexOf('WebSocket closed without opened') !== -1 || (reason.indexOf('vite') !== -1 && reason.indexOf('WebSocket') !== -1)) {
+              if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+              if (typeof event.preventDefault === 'function') event.preventDefault();
+              return true;
+            }
+          }, true);
+        }
+      })();
+    </script>
+    <script>
+      (function() {
         try {
           var saved = localStorage.getItem('quant_theme') || localStorage.getItem('theme');
           var theme = (saved === 'light' || saved === 'dark') ? saved : 'dark';

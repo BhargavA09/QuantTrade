@@ -43,7 +43,8 @@ import {
   Gauge,
   Waves,
   FileText,
-  BarChart2
+  BarChart2,
+  Eye
 } from 'lucide-react';
 import { 
   quantTraderBrain, 
@@ -77,6 +78,7 @@ import { TechnicalPatternScannerUtility } from './TechnicalPatternScannerUtility
 import { MarketSentimentHeatmap } from './MarketSentimentHeatmap';
 import { MarketSentimentGauge } from './MarketSentimentGauge';
 import { StrategyBacktestingModule } from './StrategyBacktestingModule';
+import { VolumeLensOrderFlowView } from './VolumeLensOrderFlowView';
 import { detectAutomatedPatterns } from '../../utils/patternRecognition';
 import { computeHighFrequencyAnalysis, HighFrequencyMetrics } from '../../services/api/signalProcessing';
 
@@ -95,7 +97,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   
   // Terminal Sub-Tabs
   const [activeSubTab, setActiveSubTab] = useState<
-    'chart' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'sentiment_gauge' | 'backtest'
+    'chart' | 'volumelens' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'sentiment_gauge' | 'backtest'
   >('chart');
 
   // Tear Sheet & Chart Visualizer Toggles
@@ -697,6 +699,23 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           >
             <BarChart3 className="w-4 h-4" />
             <span>Terminal & Live Chart</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('volumelens')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
+              activeSubTab === 'volumelens'
+                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-950/40 ring-1 ring-cyan-400'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+            title="VolumeLens Institutional Order Flow, Footprint Clusters, CVD Divergence & Level 2 DOM Ladder"
+          >
+            <Eye className="w-4 h-4 text-cyan-400" />
+            <span>VolumeLens & Futures</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
+              ORDER FLOW
+            </span>
           </button>
 
           <button
@@ -2765,6 +2784,20 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           chartBars={chartBars}
           onDeployToBrain={(cfg) => {
             setTradeMessage(`Deployed backtested strategy [${cfg.name}] to Brain`);
+            setTimeout(() => setTradeMessage(null), 5000);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 12: VOLUMELENS INSTITUTIONAL ORDER FLOW & FUTURES SUITE            */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'volumelens' && (
+        <VolumeLensOrderFlowView
+          selectedTicker={selectedTicker}
+          onSelectTicker={onSelectTicker}
+          onTradeExecuted={(msg) => {
+            setTradeMessage(msg);
             setTimeout(() => setTradeMessage(null), 5000);
           }}
         />

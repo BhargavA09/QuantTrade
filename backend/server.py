@@ -50,6 +50,7 @@ try:
     from finviz_engine import finviz_engine
     from continuous_learning_engine import continuous_learning_engine
     from data_calibration_engine import data_calibration_engine, MultiSourcePriceAggregator
+    from volume_lens_engine import volume_lens_engine
     import quant_portfolio_suite
 except ImportError:
     # If run directly from backend folder
@@ -62,6 +63,7 @@ except ImportError:
     from finviz_engine import finviz_engine
     from continuous_learning_engine import continuous_learning_engine
     from data_calibration_engine import data_calibration_engine, MultiSourcePriceAggregator
+    from volume_lens_engine import volume_lens_engine
     import quant_portfolio_suite
 
 # Baseline Market Prices for instant ultra-low latency response
@@ -115,14 +117,21 @@ BASELINE_MARKET_PRICES = {
     'OPEN': {'price': 1.85, 'change': 0.06, 'changePercent': 3.35, 'name': 'Opendoor Technologies', 'pe': 0, 'high': 1.91, 'low': 1.80, 'volume': 14000000},
     'PSEC': {'price': 1.62, 'change': 0.01, 'changePercent': 0.62, 'name': 'Prospect Capital Corp.', 'pe': 6.8, 'high': 1.65, 'low': 1.60, 'volume': 8400000},
 
-    # Commodities & Crypto
+    # Futures & Derivatives Contracts (VolumeLens Institutional Universe)
+    'ES=F': {'price': 5982.50, 'change': 28.50, 'changePercent': 0.48, 'name': 'E-mini S&P 500 Futures (CME)', 'pe': 0, 'high': 5998.00, 'low': 5965.25, 'volume': 1450000},
+    'NQ=F': {'price': 21485.75, 'change': 142.25, 'changePercent': 0.67, 'name': 'E-mini Nasdaq 100 Futures (CME)', 'pe': 0, 'high': 21560.00, 'low': 21390.50, 'volume': 680000},
+    'YM=F': {'price': 43920.00, 'change': 115.00, 'changePercent': 0.26, 'name': 'E-mini Dow Jones Futures (CBOT)', 'pe': 0, 'high': 44050.00, 'low': 43810.00, 'volume': 220000},
+    'RTY=F': {'price': 2248.60, 'change': 12.40, 'changePercent': 0.55, 'name': 'E-mini Russell 2000 Futures (CME)', 'pe': 0, 'high': 2260.00, 'low': 2235.80, 'volume': 190000},
     'GC=F': {'price': 4061.80, 'change': 18.50, 'changePercent': 0.46, 'name': 'Gold Futures (COMEX)', 'pe': 0, 'high': 4075.00, 'low': 4048.00, 'volume': 220000},
     'SI=F': {'price': 54.15, 'change': 0.85, 'changePercent': 1.60, 'name': 'Silver Futures (COMEX)', 'pe': 0, 'high': 54.60, 'low': 53.50, 'volume': 140000},
     'CL=F': {'price': 101.15, 'change': 1.20, 'changePercent': 1.20, 'name': 'Crude Oil WTI (NYMEX)', 'pe': 0, 'high': 102.30, 'low': 99.80, 'volume': 380000},
+    'NG=F': {'price': 3.148, 'change': 0.082, 'changePercent': 2.67, 'name': 'Natural Gas Futures (NYMEX)', 'pe': 0, 'high': 3.210, 'low': 3.080, 'volume': 380000},
+    'ZB=F': {'price': 118.45, 'change': 0.35, 'changePercent': 0.30, 'name': '30-Year U.S. Treasury Bond Futures (CBOT)', 'pe': 0, 'high': 118.90, 'low': 117.80, 'volume': 410000},
+    '6E=F': {'price': 1.0852, 'change': 0.0024, 'changePercent': 0.22, 'name': 'Euro FX Futures (CME)', 'pe': 0, 'high': 1.0875, 'low': 1.0820, 'volume': 290000},
     'GLD': {'price': 245.80, 'change': 1.40, 'changePercent': 0.57, 'name': 'SPDR Gold Shares', 'pe': 0, 'high': 246.90, 'low': 244.20, 'volume': 8500000},
     'SLV': {'price': 29.80, 'change': 0.45, 'changePercent': 1.53, 'name': 'iShares Silver Trust', 'pe': 0, 'high': 30.10, 'low': 29.40, 'volume': 16000000},
     'USO': {'price': 74.20, 'change': -1.10, 'changePercent': -1.46, 'name': 'United States Oil Fund', 'pe': 0, 'high': 75.80, 'low': 73.60, 'volume': 6400000},
-    'BTC-USD': {'price': 80827.00, 'change': 1650.00, 'changePercent': 2.08, 'name': 'Bitcoin USD', 'pe': 0, 'high': 81400.00, 'low': 79500.00, 'volume': 38000000000},
+    'BTC-USD': {'price': 80827.00, 'change': 1650.00, 'changePercent': 2.08, 'name': 'Bitcoin USD / CME Futures', 'pe': 0, 'high': 81400.00, 'low': 79500.00, 'volume': 38000000000},
     'ETH-USD': {'price': 2640.00, 'change': 54.00, 'changePercent': 2.09, 'name': 'Ethereum USD', 'pe': 0, 'high': 2680.00, 'low': 2580.00, 'volume': 14000000000}
 }
 
@@ -1407,6 +1416,51 @@ class QuantLabFullPythonHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/finviz/ticker/"):
             ticker = path.split("/")[-1].upper()
             return self._send_json(finviz_engine.get_ticker_detail(ticker))
+
+        # -----------------------------------------------------------------
+        # VolumeLens Institutional Futures & Order Flow Endpoints
+        # -----------------------------------------------------------------
+        # VolumeLens Futures Universe
+        if path in ["/api/volumelens/futures-universe", "/api/market/futures-universe", "/api/futures/universe"]:
+            return self._send_json({
+                "success": True,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "count": len(volume_lens_engine.get_futures_universe()),
+                "universe": volume_lens_engine.get_futures_universe()
+            })
+
+        # VolumeLens Order Flow & Footprint Package
+        if path.startswith("/api/volumelens/order-flow/") or path.startswith("/api/market/order-flow/"):
+            raw_ticker = path.split("/")[-1].upper()
+            clean_ticker = urllib.parse.unquote(raw_ticker)
+            tf = query.get("timeframe", ["5m"])[0]
+            # Fetch live spot price if available
+            spot = 0.0
+            try:
+                quote = fetch_live_yahoo_quote(clean_ticker)
+                spot = float(quote.get("currentPrice") or quote.get("price") or 0.0)
+            except Exception:
+                pass
+            order_flow_pkg = volume_lens_engine.get_complete_order_flow_package(clean_ticker, spot, timeframe=tf)
+            return self._send_json(order_flow_pkg)
+
+        # VolumeLens DOM (Depth of Market) Level 2 Ladder
+        if path.startswith("/api/volumelens/dom/") or path.startswith("/api/market/dom/"):
+            raw_ticker = path.split("/")[-1].upper()
+            clean_ticker = urllib.parse.unquote(raw_ticker)
+            spot = 0.0
+            try:
+                quote = fetch_live_yahoo_quote(clean_ticker)
+                spot = float(quote.get("currentPrice") or quote.get("price") or 0.0)
+            except Exception:
+                pass
+            dom_data = volume_lens_engine.generate_dom_ladder(clean_ticker, spot)
+            return self._send_json({
+                "success": True,
+                "ticker": clean_ticker,
+                "spotPrice": spot,
+                **dom_data
+            })
 
         # 2a. Continuous Data Correction & Multi-Source Reconciliation Endpoint
         if path.startswith("/api/stock/continuous-correction/"):
