@@ -518,13 +518,18 @@ export const InstitutionalRiskTearSheet: React.FC<InstitutionalRiskTearSheetProp
           </div>
 
           {/* Footer Auditor Sign-Off & Verification Stamp */}
-          <div className="pt-6 border-t border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono text-zinc-500 print:border-zinc-300 print:text-zinc-600">
-            <div>
-              Generated autonomously by QuantTrade Quantitative Core v2.4 · Compliant with Hull/Markowitz Standards
+          <div className="pt-6 border-t border-zinc-800 space-y-2 text-[11px] font-mono text-zinc-500 print:border-zinc-300 print:text-zinc-600">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                Generated autonomously by QuantTrade Quantitative Core v2.4 · Compliant with Hull/Markowitz Standards
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 print:text-emerald-700" />
+                <span>Risk Model Auditor Verified · ISO 8601 Stamp: {timestampIso.slice(0, 19)}Z</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 print:text-emerald-700" />
-              <span>Risk Model Auditor Verified · ISO 8601 Stamp: {timestampIso.slice(0, 19)}Z</span>
+            <div className="text-[10px] text-amber-400/80 print:text-zinc-600 font-sans">
+              <strong>Mandatory Notice:</strong> This tear sheet, Monte Carlo VaR projections, and stress simulations are for <strong>educational and quantitative research purposes only</strong>. Not registered investment, financial, or legal advice.
             </div>
           </div>
         </div>

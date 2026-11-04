@@ -14,17 +14,23 @@ import {
   Search,
   ArrowUpRight,
   ShieldCheck,
+  ShieldAlert,
+  Scale,
   FileText
 } from 'lucide-react';
 import { TradingTerminalView } from './components/terminal/TradingTerminalView';
+import { IntradaySuggestiveTradeView } from './components/terminal/IntradaySuggestiveTradeView';
 import { TraderBrainView } from './components/terminal/TraderBrainView';
 import { NewsCatalystView } from './components/terminal/NewsCatalystView';
 import { TradeJournalView } from './components/terminal/TradeJournalView';
 import { InstitutionalRiskTearSheet } from './components/terminal/InstitutionalRiskTearSheet';
+import { InstitutionalSecurityVaultModal } from './components/security/InstitutionalSecurityVaultModal';
+import { TermsAndConditionsView } from './components/legal/TermsAndConditionsView';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineConnectivityBanner } from './components/OfflineConnectivityBanner';
 import { quantTraderBrain, TraderBrainState } from './services/QuantTraderBrain';
 import { continuousLearningService } from './services/continuousLearningService';
+import { securityVaultService, VaultState } from './services/securityVaultService';
 
 const getInitialTicker = (): string => {
   try {
@@ -46,10 +52,12 @@ const getInitialTicker = (): string => {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'terminal' | 'brain' | 'news' | 'journal'>('terminal');
+  const [activeTab, setActiveTab] = useState<'terminal' | 'intraday' | 'brain' | 'news' | 'journal' | 'terms'>('terminal');
   const [selectedTicker, setSelectedTicker] = useState<string>(getInitialTicker);
   const [brainState, setBrainState] = useState<TraderBrainState>(() => quantTraderBrain.getState());
   const [isGlobalTearSheetOpen, setIsGlobalTearSheetOpen] = useState<boolean>(false);
+  const [isVaultModalOpen, setIsVaultModalOpen] = useState<boolean>(false);
+  const [vaultState, setVaultState] = useState<VaultState>(() => securityVaultService.getState());
 
   const handleSelectTicker = (ticker: string) => {
     const clean = ticker.trim().toUpperCase();
@@ -66,7 +74,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    return quantTraderBrain.subscribe(setBrainState);
+    const unsubBrain = quantTraderBrain.subscribe(setBrainState);
+    const unsubVault = securityVaultService.subscribe(setVaultState);
+    return () => {
+      unsubBrain();
+      unsubVault();
+    };
   }, []);
 
   return (
@@ -110,9 +123,19 @@ export default function App() {
                   Win Rate: <span className="text-emerald-400 font-bold">{brainState.stats.winRate.toFixed(1)}%</span>
                 </span>
               </div>
+
+              {/* Educational & Research Mandate Header Tag */}
+              <div 
+                onClick={() => setActiveTab('terms')}
+                className="cursor-pointer hidden lg:flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-colors select-none"
+                title="Mandatory Notice: For Educational & Research Purposes Only"
+              >
+                <ShieldAlert className="w-3 h-3 text-amber-400" />
+                <span>Educational &amp; Research Use Only</span>
+              </div>
             </div>
 
-            {/* Streamlined Primary Navigation (4 Focused Tabs with Horizontal Scroll for Mobile) */}
+            {/* Streamlined Primary Navigation (Focused Tabs with Horizontal Scroll for Mobile) */}
             <nav className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-bold uppercase tracking-wider overflow-x-auto no-scrollbar scroll-smooth">
               <button
                 onClick={() => setActiveTab('terminal')}
@@ -124,6 +147,20 @@ export default function App() {
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Terminal
+              </button>
+
+              <button
+                onClick={() => setActiveTab('intraday')}
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 relative whitespace-nowrap shrink-0 ${
+                  activeTab === 'intraday'
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40 ring-1 ring-emerald-400'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Suggestive Intraday Trade Setups, Exact Buy Price, Out Price Cap & Everyday Research"
+              >
+                <Target className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Intraday Picks</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               </button>
 
               <button
@@ -162,6 +199,19 @@ export default function App() {
                 <History className="w-3.5 h-3.5" />
                 Trade Log
               </button>
+
+              <button
+                onClick={() => setActiveTab('terms')}
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                  activeTab === 'terms'
+                    ? 'bg-amber-600 text-white shadow-sm shadow-amber-950/40'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Terms of Use, Regulatory Disclaimers & Educational Purpose Mandate"
+              >
+                <Scale className="w-3.5 h-3.5 text-amber-400" />
+                Terms &amp; Research
+              </button>
             </nav>
 
             {/* Global Actions & Portfolio Balance Readout */}
@@ -169,6 +219,24 @@ export default function App() {
               <div className="hidden sm:block">
                 <PWAInstallButton />
               </div>
+
+              <button
+                onClick={() => setIsVaultModalOpen(true)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl border font-mono text-xs flex items-center gap-1.5 transition-all shadow-sm font-bold ${
+                  vaultState.isUnlocked
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 shadow-emerald-950/40'
+                    : vaultState.isConfigured
+                      ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/25'
+                      : 'bg-zinc-900 text-zinc-300 border-zinc-700/60 hover:bg-zinc-800'
+                }`}
+                title="Institutional Security Enclave: AES-256-GCM Zero-Knowledge Key Vault & Threat Audit"
+              >
+                <ShieldCheck className={`w-3.5 h-3.5 ${vaultState.isUnlocked ? 'text-emerald-400' : 'text-cyan-400'}`} />
+                <span className="hidden sm:inline">Security Vault</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded font-sans uppercase font-bold bg-zinc-800/80">
+                  {vaultState.isUnlocked ? 'Unlocked' : vaultState.isConfigured ? 'AES-256' : 'Setup'}
+                </span>
+              </button>
 
               <button
                 onClick={() => setIsGlobalTearSheetOpen(true)}
@@ -205,6 +273,18 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'intraday' && (
+          <IntradaySuggestiveTradeView
+            onNavigateToTerminal={(ticker) => {
+              handleSelectTicker(ticker);
+              setActiveTab('terminal');
+            }}
+            onTradeExecuted={(msg) => {
+              console.log('[QuantTrade Intraday Execution]', msg);
+            }}
+          />
+        )}
+
         {activeTab === 'brain' && (
           <TraderBrainView
             selectedTicker={selectedTicker}
@@ -231,25 +311,56 @@ export default function App() {
             }}
           />
         )}
+
+        {activeTab === 'terms' && (
+          <TermsAndConditionsView
+            onNavigateToTerminal={() => setActiveTab('terminal')}
+          />
+        )}
       </main>
 
-      {/* 3. Streamlined Clean Institutional Footer */}
+      {/* 3. Streamlined Clean Institutional Footer with Educational & Legal Disclaimers */}
       <footer className="bg-zinc-900 border-t border-zinc-800 py-6 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-zinc-400">QuantTrade Pro Intelligence Systems</span>
-            <span className="text-zinc-700">·</span>
-            <span>Self-calibrating technical analysis & quant reinforcement learning</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-white">QuantTrade Pro Intelligence Systems</span>
+              <span className="text-zinc-700">·</span>
+              <span>Open-source market data &amp; ML models powered by <a href="https://londonstrategicedge.com" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline font-mono">londonstrategicedge.com</a></span>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs font-mono">
+              <button
+                onClick={() => setIsVaultModalOpen(true)}
+                className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 hover:underline"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Security Vault &amp; Audit</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('terms')}
+                className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
+              >
+                <Scale className="w-3.5 h-3.5" />
+                <span>Terms &amp; Disclaimers</span>
+              </button>
+              <button
+                onClick={() => setIsGlobalTearSheetOpen(true)}
+                className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Risk Tear Sheet</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 text-[11px] font-mono">
-            <span>Kalman Drift</span>
-            <span className="text-zinc-700">·</span>
-            <span>GARCH Volatility</span>
-            <span className="text-zinc-700">·</span>
-            <span>Ornstein-Uhlenbeck Reversion</span>
-            <span className="text-zinc-700">·</span>
-            <span>Half-Kelly Sizing</span>
+          <div className="pt-3 border-t border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-zinc-500 font-sans">
+            <p className="text-center sm:text-left leading-relaxed">
+              <strong>Mandatory Notice:</strong> QuantTrade Pro and all associated algorithmic models, Fourier filters, and price trajectories are strictly for <strong>educational, academic, and research purposes only</strong>. Not registered investment, financial, or legal advice. No fiduciary relationship is formed. Past simulated performance does not guarantee future results.
+            </p>
+            <span className="shrink-0 text-zinc-600 font-mono text-[10px]">
+              &copy; 2026 QuantTrade Pro · Academic Research License
+            </span>
           </div>
         </div>
       </footer>
@@ -259,6 +370,12 @@ export default function App() {
         isOpen={isGlobalTearSheetOpen}
         onClose={() => setIsGlobalTearSheetOpen(false)}
         selectedTicker={selectedTicker}
+      />
+
+      {/* Institutional Cryptographic Security Vault & Threat Audit Modal */}
+      <InstitutionalSecurityVaultModal
+        isOpen={isVaultModalOpen}
+        onClose={() => setIsVaultModalOpen(false)}
       />
     </div>
   );

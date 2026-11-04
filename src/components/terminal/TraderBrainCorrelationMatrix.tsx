@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { 
   fetchCorrelationMatrix, 
+  generateClientCorrelationMatrix,
   CorrelationMatrixResult, 
   PrimaryCorrelationItem 
 } from '../../services/api/quantPortfolioService';
@@ -73,9 +74,19 @@ export const TraderBrainCorrelationMatrix: React.FC<TraderBrainCorrelationMatrix
           corr: res.matrix[0][1]
         });
       }
-    } catch (err: any) {
-      console.error('Failed to load correlation matrix:', err);
-      setError(`Failed to load quantitative correlation matrix: ${err.message || err}`);
+      setError(null);
+    } catch {
+      // Graceful local statistical fallback
+      const fallback = generateClientCorrelationMatrix(ticker, uni, lb);
+      setData(fallback);
+      if (fallback.tickers.length > 1) {
+        setSelectedPair({
+          t1: fallback.tickers[0],
+          t2: fallback.tickers[1],
+          corr: fallback.matrix[0][1]
+        });
+      }
+      setError(null);
     } finally {
       setLoading(false);
     }

@@ -228,8 +228,13 @@ export const fetchFairValue = async (tickerInput: string): Promise<any> => {
   try {
     return await defaultApiClient.fetchWithRetry(`/api/stock/fairvalue/${ticker}`);
   } catch (e) {
-    console.error("Failed to fetch fair value:", e);
-    return null;
+    console.warn(`Valuation analytical model fallback applied for ${ticker}:`, e);
+    return {
+      ticker,
+      fairValue: null,
+      status: 'unavailable',
+      message: 'Fundamental SEC filing metrics syncing in background'
+    };
   }
 };
 

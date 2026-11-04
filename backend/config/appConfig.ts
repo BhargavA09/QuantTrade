@@ -32,3 +32,13 @@ export const aiLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "AI query rate limit exceeded, falling back to neural synthesized memory." }
 });
+
+// Anti-brute force limiter for security vault and enclave operations
+export const vaultLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Security Enclave: Rate limit exceeded. Throttled to prevent credential attacks." }
+});
+

@@ -6,7 +6,7 @@ import { spawn, ChildProcess } from "child_process";
 import cors from "cors";
 import helmet from "helmet";
 
-import { PORT, IS_PRODUCTION, corsConfig, generalLimiter } from "./config/appConfig";
+import { PORT, IS_PRODUCTION, corsConfig, generalLimiter, vaultLimiter } from "./config/appConfig";
 import { validateJsonPayload } from "./middleware/validation";
 import { errorHandler } from "./middleware/errorHandler";
 import { WebSocketManager } from "./services/webSocketManager";
@@ -105,14 +105,47 @@ async function startServer() {
   // Trust proxy for accurate IP determination behind load balancers / Cloud Run
   app.set("trust proxy", 1);
 
-  // Security Middlewares
-  app.use(helmet({ contentSecurityPolicy: false }));
+  // Security Middlewares & Hardened Cyber Defense
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+        connectSrc: ["'self'", "ws:", "wss:", "http:", "https:", "https://query1.finance.yahoo.com", "https://*.google.com", "https://generativelanguage.googleapis.com", "https://londonstrategicedge.com"],
+        frameAncestors: ["'self'", "https://*.google.com", "https://*.run.app", "https://ais-*.run.app"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"]
+      }
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    dnsPrefetchControl: { allow: false },
+    frameguard: false, // Managed via frameAncestors for Google AI Studio iFrame preview compatibility
+    hsts: { maxAge: 31536000, includeSubDomains: true },
+    noSniff: true,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    xssFilter: true
+  }));
+
+  // Additional OWASP Defense Headers
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+    res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+    next();
+  });
+
   app.use(cors(corsConfig));
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
   app.use(validateJsonPayload);
 
-  // General rate limiting
+  // General rate limiting & specialized vault brute-force protection
+  app.use("/api/security/vault", vaultLimiter);
   app.use("/api", generalLimiter);
 
   // Mount entire /api domain onto the Python backend

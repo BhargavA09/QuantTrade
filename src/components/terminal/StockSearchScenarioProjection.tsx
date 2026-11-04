@@ -22,7 +22,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Compass,
-  RotateCw
+  RotateCw,
+  Copy
 } from 'lucide-react';
 import { 
   fetchStockProjectionIntelligence, 
@@ -31,6 +32,12 @@ import {
   InstitutionalWhaleFlow
 } from '../../services/api/marketService';
 import { EXPANDED_STOCK_DATABASE } from '../../data/expandedStockDatabase';
+import { 
+  intradayStrategyEngine, 
+  IntradayStockRecommendation 
+} from '../../services/intradayStrategyEngine';
+import { quantTraderBrain } from '../../services/QuantTraderBrain';
+import { findNearestRelevantMatch, IntelligentSearchResponse } from '../../utils/intelligentSearch';
 
 interface StockSearchScenarioProjectionProps {
   initialTicker?: string;
@@ -70,6 +77,7 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
   const [activeTicker, setActiveTicker] = useState(startingTicker);
   const [activeRegion, setActiveRegion] = useState<string>('ALL');
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [intelligentSearchInfo, setIntelligentSearchInfo] = useState<IntelligentSearchResponse | null>(null);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,8 +96,41 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
   const [newsFilter, setNewsFilter] = useState<'all' | 'catalyst' | 'noise' | 'analyst'>('all');
   const [isAutoScanningNoise, setIsAutoScanningNoise] = useState<boolean>(true);
   const [noiseScanTick, setNoiseScanTick] = useState<number>(0);
-  const [isRefreshingNews, setIsRefreshingNews] = useState<boolean>(false);
   const [lastNoiseScanTime, setLastNoiseScanTime] = useState<string>('Live Streaming');
+  const [isRefreshingNews, setIsRefreshingNews] = useState<boolean>(false);
+  const [modelToast, setModelToast] = useState<string | null>(null);
+  const [copiedPlanTicker, setCopiedPlanTicker] = useState<string | null>(null);
+
+  const handleCopyPlan = (rec: IntradayStockRecommendation, ticker: string, currSym: string, dec: number) => {
+    const planText = [
+      `📊 INTRADAY EXECUTION PLAN · ${ticker}`,
+      `Recommendation: ${rec.recommendation} (${rec.actionTag}) - Score: ${rec.recommendationScore}%`,
+      `Current Price: ${currSym}${rec.currentPrice.toFixed(dec)}`,
+      `Suggested Buy Entry: ${currSym}${rec.suggestedBuyEntry.toFixed(dec)} (Zone: ${currSym}${rec.suggestedBuyZone.min.toFixed(dec)} - ${currSym}${rec.suggestedBuyZone.max.toFixed(dec)})`,
+      `Out Price Cap (Target): ${currSym}${rec.outPriceCap.toFixed(dec)} (+${rec.outPriceCapGainPct.toFixed(2)}%)`,
+      `Scalp Trim Cap: ${currSym}${rec.scalpTrimCap.toFixed(dec)}`,
+      `Hard Stop-Loss: ${currSym}${rec.hardStopLoss.toFixed(dec)}`,
+      `Risk/Reward Ratio: 1:${rec.riskRewardRatio}`,
+      `Expected Holding Time: ${rec.everydayResearch?.optimalHoldingMinutes || '45-90 mins'}`,
+      `Optimal Time Window: ${rec.suggestiveTimeWindow}`,
+      `Engine: Multi-Scenario Calibration & Volatility Bands`,
+      `Educational Mandate: Strictly for research and simulation purposes.`
+    ].join('\n');
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(planText);
+      }
+    } catch (err) {
+      console.warn('Clipboard write fallback:', err);
+    }
+    setCopiedPlanTicker(ticker);
+    setModelToast(`✓ Copied ${ticker} Intraday Plan to Clipboard!`);
+    setTimeout(() => {
+      setCopiedPlanTicker(null);
+      setModelToast(null);
+    }, 4000);
+  };
 
   const refreshMarketNoise = async (ticker: string) => {
     if (!ticker) return;
@@ -220,10 +261,15 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
     const clean = val.trim().toUpperCase();
     if (!clean || clean.length < 1) {
       setSearchResults([]);
+      setIntelligentSearchInfo(null);
       return;
     }
 
-    // 1. Instant local match (<1ms) so accurate price is visible immediately without delay
+    // Intelligent Fuzzy & Nearest-Match Resolution (London Strategic Edge Open Universe)
+    const fuzzy = findNearestRelevantMatch(clean, 8);
+    setIntelligentSearchInfo(fuzzy);
+
+    // 1. Instant local match (<1ms)
     const localMatches = EXPANDED_STOCK_DATABASE
       .filter(s => s.ticker.startsWith(clean) || s.ticker.includes(clean) || s.name.toUpperCase().includes(clean))
       .slice(0, 8)
@@ -239,9 +285,32 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
         exchange: s.ticker.endsWith('.TO') ? 'TSX' : (s.ticker.endsWith('.L') ? 'LSE' : (s.ticker.endsWith('.AS') ? 'AMS' : (s.ticker.endsWith('.T') ? 'TSE' : 'US')))
       }));
 
-    if (localMatches.length > 0) {
-      setSearchResults(localMatches);
-    }
+    // Convert fuzzy nearest matches from London Strategic Edge
+    const fuzzyItems = fuzzy.nearestMatches.map(m => ({
+      symbol: m.item.ticker,
+      shortname: m.item.name,
+      longname: m.item.name,
+      name: m.item.name,
+      currentPrice: m.item.price,
+      price: m.item.price,
+      change: 0,
+      changePercent: 0,
+      exchange: m.item.exchange,
+      similarityScore: m.similarityScore,
+      matchType: m.matchType,
+      matchReason: m.matchReason
+    }));
+
+    const initialCombined = [...localMatches];
+    const seenInitial = new Set(localMatches.map(m => m.symbol.toUpperCase()));
+    fuzzyItems.forEach(f => {
+      if (!seenInitial.has(f.symbol.toUpperCase())) {
+        seenInitial.add(f.symbol.toUpperCase());
+        initialCombined.push(f);
+      }
+    });
+
+    setSearchResults(initialCombined.slice(0, 10));
 
     // 2. Fetch live global quotes from backend in background to supplement global universe
     try {
@@ -251,10 +320,9 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
         const json = await res.json();
         const quotes = json.quotes || json.results || [];
         if (Array.isArray(quotes) && quotes.length > 0) {
-          // Merge deduplicated, keeping instant local prices prioritized for accurate display
           const seen = new Set<string>();
           const merged: any[] = [];
-          [...quotes, ...localMatches].forEach(q => {
+          [...quotes, ...initialCombined].forEach(q => {
             const sym = (q.symbol || q.ticker || '').toUpperCase();
             if (sym && !seen.has(sym)) {
               seen.add(sym);
@@ -279,7 +347,9 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
   const handleSearchSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (searchInput.trim()) {
-      loadTickerProjection(searchInput.trim().toUpperCase());
+      const match = findNearestRelevantMatch(searchInput.trim(), 1);
+      const targetTicker = match.resolvedTicker || searchInput.trim().toUpperCase();
+      loadTickerProjection(targetTicker);
     }
   };
 
@@ -344,12 +414,35 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
             {searchResults.length > 0 && (
               <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-zinc-700/80 rounded-xl shadow-2xl z-50 p-2 space-y-1 backdrop-blur-md max-h-80 overflow-y-auto">
                 <div className="flex items-center justify-between text-[10px] uppercase font-bold text-zinc-400 px-2 py-1 border-b border-zinc-800">
-                  <span>Global Exchange Matches</span>
+                  <span>Global Exchange & LSE Open Matches</span>
                   <span className="text-emerald-400 font-mono flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Live Streaming Prices
                   </span>
                 </div>
+
+                {/* Nearest Match Typo Correction Callout */}
+                {intelligentSearchInfo?.didYouMean && (!intelligentSearchInfo.exactMatch || intelligentSearchInfo.didYouMean.ticker !== searchInput.trim().toUpperCase()) && (
+                  <div
+                    onClick={() => {
+                      setSearchInput(intelligentSearchInfo.didYouMean!.ticker);
+                      loadTickerProjection(intelligentSearchInfo.didYouMean!.ticker);
+                      setSearchResults([]);
+                    }}
+                    className="p-2.5 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-cyan-200 text-xs font-mono cursor-pointer hover:bg-cyan-900/60 transition-all flex items-center justify-between shadow-md mb-2 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <span>
+                        Nearest match for &ldquo;{searchInput.trim()}&rdquo;: <strong className="text-white underline font-bold group-hover:text-cyan-300">{intelligentSearchInfo.didYouMean.ticker}</strong> ({intelligentSearchInfo.didYouMean.name})
+                      </span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/30 text-cyan-200 font-bold shrink-0">
+                      Select &rarr;
+                    </span>
+                  </div>
+                )}
+
                 {searchResults.map((q, idx) => {
                   const sym = q.symbol || q.ticker;
                   const symCurr = getCurrencySymbol(sym);
@@ -374,6 +467,11 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
                         <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-sans font-bold">
                           {q.exchange || 'EXCHANGE'}
                         </span>
+                        {q.similarityScore && q.similarityScore < 100 && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
+                            {q.similarityScore}% MATCH
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {priceVal !== undefined && priceVal !== null ? (
@@ -553,6 +651,242 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
               <span className="text-[10px] text-zinc-400 block">Lower bound: {currSym}{mc?.targetLow95 ? mc.targetLow95.toFixed(data.currentPrice < 5 ? 3 : 2) : '---'}</span>
             </div>
           </div>
+
+          {/* Model Toast Notification */}
+          {modelToast && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-medium flex items-center justify-between gap-2 shadow-lg animate-fade-in font-mono">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{modelToast}</span>
+              </div>
+              <button 
+                onClick={() => setModelToast(null)}
+                className="text-zinc-400 hover:text-white text-xs px-2 py-0.5"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* =========================================================================
+              NEW: INTRADAY BUY RECOMMENDATION & OUT PRICE CAP MODEL (CORE REQUIREMENT)
+             ========================================================================= */}
+          {(() => {
+            const intradayRec = intradayStrategyEngine.getIntradayRecommendationForStock(data.ticker, data.currentPrice);
+            const dec = data.currentPrice < 1.0 ? 4 : (data.currentPrice < 5.0 ? 3 : 2);
+            return (
+              <div className="rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900/90 to-zinc-950 border border-emerald-500/30 p-5 space-y-4 shadow-2xl relative overflow-hidden">
+                <div className="absolute -top-12 -right-12 w-44 h-44 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono flex items-center gap-1.5">
+                        <Zap className="w-3 h-3 text-emerald-400" />
+                        EVERYDAY INTRADAY BUY &amp; OUT PRICE CAP MODEL
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        {intradayRec.everydayResearch.researchDate}
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
+                        Tape: {intradayRec.everydayResearch.volumeProfileStatus}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <Target className="w-5 h-5 text-emerald-400" />
+                      <span>Intraday Recommendation &amp; Mandatory Out Cap for {data.ticker}</span>
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Dynamic intraday research calculating peak ATR expansion and strict profit-taking ceiling before afternoon reversal traps.
+                    </p>
+                  </div>
+
+                  {/* Recommendation Badge & Score */}
+                  <div className="flex items-center gap-2.5 sm:self-center">
+                    <div className="text-right">
+                      <div className="text-[10px] uppercase font-bold text-zinc-500">Model Recommendation</div>
+                      <span className={`text-xs font-black uppercase px-2.5 py-1 rounded font-mono inline-block ${
+                        intradayRec.recommendation === 'STRONG_BUY'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-950'
+                          : (intradayRec.recommendation === 'BUY_ON_PULLBACK'
+                              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                              : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40')
+                      }`}>
+                        {intradayRec.recommendation.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-center min-w-[70px]">
+                      <div className="text-[9px] uppercase font-bold text-zinc-500">Score</div>
+                      <div className="text-sm font-black text-emerald-400 font-mono">
+                        {intradayRec.recommendationScore}<span className="text-[9px] text-zinc-500">/100</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4-Box Key Execution Matrix: Suggested Buy vs. OUT PRICE CAP vs. TP1 vs. Stop Loss */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* 1. Suggested Buy Entry & Zone */}
+                  <div className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-1">
+                    <span className="text-[10px] text-zinc-400 uppercase font-bold block">
+                      Suggested Buy Entry
+                    </span>
+                    <div className="text-xl font-black text-white font-mono">
+                      {currSym}{intradayRec.suggestedBuyEntry.toFixed(dec)}
+                    </div>
+                    <span className="text-[10px] text-zinc-400 block font-mono truncate">
+                      Zone: {currSym}{intradayRec.suggestedBuyZone.min.toFixed(dec)} - {currSym}{intradayRec.suggestedBuyZone.max.toFixed(dec)}
+                    </span>
+                  </div>
+
+                  {/* 2. INTRADAY OUT PRICE CAP (CEILING) */}
+                  <div className="p-3.5 rounded-xl bg-gradient-to-br from-amber-500/10 via-amber-950/25 to-zinc-950 border border-amber-500/40 space-y-1 shadow-lg shadow-amber-950/20">
+                    <div className="flex items-center justify-between text-[10px] text-amber-300 uppercase font-black">
+                      <span>OUT PRICE CAP (CEILING)</span>
+                      <span className="text-[8px] bg-amber-500/30 px-1 py-0.5 rounded text-amber-200 font-mono">MANDATED</span>
+                    </div>
+                    <div className="text-xl font-black text-amber-400 font-mono">
+                      {currSym}{intradayRec.outPriceCap.toFixed(dec)}
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-bold block font-mono">
+                      +{intradayRec.outPriceCapGainPct}% Max Gain Cap Target
+                    </span>
+                  </div>
+
+                  {/* 3. Scalp Trim Cap (50% scale out) */}
+                  <div className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-1">
+                    <span className="text-[10px] text-zinc-400 uppercase font-bold block">
+                      Scalp Trim Cap (TP1)
+                    </span>
+                    <div className="text-xl font-black text-emerald-400 font-mono">
+                      {currSym}{intradayRec.scalpTrimCap.toFixed(dec)}
+                    </div>
+                    <span className="text-[10px] text-zinc-400 block font-mono">
+                      Scale 50% &amp; Move Stop to Entry
+                    </span>
+                  </div>
+
+                  {/* 4. Hard Stop Loss Floor */}
+                  <div className="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-1">
+                    <span className="text-[10px] text-zinc-400 uppercase font-bold block">
+                      Hard Stop Floor
+                    </span>
+                    <div className="text-xl font-black text-rose-400 font-mono">
+                      {currSym}{intradayRec.hardStopLoss.toFixed(dec)}
+                    </div>
+                    <span className="text-[10px] text-zinc-400 block font-mono">
+                      Risk/Reward {intradayRec.riskRewardRatio}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Timing & Time Window Horizon */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-xs">
+                  <div className="flex items-center gap-2 text-zinc-300 font-mono text-[11px]">
+                    <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span><strong>Optimal Entry:</strong> {intradayRec.suggestiveTimeWindow.split('(')[0]}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-zinc-300 font-mono text-[11px]">
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span><strong>Cap-Out Limit:</strong> {intradayRec.capOutTimeLimit.split('(')[0]}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-zinc-300 font-mono text-[11px]">
+                    <Target className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span><strong>Target Duration:</strong> {intradayRec.everydayResearch.optimalHoldingMinutes}</span>
+                  </div>
+                </div>
+
+                {/* Everyday Market Research Rationale Box */}
+                <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-2.5">
+                  <div className="text-[10px] uppercase font-bold text-zinc-400 flex items-center justify-between border-b border-zinc-850 pb-2">
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Daily Research Synthesis for {data.ticker}
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500">
+                      Regime: {intradayRec.everydayResearch.marketRegime}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs leading-relaxed">
+                    <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/60 space-y-1">
+                      <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" />
+                        Why Model Recommends BUY Today:
+                      </div>
+                      <p className="text-zinc-300 text-[11px]">
+                        {intradayRec.everydayResearch.whyBuyReason}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/60 space-y-1">
+                      <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Why Out Price Cap Placed Here:
+                      </div>
+                      <p className="text-zinc-300 text-[11px]">
+                        {intradayRec.everydayResearch.whyOutPriceCapReason}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Model Execution Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-800/80">
+                  <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live Intraday Strategy Engine · Calibrated {intradayRec.lastUpdated}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopyPlan(intradayRec, data.ticker, currSym, dec)}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold font-mono bg-zinc-850 hover:bg-zinc-800 text-zinc-200 hover:text-white flex items-center gap-1.5 transition-all border border-zinc-700/60 shadow-sm"
+                      title="Copy full intraday trading plan parameters to clipboard"
+                    >
+                      {copiedPlanTicker === data.ticker ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                      )}
+                      <span>{copiedPlanTicker === data.ticker ? 'Plan Copied!' : 'Copy Plan'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        try {
+                          localStorage.setItem('quant_terminal_active_ticker', data.ticker);
+                          localStorage.setItem('quant_suggested_buy_entry', intradayRec.suggestedBuyEntry.toString());
+                          localStorage.setItem('quant_out_price_cap', intradayRec.outPriceCap.toString());
+                          localStorage.setItem('quant_scalp_trim_cap', intradayRec.scalpTrimCap.toString());
+                          localStorage.setItem('quant_stop_loss', intradayRec.hardStopLoss.toString());
+                        } catch {}
+                        setModelToast(`✓ Applied ${data.ticker} parameters to Order Ticket: Buy @ ${currSym}${intradayRec.suggestedBuyEntry.toFixed(dec)}, Out Cap @ ${currSym}${intradayRec.outPriceCap.toFixed(dec)}`);
+                        setTimeout(() => setModelToast(null), 5000);
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold font-mono bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition-all shadow-md shadow-emerald-950/40"
+                    >
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                      <span>Apply Limits to Order Ticket</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        quantTraderBrain.simulateDailyLearningStep();
+                        setModelToast(`🤖 Brain simulated algorithmic intraday execution on ${data.ticker}: Buy Zone $${intradayRec.suggestedBuyZone.min}-$${intradayRec.suggestedBuyZone.max}, Out Price Cap $${intradayRec.outPriceCap}`);
+                        setTimeout(() => setModelToast(null), 5000);
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center gap-1.5 transition-all"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Simulate Brain Trade</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 3. Multi-Scenario Overview & Future Impact (The Core User Request) */}
           <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4 shadow-xl">

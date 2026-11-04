@@ -255,9 +255,12 @@ export const COMMON_TICKER_MAP: Readonly<Record<string, string>> = Object.freeze
   'BITFARMS': 'BITF'
 });
 
+import { findNearestRelevantMatch } from '../../utils/intelligentSearch';
+
 /**
  * Resolves a potentially mistyped ticker or natural language company name to its standard symbol.
  * Handles TSX / TSE prefixes (e.g. "TSX:SHOP" -> "SHOP.TO", "TSE:RY" -> "RY.TO", "SHOP-TO" -> "SHOP.TO").
+ * If no direct mapping exists, employs London Strategic Edge intelligent nearest-match resolution.
  * 
  * @param input Raw ticker symbol or company name
  * @returns Clean uppercase market ticker symbol
@@ -286,6 +289,15 @@ export const resolveTickerSymbol = (input: string): string => {
   if (COMMON_TICKER_MAP[normalized]) {
     return COMMON_TICKER_MAP[normalized];
   }
+
+  // Intelligent Nearest-Match Typo Resolution (London Strategic Edge Open Feed)
+  try {
+    const fuzzy = findNearestRelevantMatch(normalized, 1);
+    if (fuzzy.didYouMean && fuzzy.nearestMatches.length > 0 && fuzzy.nearestMatches[0].similarityScore >= 80) {
+      return fuzzy.didYouMean.ticker;
+    }
+  } catch {}
+
   return normalized;
 };
 

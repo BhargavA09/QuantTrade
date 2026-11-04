@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { 
   ResponsiveContainer, 
   ComposedChart, 
@@ -44,7 +44,10 @@ import {
   Waves,
   FileText,
   BarChart2,
-  Eye
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Database
 } from 'lucide-react';
 import { 
   quantTraderBrain, 
@@ -79,8 +82,12 @@ import { MarketSentimentHeatmap } from './MarketSentimentHeatmap';
 import { MarketSentimentGauge } from './MarketSentimentGauge';
 import { StrategyBacktestingModule } from './StrategyBacktestingModule';
 import { VolumeLensOrderFlowView } from './VolumeLensOrderFlowView';
+import { FourierSignalFilteringChart } from './FourierSignalFilteringChart';
+import { LondonStrategicEdgeView } from './LondonStrategicEdgeView';
+import { IntradaySuggestiveTradeView } from './IntradaySuggestiveTradeView';
 import { detectAutomatedPatterns } from '../../utils/patternRecognition';
 import { computeHighFrequencyAnalysis, HighFrequencyMetrics } from '../../services/api/signalProcessing';
+import { findNearestRelevantMatch } from '../../utils/intelligentSearch';
 
 interface TradingTerminalViewProps {
   selectedTicker: string;
@@ -97,8 +104,16 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   
   // Terminal Sub-Tabs
   const [activeSubTab, setActiveSubTab] = useState<
-    'chart' | 'volumelens' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'sentiment_gauge' | 'backtest'
+    'chart' | 'intraday_picks' | 'volumelens' | 'lse_edge' | 'fourier' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'sentiment_gauge' | 'backtest'
   >('chart');
+
+  const subTabsContainerRef = useRef<HTMLDivElement>(null);
+  const scrollSubTabs = (direction: 'left' | 'right') => {
+    if (subTabsContainerRef.current) {
+      const scrollAmount = direction === 'left' ? -260 : 260;
+      subTabsContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   // Tear Sheet & Chart Visualizer Toggles
   const [isTearSheetOpen, setIsTearSheetOpen] = useState<boolean>(false);
@@ -494,14 +509,20 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     return computeHighFrequencyAnalysis(prices, 0.15);
   }, [chartBars]);
 
-  // Enriched chart bars with Fourier Low-Pass smoothed baseline & high-pass Z-score
+  // Enriched chart bars with Fourier Low-Pass smoothed baseline, volatility envelopes & high-pass Z-score
   const enrichedChartBars = useMemo(() => {
     if (!fourierMetrics || !fourierMetrics.lowPass.length) return chartBars;
-    return chartBars.map((b, idx) => ({
-      ...b,
-      fourierLowPass: fourierMetrics.lowPass[idx] !== undefined ? parseFloat(fourierMetrics.lowPass[idx].toFixed(2)) : undefined,
-      fourierZScore: fourierMetrics.zScores[idx] !== undefined ? parseFloat(fourierMetrics.zScores[idx].toFixed(2)) : undefined
-    }));
+    const stdDev = Math.sqrt(fourierMetrics.hfVariance) || 0.01;
+    return chartBars.map((b, idx) => {
+      const lp = fourierMetrics.lowPass[idx] !== undefined ? fourierMetrics.lowPass[idx] : b.price;
+      return {
+        ...b,
+        fourierLowPass: fourierMetrics.lowPass[idx] !== undefined ? parseFloat(fourierMetrics.lowPass[idx].toFixed(2)) : undefined,
+        fourierUpperEnvelope: parseFloat((lp + 1.8 * stdDev).toFixed(2)),
+        fourierLowerEnvelope: parseFloat((lp - 1.8 * stdDev).toFixed(2)),
+        fourierZScore: fourierMetrics.zScores[idx] !== undefined ? parseFloat(fourierMetrics.zScores[idx].toFixed(2)) : undefined
+      };
+    });
   }, [chartBars, fourierMetrics]);
 
   // Quant Signal for currently selected ticker based on real live data
@@ -579,7 +600,13 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
     });
   }, [globalUniverse, marketCategoryFilter, searchQuery]);
 
-  // Combined search results prioritizing live remote prices
+  // Intelligent Fuzzy Search powered by London Strategic Edge Open Master
+  const intelligentSearchResult = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    return findNearestRelevantMatch(searchQuery.trim(), 8);
+  }, [searchQuery]);
+
+  // Combined search results prioritizing live remote prices and LSE nearest matches
   const combinedSearchResults = useMemo(() => {
     const seen = new Set<string>();
     const list: any[] = [];
@@ -621,8 +648,32 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       }
     });
 
+    // Blend in London Strategic Edge intelligent nearest matches
+    if (intelligentSearchResult?.nearestMatches) {
+      intelligentSearchResult.nearestMatches.forEach(match => {
+        const sym = match.item.ticker.toUpperCase();
+        if (!seen.has(sym)) {
+          seen.add(sym);
+          const live = liveQuotesMap[sym];
+          list.push({
+            ticker: sym,
+            symbol: sym,
+            name: match.item.name,
+            price: live?.currentPrice ?? match.item.price,
+            change: live?.change ?? 0,
+            changePercent: live?.changePercent ?? 0,
+            currency: match.item.currency || (sym.endsWith('.TO') ? 'CAD' : 'USD'),
+            exchange: match.item.exchange || 'LSE Open',
+            similarityScore: match.similarityScore,
+            matchType: match.matchType,
+            matchReason: match.matchReason
+          });
+        }
+      });
+    }
+
     return list.slice(0, 10);
-  }, [remoteSearchResults, filteredGlobalUniverse, liveQuotesMap]);
+  }, [remoteSearchResults, filteredGlobalUniverse, liveQuotesMap, intelligentSearchResult]);
 
   // Execute Paper Order
   const handleExecute = (type: 'LONG' | 'SHORT') => {
@@ -687,8 +738,21 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       {/* 1. Sub-Tab Header Strip, Live Indicator & Quick Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl backdrop-blur-md">
         
-        {/* Terminal Sub-Tabs */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs font-bold font-mono overflow-x-auto no-scrollbar scroll-smooth max-w-full">
+        {/* Terminal Sub-Tabs with Smooth Navigation */}
+        <div className="relative flex items-center max-w-full overflow-hidden group flex-1">
+          <button
+            onClick={() => scrollSubTabs('left')}
+            className="hidden sm:flex items-center justify-center absolute left-0 z-10 w-7 h-full bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-transparent text-zinc-400 hover:text-white transition-opacity opacity-0 group-hover:opacity-100"
+            title="Scroll sub-tabs left"
+            aria-label="Scroll sub-tabs left"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div 
+            ref={subTabsContainerRef}
+            className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs font-bold font-mono overflow-x-auto no-scrollbar scroll-smooth max-w-full"
+          >
           <button
             onClick={() => setActiveSubTab('chart')}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
@@ -699,6 +763,23 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           >
             <BarChart3 className="w-4 h-4" />
             <span>Terminal & Live Chart</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('intraday_picks')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
+              activeSubTab === 'intraday_picks'
+                ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40 ring-1 ring-emerald-400'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+            title="Suggestive Intraday Trade Setups, Exact Buy Price, Out Price Cap & Everyday Research"
+          >
+            <Target className="w-4 h-4 text-emerald-400" />
+            <span>Intraday Picks</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold">
+              BUY WINDOWS
+            </span>
           </button>
 
           <button
@@ -715,6 +796,40 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
             <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
               ORDER FLOW
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('lse_edge')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
+              activeSubTab === 'lse_edge'
+                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-950/40 ring-1 ring-cyan-400'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+            title="London Strategic Edge Open Source Market Data & ML Forecasting Engine (londonstrategicedge.com)"
+          >
+            <Database className="w-4 h-4 text-cyan-400" />
+            <span>LSE Open Edge</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
+              OPEN DATA
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('fourier')}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
+              activeSubTab === 'fourier'
+                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-950/40 ring-1 ring-cyan-400'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+            }`}
+            title="Interactive Intraday Price Chart with Discrete Fourier Signal Filtering & Volatility Envelopes"
+          >
+            <Waves className="w-4 h-4 text-cyan-400" />
+            <span>Fourier Signal Filter</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
+              SPECTRAL FFT
             </span>
           </button>
 
@@ -899,6 +1014,16 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
           </button>
         </div>
 
+          <button
+            onClick={() => scrollSubTabs('right')}
+            className="hidden sm:flex items-center justify-center absolute right-0 z-10 w-7 h-full bg-gradient-to-l from-zinc-950 via-zinc-950/80 to-transparent text-zinc-400 hover:text-white transition-opacity opacity-0 group-hover:opacity-100"
+            title="Scroll sub-tabs right"
+            aria-label="Scroll sub-tabs right"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
         {/* Global Asset Search Bar */}
         <div className="relative flex-1 max-w-md">
           <div className="relative">
@@ -913,7 +1038,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
               onFocus={() => setIsSearchOpen(true)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && searchQuery.trim()) {
-                  const sym = searchQuery.trim().toUpperCase();
+                  const sym = (intelligentSearchResult?.resolvedTicker || searchQuery.trim()).toUpperCase();
                   onSelectTicker(sym);
                   setActiveSubTab('projection');
                   setIsSearchOpen(false);
@@ -926,7 +1051,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             <button
               onClick={() => {
                 if (searchQuery.trim()) {
-                  const sym = searchQuery.trim().toUpperCase();
+                  const sym = (intelligentSearchResult?.resolvedTicker || searchQuery.trim()).toUpperCase();
                   onSelectTicker(sym);
                   setActiveSubTab('projection');
                   setIsSearchOpen(false);
@@ -939,18 +1064,41 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             </button>
           </div>
 
-          {/* Quick Search Auto-Suggest Dropdown with Live Prices */}
+          {/* Quick Search Auto-Suggest Dropdown with Live Prices & LSE Nearest Matches */}
           {isSearchOpen && searchQuery.trim() && (
             <div className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-zinc-700/80 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto p-2 space-y-1 backdrop-blur-md">
               <div className="flex items-center justify-between text-[10px] uppercase font-bold text-zinc-400 px-2 py-1 border-b border-zinc-800">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Live Market Search Matches
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  Intelligent Search Matches (London Strategic Edge Open Data)
                 </span>
                 {isSearchingRemote && (
                   <span className="text-[10px] text-zinc-400 font-mono animate-pulse">Searching global feeds...</span>
                 )}
               </div>
+
+              {/* Nearest Match Typo Correction Callout */}
+              {intelligentSearchResult?.didYouMean && (!intelligentSearchResult.exactMatch || intelligentSearchResult.didYouMean.ticker !== searchQuery.trim().toUpperCase()) && (
+                <div 
+                  onClick={() => {
+                    onSelectTicker(intelligentSearchResult.didYouMean!.ticker);
+                    setActiveSubTab('projection');
+                    setIsSearchOpen(false);
+                    setSearchQuery('');
+                  }}
+                  className="p-2 rounded-lg bg-cyan-950/70 border border-cyan-500/40 text-cyan-200 text-xs font-mono cursor-pointer hover:bg-cyan-900/60 transition-all flex items-center justify-between shadow-md mb-1.5 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>
+                      Nearest match for &ldquo;{searchQuery.trim()}&rdquo;: <strong className="text-white underline font-bold group-hover:text-cyan-300">{intelligentSearchResult.didYouMean.ticker}</strong> ({intelligentSearchResult.didYouMean.name})
+                    </span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/30 text-cyan-200 font-bold shrink-0">
+                    Select &rarr;
+                  </span>
+                </div>
+              )}
 
               {combinedSearchResults.map((item, idx) => {
                 const symCurr = getCurrencySymbol(item.ticker);
@@ -975,6 +1123,11 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                       <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-sans font-bold">
                         {item.exchange || 'US'}
                       </span>
+                      {item.similarityScore && item.similarityScore < 100 && (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
+                          {item.similarityScore}% MATCH
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2.5 shrink-0">
                       {priceVal !== undefined && priceVal !== null ? (
@@ -1449,6 +1602,8 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                         if (name === 'bbUpper') return [`$${val}`, 'Upper Band'];
                         if (name === 'bbLower') return [`$${val}`, 'Lower Band'];
                         if (name === 'fourierLowPass') return [`$${val}`, 'Fourier Low-Pass Baseline'];
+                        if (name === 'fourierUpperEnvelope') return [`$${val}`, 'Fourier Upper Envelope (+1.8σ)'];
+                        if (name === 'fourierLowerEnvelope') return [`$${val}`, 'Fourier Lower Envelope (-1.8σ)'];
                         if (name === 'fourierZScore') return [`${val}σ`, 'Fourier High-Pass Residual'];
                         return [val, name];
                       }}
@@ -1467,11 +1622,39 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                       <Line type="monotone" dataKey="ema50" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
                     )}
                     {showFourierFilter && (
-                      <Line type="monotone" dataKey="fourierLowPass" stroke="#06b6d4" strokeWidth={2.2} strokeDasharray="4 4" dot={false} />
+                      <>
+                        <Line type="monotone" dataKey="fourierUpperEnvelope" stroke="#c084fc" strokeWidth={1.2} strokeDasharray="3 3" dot={false} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="fourierLowerEnvelope" stroke="#c084fc" strokeWidth={1.2} strokeDasharray="3 3" dot={false} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="fourierLowPass" stroke="#06b6d4" strokeWidth={2.4} strokeDasharray="4 4" dot={false} />
+                      </>
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
+
+              {/* Fourier Telemetry Quick Strip */}
+              {showFourierFilter && fourierMetrics && (
+                <div className="p-2.5 rounded-xl bg-cyan-950/25 border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono">
+                  <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                    <Waves className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span className="text-zinc-300 font-bold">Fourier Model:</span>
+                    <span className="text-cyan-300">Baseline S_LP(t) + Volatility Corridor (&plusmn;1.8&sigma;) Active</span>
+                    <span className="text-zinc-600">·</span>
+                    <span className="text-zinc-400">Residual Z:</span>
+                    <span className={`font-black ${fourierMetrics.currentZScore <= -1.8 ? 'text-emerald-400' : (fourierMetrics.currentZScore >= 1.8 ? 'text-rose-400' : 'text-zinc-200')}`}>
+                      {fourierMetrics.currentZScore >= 0 ? '+' : ''}{fourierMetrics.currentZScore.toFixed(2)}&sigma;
+                    </span>
+                    <span className="text-zinc-600">·</span>
+                    <span className="text-zinc-400">Noise: {fourierMetrics.hfEnergyPercent}%</span>
+                  </div>
+                  <button
+                    onClick={() => setActiveSubTab('fourier')}
+                    className="text-cyan-400 hover:text-cyan-300 text-[11px] font-bold flex items-center gap-1 shrink-0 hover:underline"
+                  >
+                    <span>Open Interactive Fourier Studio &rarr;</span>
+                  </button>
+                </div>
+              )}
 
               {/* Technical Footprint Readouts */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs border-t border-zinc-800">
@@ -2796,6 +2979,47 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
         <VolumeLensOrderFlowView
           selectedTicker={selectedTicker}
           onSelectTicker={onSelectTicker}
+          onTradeExecuted={(msg) => {
+            setTradeMessage(msg);
+            setTimeout(() => setTradeMessage(null), 5000);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 13: INTERACTIVE FOURIER SIGNAL FILTERING & VOLATILITY ENVELOPES  */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'fourier' && (
+        <FourierSignalFilteringChart
+          ticker={selectedTicker}
+          currentPrice={currentPrice}
+          bars={chartBars}
+          onTradeSignal={(action, price, reason) => {
+            setTradeMessage(`Executed Fourier ${action} on ${selectedTicker} @ $${price.toFixed(2)}: ${reason}`);
+            setTimeout(() => setTradeMessage(null), 5000);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 14: LONDON STRATEGIC EDGE OPEN DATA & ML FORECASTING ENGINE       */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'lse_edge' && (
+        <LondonStrategicEdgeView
+          initialTicker={selectedTicker}
+          onSelectTicker={onSelectTicker}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-TAB 15: INTRADAY SUGGESTIVE TRADES, OUT PRICE CAPS & EVERYDAY RESEARCH */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'intraday_picks' && (
+        <IntradaySuggestiveTradeView
+          onNavigateToTerminal={(ticker) => {
+            onSelectTicker(ticker);
+            setActiveSubTab('chart');
+          }}
           onTradeExecuted={(msg) => {
             setTradeMessage(msg);
             setTimeout(() => setTradeMessage(null), 5000);
