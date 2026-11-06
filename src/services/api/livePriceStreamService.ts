@@ -11,6 +11,7 @@
  */
 
 import { offlineMarketVaultService } from '../offlineMarketVaultService';
+import { intradayStrategyEngine } from '../intradayStrategyEngine';
 
 export interface LivePriceTick {
   ticker: string;
@@ -39,10 +40,11 @@ export type StreamStatusListener = (status: {
 
 class LivePriceStreamService {
   private eventSource: EventSource | null = null;
+  private ws: WebSocket | null = null;
   private tickListeners: Set<TickListener> = new Set();
   private statusListeners: Set<StreamStatusListener> = new Set();
   private subscribedTickers: Set<string> = new Set([
-    'NVDA', 'SHOP.TO', 'PLUG', 'SNDL', 'ASML.AS', 'SHEL.L', '7203.T', 'BTC-USD', 'GC=F'
+    'NVDA', 'SHOP.TO', 'PLUG', 'SNDL', 'PSEC', 'SOFI', 'MARA', 'DNA', 'TSLA', 'AAPL', 'MSFT', 'PLTR', 'SPY', 'QQQ', 'BTC-USD', 'GC=F'
   ]);
   private lastPrices: Map<string, number> = new Map();
   private isConnected: boolean = false;
@@ -77,6 +79,9 @@ class LivePriceStreamService {
       if (clean && !this.subscribedTickers.has(clean)) {
         this.subscribedTickers.add(clean);
         changed = true;
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ type: 'SUBSCRIBE', ticker: clean }));
+        }
       }
     });
 
@@ -89,6 +94,9 @@ class LivePriceStreamService {
     const clean = ticker.trim().toUpperCase();
     if (!clean) return;
     this.subscribedTickers.add(clean);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'SUBSCRIBE', ticker: clean }));
+    }
     this.fetchImmediateTick(clean);
   }
 
@@ -106,8 +114,61 @@ class LivePriceStreamService {
     }
   }
 
+  private initWebSocket() {
+    if (typeof window === 'undefined') return;
+    try {
+      if (this.ws) {
+        this.ws.close();
+      }
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this.isConnected = true;
+        this.notifyStatus();
+        this.subscribedTickers.forEach(t => {
+          this.ws?.send(JSON.stringify({ type: 'SUBSCRIBE', ticker: t }));
+        });
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'PRICE_UPDATE' && data.ticker && data.price) {
+            this.dispatchTick({
+              ticker: data.ticker,
+              name: data.name || data.ticker,
+              price: data.price,
+              change: data.change || 0,
+              changePercent: data.changePercent || 0,
+              volume: data.volume || 15000000,
+              high: data.high || data.price * 1.01,
+              low: data.low || data.price * 0.99,
+              currency: data.currency || (data.ticker.endsWith('.TO') ? 'CAD' : 'USD'),
+              exchange: data.exchange || (data.ticker.endsWith('.TO') ? 'TSX' : 'US'),
+              latencyMs: 18,
+              timestamp: data.timestamp || new Date().toISOString()
+            });
+          }
+        } catch {}
+      };
+
+      this.ws.onerror = () => {
+        // Will rely on EventSource & fast polling
+      };
+
+      this.ws.onclose = () => {
+        setTimeout(() => this.initWebSocket(), 6000);
+      };
+    } catch {}
+  }
+
   private startStreaming() {
     if (typeof window === 'undefined') return;
+
+    // Connect WebSocket
+    this.initWebSocket();
 
     const tickerParam = Array.from(this.subscribedTickers).slice(0, 15).join(',');
     const streamUrl = `/api/market/stream?tickers=${encodeURIComponent(tickerParam)}`;
@@ -139,8 +200,6 @@ class LivePriceStreamService {
       };
 
       this.eventSource.onerror = () => {
-        this.isConnected = false;
-        this.notifyStatus();
         this.eventSource?.close();
         this.eventSource = null;
 
@@ -157,7 +216,7 @@ class LivePriceStreamService {
 
     this.pollInterval = setInterval(async () => {
       try {
-        const tickerParam = Array.from(this.subscribedTickers).slice(0, 10).join(',');
+        const tickerParam = Array.from(this.subscribedTickers).slice(0, 12).join(',');
         const res = await fetch(`/api/market/live-stream-ticks?tickers=${encodeURIComponent(tickerParam)}`);
         if (res.ok) {
           const json = await res.json();
@@ -170,7 +229,7 @@ class LivePriceStreamService {
         this.isConnected = false;
       }
       this.notifyStatus();
-    }, 2800);
+    }, 1800);
 
     // Attempt to reconnect SSE every 25 seconds
     if (!this.reconnectTimer) {
@@ -232,6 +291,11 @@ class LivePriceStreamService {
       isLiveMarketData: true,
       exchangeTimestamp: tick.timestamp
     });
+
+    // Real-time synchronization to Intraday Strategy Engine
+    try {
+      intradayStrategyEngine.updateLiveTick(fullTick);
+    } catch {}
 
     this.lastTickMs = Date.now();
     if (tick.latencyMs) {

@@ -35,6 +35,18 @@ export const InstitutionalRiskTearSheet: React.FC<InstitutionalRiskTearSheetProp
     return quantTraderBrain.subscribe(setBrainState);
   }, []);
 
+  // Escape key to close
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const stats = brainState.stats;
   const weights = brainState.weights;
   const activeTrades = brainState.activeTrades;
@@ -210,22 +222,27 @@ export const InstitutionalRiskTearSheet: React.FC<InstitutionalRiskTearSheetProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+    >
       <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden print:m-0 print:p-0 print:border-none print:shadow-none print:max-h-none print:w-full">
         
         {/* Modal Action Bar (Hidden during Print) */}
-        <div className="p-4 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between print:hidden">
+        <div className="p-3.5 sm:p-4 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-emerald-400" />
             <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
-              Institutional Risk Tear Sheet & Executive Mandate
+              Institutional Risk Tear Sheet &amp; Executive Mandate
             </h2>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportCsv}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-xs flex items-center gap-1.5 transition-colors border border-zinc-700/60"
+              className="hidden sm:flex px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-xs items-center gap-1.5 transition-colors border border-zinc-700/60"
               title="Download RFC-4180 CSV spreadsheet"
             >
               <Download className="w-3.5 h-3.5 text-emerald-400" />
@@ -234,7 +251,7 @@ export const InstitutionalRiskTearSheet: React.FC<InstitutionalRiskTearSheetProp
 
             <button
               onClick={handleExportJson}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-xs flex items-center gap-1.5 transition-colors border border-zinc-700/60"
+              className="hidden sm:flex px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-xs items-center gap-1.5 transition-colors border border-zinc-700/60"
               title="Download machine-readable JSON telemetry"
             >
               <Download className="w-3.5 h-3.5 text-blue-400" />
@@ -250,12 +267,15 @@ export const InstitutionalRiskTearSheet: React.FC<InstitutionalRiskTearSheetProp
               <span>Print / Save PDF</span>
             </button>
 
+            {/* Prominent High-Contrast Close Button */}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors ml-2"
-              title="Close Tear Sheet"
+              className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-rose-950/80 border border-zinc-700 hover:border-rose-500/60 text-zinc-100 hover:text-rose-200 font-mono text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ml-1 group"
+              title="Close Risk Tear Sheet (Esc)"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 text-zinc-400 group-hover:text-rose-400 transition-colors" />
+              <span>Close</span>
+              <kbd className="hidden sm:inline text-[9px] bg-zinc-900 px-1 py-0.5 rounded text-zinc-400 border border-zinc-700 group-hover:text-rose-300">ESC</kbd>
             </button>
           </div>
         </div>
@@ -531,6 +551,34 @@ export const InstitutionalRiskTearSheet: React.FC<InstitutionalRiskTearSheetProp
             <div className="text-[10px] text-amber-400/80 print:text-zinc-600 font-sans">
               <strong>Mandatory Notice:</strong> This tear sheet, Monte Carlo VaR projections, and stress simulations are for <strong>educational and quantitative research purposes only</strong>. Not registered investment, financial, or legal advice.
             </div>
+          </div>
+        </div>
+
+        {/* Sticky Modal Bottom Action Bar (Hidden during Print) */}
+        <div className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-800 flex items-center justify-between print:hidden">
+          <div className="text-xs text-zinc-400 font-mono hidden sm:flex items-center gap-3">
+            <span>Portfolio NAV: <strong className="text-emerald-400">${riskMetrics.nav.toLocaleString()}</strong></span>
+            <span className="text-zinc-600">·</span>
+            <span>Sharpe Ratio: <strong className="text-white">{riskMetrics.sharpe}</strong></span>
+            <span className="text-zinc-600">·</span>
+            <span>Max Drawdown: <strong className="text-rose-400">{riskMetrics.maxDrawdownPct}%</strong></span>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <button
+              onClick={handlePrint}
+              className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/60 transition-colors"
+            >
+              <Printer className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Print / PDF</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full sm:w-auto px-5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 hover:border-rose-500 font-mono text-xs font-black flex items-center justify-center gap-2 transition-all shadow-md"
+            >
+              <X className="w-4 h-4 text-rose-300" />
+              <span>Close Tear Sheet</span>
+            </button>
           </div>
         </div>
       </div>

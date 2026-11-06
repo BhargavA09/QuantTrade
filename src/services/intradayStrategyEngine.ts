@@ -261,7 +261,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Plug Power Inc.',
     category: 'PENNY' as const,
     exchange: 'NASDAQ',
-    basePrice: 1.41,
+    basePrice: 1.35,
     baseVol: '48.5M',
     strategyId: 'PENNY_FLOAT_ROTATION',
     strategyName: 'Low-Float Penny Squeeze',
@@ -277,7 +277,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'SNDL Inc.',
     category: 'PENNY' as const,
     exchange: 'NASDAQ',
-    basePrice: 2.14,
+    basePrice: 1.38,
     baseVol: '18.2M',
     strategyId: 'ORB_15_30',
     strategyName: 'Opening Range Breakout',
@@ -293,7 +293,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Prospect Capital Corp.',
     category: 'PENNY' as const,
     exchange: 'NASDAQ',
-    basePrice: 2.24,
+    basePrice: 1.385,
     baseVol: '14.1M',
     strategyId: 'SEC_INSIDER_SQUEEZE',
     strategyName: 'SEC Form 4 Insider Confluence',
@@ -309,7 +309,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'SoFi Technologies Inc.',
     category: 'PENNY' as const,
     exchange: 'NASDAQ',
-    basePrice: 9.42,
+    basePrice: 14.20,
     baseVol: '62.4M',
     strategyId: 'VWAP_MEAN_REVERSION',
     strategyName: 'VWAP Mean Reversion & Squeeze',
@@ -325,7 +325,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'MARA Holdings Inc.',
     category: 'PENNY' as const,
     exchange: 'NASDAQ',
-    basePrice: 16.80,
+    basePrice: 19.40,
     baseVol: '38.0M',
     strategyId: 'PENNY_FLOAT_ROTATION',
     strategyName: 'High-Beta Momentum Squeeze',
@@ -341,7 +341,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Ginkgo Bioworks Holdings',
     category: 'PENNY' as const,
     exchange: 'NYSE',
-    basePrice: 0.38,
+    basePrice: 0.34,
     baseVol: '24.5M',
     strategyId: 'PENNY_FLOAT_ROTATION',
     strategyName: 'Micro-Cap Float Rotation',
@@ -359,7 +359,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'NVIDIA Corporation',
     category: 'LARGE_CAP' as const,
     exchange: 'NASDAQ',
-    basePrice: 136.75,
+    basePrice: 181.60,
     baseVol: '54.2M',
     strategyId: 'SMC_ORDER_BLOCK',
     strategyName: 'SMC Order Block Sniping',
@@ -375,7 +375,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Tesla Inc.',
     category: 'LARGE_CAP' as const,
     exchange: 'NASDAQ',
-    basePrice: 248.50,
+    basePrice: 343.69,
     baseVol: '68.5M',
     strategyId: 'ORB_15_30',
     strategyName: 'Opening Range Breakout (ORB)',
@@ -391,7 +391,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Apple Inc.',
     category: 'LARGE_CAP' as const,
     exchange: 'NASDAQ',
-    basePrice: 234.80,
+    basePrice: 344.17,
     baseVol: '42.1M',
     strategyId: 'VWAP_MEAN_REVERSION',
     strategyName: 'VWAP Equilibrium Reversion',
@@ -407,7 +407,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Microsoft Corporation',
     category: 'LARGE_CAP' as const,
     exchange: 'NASDAQ',
-    basePrice: 422.60,
+    basePrice: 535.93,
     baseVol: '22.4M',
     strategyId: 'KALMAN_DRIFT_MOMENTUM',
     strategyName: 'Kalman Trend Drift',
@@ -423,7 +423,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Palantir Technologies',
     category: 'LARGE_CAP' as const,
     exchange: 'NYSE',
-    basePrice: 44.20,
+    basePrice: 54.20,
     baseVol: '74.2M',
     strategyId: 'ORB_15_30',
     strategyName: 'Momentum Breakout & Volume Squeeze',
@@ -441,7 +441,7 @@ const MONITORED_INTRADAY_UNIVERSE = [
     name: 'Shopify Inc. (TSX)',
     category: 'CANADIAN_TSX' as const,
     exchange: 'TSX',
-    basePrice: 112.40,
+    basePrice: 201.23,
     baseVol: '3.8M',
     strategyId: 'SMC_ORDER_BLOCK',
     strategyName: 'SMC Fair Value Gap Retest',
@@ -523,9 +523,23 @@ const MONITORED_INTRADAY_UNIVERSE = [
 class IntradayStrategyEngineService {
   private liveQuotes: Record<string, { price: number; changePercent: number; volume: string }> = {};
   private lastCalibrationTime: string = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  private listeners: Set<() => void> = new Set();
 
   constructor() {
     this.initBaselineQuotes();
+  }
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify() {
+    this.listeners.forEach(fn => {
+      try {
+        fn();
+      } catch {}
+    });
   }
 
   private initBaselineQuotes() {
@@ -536,6 +550,24 @@ class IntradayStrategyEngineService {
         volume: item.baseVol
       };
     }
+  }
+
+  /**
+   * Directly updates a live single tick from the real-time stream
+   */
+  public updateLiveTick(tick: { ticker: string; price: number; change?: number; changePercent?: number; volume?: any }) {
+    if (!tick || !tick.ticker || !tick.price || tick.price <= 0) return;
+    const sym = tick.ticker.toUpperCase();
+    const prev = this.liveQuotes[sym];
+    this.liveQuotes[sym] = {
+      price: tick.price,
+      changePercent: tick.changePercent ?? prev?.changePercent ?? 0.0,
+      volume: typeof tick.volume === 'number' 
+        ? (tick.volume > 1e6 ? `${(tick.volume / 1e6).toFixed(1)}M` : `${tick.volume}`) 
+        : (tick.volume || prev?.volume || '15M')
+    };
+    this.lastCalibrationTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    this.notify();
   }
 
   /**
@@ -553,6 +585,7 @@ class IntradayStrategyEngineService {
       }
     }
     this.lastCalibrationTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    this.notify();
   }
 
   /**

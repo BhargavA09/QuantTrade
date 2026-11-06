@@ -30,6 +30,7 @@ import {
 } from '../../services/intradayStrategyEngine';
 import { quantTraderBrain } from '../../services/QuantTraderBrain';
 import { findNearestRelevantMatch } from '../../utils/intelligentSearch';
+import { livePriceStreamService, LivePriceTick } from '../../services/api/livePriceStreamService';
 
 interface IntradaySuggestiveTradeViewProps {
   onNavigateToTerminal?: (ticker: string) => void;
@@ -54,6 +55,44 @@ export const IntradaySuggestiveTradeView: React.FC<IntradaySuggestiveTradeViewPr
   const [lastRefreshed, setLastRefreshed] = useState<string>(() => 
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
+  const [isStreamActive, setIsStreamActive] = useState<boolean>(true);
+  const [flashingTickers, setFlashingTickers] = useState<Record<string, 'UP' | 'DOWN'>>({});
+
+  // Real-time live data stream synchronization
+  useEffect(() => {
+    // 1. Subscribe to live price stream ticks
+    const unsubTicks = livePriceStreamService.subscribeTick((tick: LivePriceTick) => {
+      intradayStrategyEngine.updateLiveTick(tick);
+      if (tick.direction === 'UP' || tick.direction === 'DOWN') {
+        const dir: 'UP' | 'DOWN' = tick.direction;
+        setFlashingTickers(prev => ({ ...prev, [tick.ticker]: dir }));
+        setTimeout(() => {
+          setFlashingTickers(prev => {
+            const next = { ...prev };
+            delete next[tick.ticker];
+            return next;
+          });
+        }, 900);
+      }
+    });
+
+    // 2. Subscribe to intraday engine recalibrations
+    const unsubEngine = intradayStrategyEngine.subscribe(() => {
+      setRecommendations(intradayStrategyEngine.getEverydayBuyRecommendations());
+      setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    });
+
+    // 3. Register all active universe tickers with the live streaming engine
+    const coreUniverse = [
+      'NVDA', 'AAPL', 'MSFT', 'TSLA', 'PLUG', 'SNDL', 'PSEC', 'SOFI', 'MARA', 'DNA', 'SHOP.TO', 'PLTR', 'SPY', 'QQQ', 'BTC-USD', 'GC=F'
+    ];
+    livePriceStreamService.addTickers(coreUniverse);
+
+    return () => {
+      unsubTicks();
+      unsubEngine();
+    };
+  }, []);
 
   const refreshData = () => {
     setRecommendations(intradayStrategyEngine.getEverydayBuyRecommendations());
@@ -125,13 +164,27 @@ export const IntradaySuggestiveTradeView: React.FC<IntradaySuggestiveTradeViewPr
       const q = searchQuery.trim().toUpperCase();
       const fuzzy = findNearestRelevantMatch(q, 6);
       const topSymbols = new Set(fuzzy.nearestMatches.map(m => m.item.ticker));
-      topSymbols.add(fuzzy.resolvedTicker);
+      if (fuzzy.resolvedTicker) {
+        topSymbols.add(fuzzy.resolvedTicker);
+      }
 
-      list = list.filter(r => 
+      const matchedList = list.filter(r => 
         r.ticker.includes(q) || 
         r.name.toUpperCase().includes(q) || 
         topSymbols.has(r.ticker)
       );
+
+      // If no recommendation matched or the top matched ticker isn't in the preset list, dynamically synthesize one for the searched stock!
+      if (matchedList.length === 0 || (!matchedList.some(r => r.ticker === fuzzy.resolvedTicker) && fuzzy.resolvedTicker)) {
+        const targetTicker = fuzzy.resolvedTicker || q;
+        const dynamicRec = intradayStrategyEngine.getIntradayRecommendationForStock(targetTicker);
+        livePriceStreamService.addTickers([targetTicker]);
+        if (!matchedList.some(r => r.ticker === dynamicRec.ticker)) {
+          return [dynamicRec, ...matchedList];
+        }
+      }
+
+      return matchedList;
     }
     return list;
   }, [recommendations, activeCategory, searchQuery]);
@@ -163,9 +216,13 @@ export const IntradaySuggestiveTradeView: React.FC<IntradaySuggestiveTradeViewPr
               <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                 DAILY BUY WINDOWS &amp; CAPS
               </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 flex items-center gap-1.5">
+                <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+                <span>24/7 LIVE STREAM ACTIVE</span>
+              </span>
               <span className="text-xs text-zinc-400 font-mono flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Calibrated {lastRefreshed}</span>
+                <span>Sync {lastRefreshed}</span>
               </span>
             </div>
 
@@ -286,11 +343,18 @@ export const IntradaySuggestiveTradeView: React.FC<IntradaySuggestiveTradeViewPr
             const symCurr = rec.ticker.endsWith('.TO') ? 'C$' : (rec.ticker.endsWith('.L') ? '£' : '$');
             const dec = rec.currentPrice < 1 ? 4 : 2;
             const isResearchExpanded = expandedResearchTicker === rec.ticker;
+            const flash = flashingTickers[rec.ticker];
 
             return (
               <div
                 key={rec.ticker}
-                className="rounded-2xl bg-zinc-900/90 border border-zinc-800 p-5 space-y-4 shadow-xl hover:border-zinc-700/80 transition-all flex flex-col justify-between group"
+                className={`rounded-2xl bg-zinc-900/90 border p-5 space-y-4 shadow-xl transition-all duration-300 flex flex-col justify-between group ${
+                  flash === 'UP'
+                    ? 'border-emerald-500/80 ring-1 ring-emerald-500/50 shadow-emerald-950/50'
+                    : (flash === 'DOWN'
+                      ? 'border-rose-500/80 ring-1 ring-rose-500/50 shadow-rose-950/50'
+                      : 'border-zinc-800 hover:border-zinc-700/80')
+                }`}
               >
                 {/* Header: Ticker, Name, Category & Conviction Directive */}
                 <div className="space-y-3">
@@ -306,6 +370,13 @@ export const IntradaySuggestiveTradeView: React.FC<IntradaySuggestiveTradeViewPr
                         <span className="text-[10px] font-mono text-zinc-500">
                           {rec.category.replace(/_/g, ' ')}
                         </span>
+                        {flash && (
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold animate-pulse ${
+                            flash === 'UP' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                          }`}>
+                            LIVE {flash}
+                          </span>
+                        )}
                       </div>
                       <h4 className="text-xs text-zinc-300 font-medium truncate max-w-[220px] sm:max-w-xs">
                         {rec.name}
@@ -338,13 +409,17 @@ export const IntradaySuggestiveTradeView: React.FC<IntradaySuggestiveTradeViewPr
                         <Target className="w-3 h-3 text-emerald-400" />
                         <span>Suggested Buy Entry</span>
                       </div>
-                      <div className="text-xl font-black text-white">
+                      <div className={`text-xl font-black transition-colors ${
+                        flash === 'UP' ? 'text-emerald-400' : (flash === 'DOWN' ? 'text-rose-400' : 'text-white')
+                      }`}>
                         {symCurr}{rec.suggestedBuyEntry.toFixed(dec)}
                       </div>
                       <div className="text-[10px] text-zinc-400">
                         Buy Zone: <strong className="text-emerald-300">{symCurr}{rec.suggestedBuyZone.min.toFixed(dec)} - {symCurr}{rec.suggestedBuyZone.max.toFixed(dec)}</strong>
                       </div>
-                      <div className="text-[10px] text-zinc-500">
+                      <div className={`text-[10px] transition-colors ${
+                        flash === 'UP' ? 'text-emerald-400 font-bold' : (flash === 'DOWN' ? 'text-rose-400 font-bold' : 'text-zinc-400')
+                      }`}>
                         Spot: {symCurr}{rec.currentPrice.toFixed(dec)} ({rec.changePercent >= 0 ? '+' : ''}{rec.changePercent.toFixed(2)}%)
                       </div>
                     </div>

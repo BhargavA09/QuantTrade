@@ -26,6 +26,7 @@ import { TradeJournalView } from './components/terminal/TradeJournalView';
 import { InstitutionalRiskTearSheet } from './components/terminal/InstitutionalRiskTearSheet';
 import { InstitutionalSecurityVaultModal } from './components/security/InstitutionalSecurityVaultModal';
 import { TermsAndConditionsView } from './components/legal/TermsAndConditionsView';
+import { QuickCommandPalette } from './components/navigation/QuickCommandPalette';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineConnectivityBanner } from './components/OfflineConnectivityBanner';
 import { quantTraderBrain, TraderBrainState } from './services/QuantTraderBrain';
@@ -58,6 +59,7 @@ export default function App() {
   const [isGlobalTearSheetOpen, setIsGlobalTearSheetOpen] = useState<boolean>(false);
   const [isVaultModalOpen, setIsVaultModalOpen] = useState<boolean>(false);
   const [vaultState, setVaultState] = useState<VaultState>(() => securityVaultService.getState());
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
 
   const handleSelectTicker = (ticker: string) => {
     const clean = ticker.trim().toUpperCase();
@@ -76,9 +78,20 @@ export default function App() {
   useEffect(() => {
     const unsubBrain = quantTraderBrain.subscribe(setBrainState);
     const unsubVault = securityVaultService.subscribe(setVaultState);
+    
+    // Global Cmd+K / Ctrl+K keyboard shortcut to open Quick Command Palette
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       unsubBrain();
       unsubVault();
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -216,6 +229,17 @@ export default function App() {
 
             {/* Global Actions & Portfolio Balance Readout */}
             <div className="flex items-center justify-between sm:justify-end gap-2.5">
+              {/* Quick Search & Command Palette Trigger (Cmd+K) */}
+              <button
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 transition-all font-mono shadow-inner group"
+                title="Search any stock, ticker, model, or tool (⌘K / Ctrl+K)"
+              >
+                <Search className="w-3.5 h-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                <span className="hidden md:inline text-zinc-400">Search</span>
+                <kbd className="hidden sm:inline text-[9px] bg-zinc-800 text-zinc-400 group-hover:text-zinc-200 px-1.5 py-0.5 rounded border border-zinc-700 font-sans font-bold">⌘K</kbd>
+              </button>
+
               <div className="hidden sm:block">
                 <PWAInstallButton />
               </div>
@@ -376,6 +400,16 @@ export default function App() {
       <InstitutionalSecurityVaultModal
         isOpen={isVaultModalOpen}
         onClose={() => setIsVaultModalOpen(false)}
+      />
+
+      {/* Universal Quick Command Palette (Cmd+K / Ctrl+K) */}
+      <QuickCommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectTicker={handleSelectTicker}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+        onOpenVault={() => setIsVaultModalOpen(true)}
+        onOpenTearSheet={() => setIsGlobalTearSheetOpen(true)}
       />
     </div>
   );

@@ -106,14 +106,21 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<
     'chart' | 'intraday_picks' | 'volumelens' | 'lse_edge' | 'fourier' | 'projection' | 'strategy' | 'correction' | 'global_radar' | 'options' | 'deltagamma' | 'volume_profile' | 'multileg' | 'macro_stress' | 'patterns' | 'sentiment_heatmap' | 'sentiment_gauge' | 'backtest'
   >('chart');
+  const [isQuantMenuOpen, setIsQuantMenuOpen] = useState(false);
+  const quantMenuRef = useRef<HTMLDivElement>(null);
 
-  const subTabsContainerRef = useRef<HTMLDivElement>(null);
-  const scrollSubTabs = (direction: 'left' | 'right') => {
-    if (subTabsContainerRef.current) {
-      const scrollAmount = direction === 'left' ? -260 : 260;
-      subTabsContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  // Close quant menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (quantMenuRef.current && !quantMenuRef.current.contains(e.target as Node)) {
+        setIsQuantMenuOpen(false);
+      }
+    };
+    if (isQuantMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
     }
-  };
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isQuantMenuOpen]);
 
   // Tear Sheet & Chart Visualizer Toggles
   const [isTearSheetOpen, setIsTearSheetOpen] = useState<boolean>(false);
@@ -738,21 +745,10 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
       {/* 1. Sub-Tab Header Strip, Live Indicator & Quick Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl backdrop-blur-md">
         
-        {/* Terminal Sub-Tabs with Smooth Navigation */}
-        <div className="relative flex items-center max-w-full overflow-hidden group flex-1">
-          <button
-            onClick={() => scrollSubTabs('left')}
-            className="hidden sm:flex items-center justify-center absolute left-0 z-10 w-7 h-full bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-transparent text-zinc-400 hover:text-white transition-opacity opacity-0 group-hover:opacity-100"
-            title="Scroll sub-tabs left"
-            aria-label="Scroll sub-tabs left"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          <div 
-            ref={subTabsContainerRef}
-            className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs font-bold font-mono overflow-x-auto no-scrollbar scroll-smooth max-w-full"
-          >
+        {/* Streamlined Primary Sub-Tabs & Quant Labs Hub */}
+        <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0" ref={quantMenuRef}>
+          {/* 1. Core Primary Tabs */}
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-bold font-mono">
           <button
             onClick={() => setActiveSubTab('chart')}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
@@ -782,245 +778,228 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
             </span>
           </button>
 
-          <button
-            onClick={() => setActiveSubTab('volumelens')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'volumelens'
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-950/40 ring-1 ring-cyan-400'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-            title="VolumeLens Institutional Order Flow, Footprint Clusters, CVD Divergence & Level 2 DOM Ladder"
-          >
-            <Eye className="w-4 h-4 text-cyan-400" />
-            <span>VolumeLens & Futures</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
-              ORDER FLOW
-            </span>
-          </button>
+            <button
+              onClick={() => setActiveSubTab('fourier')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                activeSubTab === 'fourier'
+                  ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-950/40'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+              title="Interactive Intraday Chart with Discrete Fourier Signal Filtering"
+            >
+              <Waves className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Fourier Signals</span>
+            </button>
 
-          <button
-            onClick={() => setActiveSubTab('lse_edge')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'lse_edge'
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-950/40 ring-1 ring-cyan-400'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-            title="London Strategic Edge Open Source Market Data & ML Forecasting Engine (londonstrategicedge.com)"
-          >
-            <Database className="w-4 h-4 text-cyan-400" />
-            <span>LSE Open Edge</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
-              OPEN DATA
-            </span>
-          </button>
+            <button
+              onClick={() => setActiveSubTab('projection')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                activeSubTab === 'projection'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+              title="Search Stock Scenario Projections, SEC Insiders & Catalysts"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Scenarios &amp; ML</span>
+            </button>
+          </div>
 
-          <button
-            onClick={() => setActiveSubTab('fourier')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'fourier'
-                ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-950/40 ring-1 ring-cyan-400'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-            title="Interactive Intraday Price Chart with Discrete Fourier Signal Filtering & Volatility Envelopes"
-          >
-            <Waves className="w-4 h-4 text-cyan-400" />
-            <span>Fourier Signal Filter</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-sans font-bold">
-              SPECTRAL FFT
-            </span>
-          </button>
+          {/* Active Advanced Tool Indicator (When using specialized tool) */}
+          {activeSubTab !== 'chart' && activeSubTab !== 'intraday_picks' && activeSubTab !== 'fourier' && activeSubTab !== 'projection' && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-cyan-950/50 border border-cyan-500/40 text-xs font-mono text-cyan-300">
+              <span className="text-zinc-400">Active Lab:</span>
+              <span className="font-bold text-white capitalize">{activeSubTab.replace('_', ' ')}</span>
+              <button
+                onClick={() => setActiveSubTab('chart')}
+                className="ml-1 text-cyan-400 hover:text-white underline text-[11px] font-bold"
+                title="Return to primary Live Chart"
+              >
+                &larr; Back to Chart
+              </button>
+            </div>
+          )}
 
-          <button
-            onClick={() => setActiveSubTab('projection')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'projection'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Target className="w-4 h-4 text-indigo-400" />
-            <span>Search Scenarios & Projections</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-sans">INSIDERS</span>
-          </button>
+          {/* Categorized Quant Labs Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsQuantMenuOpen(!isQuantMenuOpen)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+                isQuantMenuOpen
+                  ? 'bg-zinc-800 text-white border-zinc-600'
+                  : 'bg-zinc-950 text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Quant Labs &amp; Tools</span>
+              <span className="text-[10px] text-zinc-500">{isQuantMenuOpen ? '▲' : '▼'}</span>
+            </button>
 
-          <button
-            onClick={() => setActiveSubTab('strategy')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'strategy'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Sliders className="w-4 h-4 text-indigo-400" />
-            <span>Strategy & RL Model</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          </button>
+            {isQuantMenuOpen && (
+              <div className="absolute left-0 top-full mt-2 z-40 w-[340px] sm:w-[460px] p-4 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150 space-y-3 font-mono text-xs">
+                <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
+                  <span className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                    Specialized Quantitative Modules
+                  </span>
+                  <button 
+                    onClick={() => setIsQuantMenuOpen(false)}
+                    className="text-zinc-500 hover:text-white text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
 
-          <button
-            onClick={() => setActiveSubTab('correction')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'correction'
-                ? 'bg-teal-600 text-white shadow-sm shadow-teal-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Radio className="w-4 h-4 text-teal-400" />
-            <span>Continuous Correction</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300 font-sans">MULTI-API</span>
-          </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                  {/* Category A: Order Flow & Microstructure */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 block">Microstructure &amp; Flow</span>
+                    <button
+                      onClick={() => { setActiveSubTab('volumelens'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'volumelens' ? 'bg-cyan-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5 text-cyan-400" /> VolumeLens Order Flow</span>
+                      <span className="text-[9px] text-zinc-500">DOM/CVD</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('volume_profile'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'volume_profile' ? 'bg-cyan-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5 text-cyan-400" /> Volume Profile &amp; L2</span>
+                      <span className="text-[9px] text-zinc-500">POC/VAH</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('patterns'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'patterns' ? 'bg-indigo-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Pattern Recognition</span>
+                      <span className="text-[9px] text-zinc-500">Geo</span>
+                    </button>
+                  </div>
 
-          <button
-            onClick={() => setActiveSubTab('global_radar')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
-              activeSubTab === 'global_radar'
-                ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Globe className="w-4 h-4 text-blue-400" />
-            <span>Global & Commodities</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-sans">LIVE RADAR</span>
-          </button>
+                  {/* Category B: Options & Derivatives */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 block">Options &amp; Greeks</span>
+                    <button
+                      onClick={() => { setActiveSubTab('options'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'options' ? 'bg-amber-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Coins className="w-3.5 h-3.5 text-amber-400" /> Options Chain &amp; IV</span>
+                      <span className="text-[9px] text-zinc-500">Black-Scholes</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('deltagamma'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'deltagamma' ? 'bg-amber-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-amber-400" /> Delta-Gamma Sensitivity</span>
+                      <span className="text-[9px] text-zinc-500">Hedge</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('multileg'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'multileg' ? 'bg-amber-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-amber-400" /> Multi-Leg Builder</span>
+                      <span className="text-[9px] text-zinc-500">Payoff</span>
+                    </button>
+                  </div>
 
-          <button
-            onClick={() => setActiveSubTab('options')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
-              activeSubTab === 'options'
-                ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Layers className="w-4 h-4 text-purple-400" />
-            <span>Options Simulator</span>
-          </button>
+                  {/* Category C: Advanced ML & Strategy */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 block">Quantitative ML Models</span>
+                    <button
+                      onClick={() => { setActiveSubTab('lse_edge'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'lse_edge' ? 'bg-cyan-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5 text-cyan-400" /> LSE Open Source Models</span>
+                      <span className="text-[9px] text-zinc-500">Ensemble</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('strategy'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'strategy' ? 'bg-indigo-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Cpu className="w-3.5 h-3.5 text-indigo-400" /> RL Policy &amp; Sizing</span>
+                      <span className="text-[9px] text-zinc-500">Half-Kelly</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('backtest'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'backtest' ? 'bg-purple-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Sliders className="w-3.5 h-3.5 text-purple-400" /> Strategy Backtester</span>
+                      <span className="text-[9px] text-zinc-500">Simulation</span>
+                    </button>
+                  </div>
 
-          <button
-            onClick={() => setActiveSubTab('deltagamma')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'deltagamma'
-                ? 'bg-amber-600 text-white shadow-sm shadow-amber-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Gauge className="w-4 h-4 text-amber-400" />
-            <span>Delta-Gamma Gauge</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans font-bold">HEDGING</span>
-          </button>
+                  {/* Category D: Macro & Sentiment */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 block">Macro &amp; Sentiment</span>
+                    <button
+                      onClick={() => { setActiveSubTab('macro_stress'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'macro_stress' ? 'bg-rose-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-rose-400" /> Macro Stress Test</span>
+                      <span className="text-[9px] text-zinc-500">Shocks</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('sentiment_heatmap'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'sentiment_heatmap' ? 'bg-emerald-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Flame className="w-3.5 h-3.5 text-emerald-400" /> Sentiment Heatmap</span>
+                      <span className="text-[9px] text-zinc-500">Social</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('sentiment_gauge'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'sentiment_gauge' ? 'bg-amber-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Gauge className="w-3.5 h-3.5 text-amber-400" /> Fear &amp; Greed Gauge</span>
+                      <span className="text-[9px] text-zinc-500">Index</span>
+                    </button>
+                    <button
+                      onClick={() => { setActiveSubTab('correction'); setIsQuantMenuOpen(false); }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex items-center justify-between ${
+                        activeSubTab === 'correction' ? 'bg-teal-600 text-white' : 'hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5"><Radio className="w-3.5 h-3.5 text-teal-400" /> Multi-API Calibration</span>
+                      <span className="text-[9px] text-zinc-500">Sync</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-          <button
-            onClick={() => setActiveSubTab('multileg')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'multileg'
-                ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Layers className="w-4 h-4 text-purple-400" />
-            <span>Multi-Leg Options</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-sans font-bold">POP %</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('volume_profile')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'volume_profile'
-                ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <BarChart2 className="w-4 h-4 text-blue-400" />
-            <span>Volume Profile & L2</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-sans font-bold">POC 70%</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('macro_stress')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'macro_stress'
-                ? 'bg-rose-600 text-white shadow-sm shadow-rose-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4 text-rose-400" />
-            <span>Macro Stress Engine</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 font-sans font-bold">CRISIS</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('patterns')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'patterns'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-            <span>Chart Patterns</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-sans font-bold">H&S / FLAGS</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('sentiment_heatmap')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'sentiment_heatmap'
-                ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Flame className="w-4 h-4 text-emerald-400" />
-            <span>Sentiment Heatmap</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold">SOCIAL & NEWS</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('sentiment_gauge')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'sentiment_gauge'
-                ? 'bg-amber-600 text-white shadow-sm shadow-amber-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-            title="Fear & Greed Index with Discrete Fourier Signal Confluence"
-          >
-            <Gauge className="w-4 h-4 text-amber-400" />
-            <span>Fear & Greed Gauge</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans font-bold">FOURIER CONFLUENCE</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('backtest')}
-            className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 relative shrink-0 whitespace-nowrap ${
-              activeSubTab === 'backtest'
-                ? 'bg-purple-600 text-white shadow-sm shadow-purple-950/40'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-            }`}
-          >
-            <Sliders className="w-4 h-4 text-purple-400" />
-            <span>Strategy Backtest</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-sans font-bold">CUSTOM SIGNALS</span>
-          </button>
-
+          {/* Tear Sheet Button */}
           <button
             onClick={() => setIsTearSheetOpen(true)}
-            className="px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 shadow-sm font-bold shrink-0 whitespace-nowrap"
+            className="px-2.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 text-xs font-mono font-bold flex items-center gap-1 transition-colors"
             title="Open Full Institutional Risk Tear Sheet & Report Generator"
           >
-            <FileText className="w-4 h-4 text-emerald-400" />
-            <span>Risk Tear Sheet</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/30 text-emerald-200 font-sans">PDF / CSV</span>
-          </button>
-        </div>
-
-          <button
-            onClick={() => scrollSubTabs('right')}
-            className="hidden sm:flex items-center justify-center absolute right-0 z-10 w-7 h-full bg-gradient-to-l from-zinc-950 via-zinc-950/80 to-transparent text-zinc-400 hover:text-white transition-opacity opacity-0 group-hover:opacity-100"
-            title="Scroll sub-tabs right"
-            aria-label="Scroll sub-tabs right"
-          >
-            <ChevronRight className="w-4 h-4" />
+            <FileText className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Tear Sheet</span>
           </button>
         </div>
 
@@ -1045,7 +1024,7 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
                   setSearchQuery('');
                 }
               }}
-              placeholder="Search ANY stock, commodity, or Canadian TSX (e.g. SHOP.TO, RY.TO, NVDA, ENB.TO)..."
+              placeholder="Search ANY stock (e.g. NVDA, SHOP.TO, TSLA) or press ⌘K..."
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-24 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
             />
             <button
