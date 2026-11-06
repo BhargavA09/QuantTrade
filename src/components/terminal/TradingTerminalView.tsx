@@ -493,20 +493,35 @@ export const TradingTerminalView: React.FC<TradingTerminalViewProps> = ({
 
   const currentPrice = stockMeta.price;
 
-  // Chart bars: use real historical daily OHLCV candles from the exchange or offline vault
+  // Chart bars: use real historical daily OHLCV candles from the exchange or offline vault, anchored live to current stream
   const chartBars = useMemo(() => {
+    let baseBars: any[] = [];
     if (liveAssetData?.bars && liveAssetData.bars.length > 0) {
-      return liveAssetData.bars;
+      baseBars = liveAssetData.bars;
+    } else {
+      const cleanSym = selectedTicker.toUpperCase();
+      const vaultBars = offlineMarketVaultService.getBars(cleanSym);
+      if (vaultBars && vaultBars.length > 0) {
+        baseBars = vaultBars;
+      } else {
+        baseBars = offlineMarketVaultService.generateOfflineBars(currentPrice);
+      }
     }
 
-    const cleanSym = selectedTicker.toUpperCase();
-    const vaultBars = offlineMarketVaultService.getBars(cleanSym);
-    if (vaultBars && vaultBars.length > 0) {
-      return vaultBars;
+    // Anchor the latest candle directly to the real-time live streaming price
+    if (baseBars && baseBars.length > 0 && currentPrice && currentPrice > 0) {
+      const last = baseBars[baseBars.length - 1];
+      const updatedLast = {
+        ...last,
+        price: currentPrice,
+        close: currentPrice,
+        high: Math.max(last.high || currentPrice, currentPrice),
+        low: Math.min(last.low || currentPrice, currentPrice)
+      };
+      return [...baseBars.slice(0, -1), updatedLast];
     }
 
-    // High fidelity offline generated bars anchored directly to the verified price
-    return offlineMarketVaultService.generateOfflineBars(currentPrice);
+    return baseBars;
   }, [liveAssetData, currentPrice, selectedTicker]);
 
   // High-Frequency Discrete Fourier Signal Decomposition

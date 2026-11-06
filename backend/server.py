@@ -70,14 +70,14 @@ except ImportError:
 
 # Baseline Market Prices for instant ultra-low latency response
 BASELINE_MARKET_PRICES = {
-    'SPY': {'price': 733.00, 'change': 4.85, 'changePercent': 0.63, 'name': 'SPDR S&P 500 ETF Trust', 'pe': 26.5, 'high': 736.10, 'low': 730.40, 'volume': 52000000},
-    'QQQ': {'price': 647.05, 'change': 4.10, 'changePercent': 0.84, 'name': 'Invesco QQQ Trust', 'pe': 32.1, 'high': 650.80, 'low': 644.10, 'volume': 38200000},
+    'SPY': {'price': 739.13, 'change': 6.13, 'changePercent': 0.84, 'name': 'SPDR S&P 500 ETF Trust', 'pe': 26.5, 'high': 742.00, 'low': 735.60, 'volume': 62000000},
+    'QQQ': {'price': 647.05, 'change': 5.40, 'changePercent': 0.84, 'name': 'Invesco QQQ Trust', 'pe': 32.1, 'high': 651.20, 'low': 644.10, 'volume': 42000000},
     'DIA': {'price': 428.90, 'change': 1.45, 'changePercent': 0.34, 'name': 'SPDR Dow Jones Industrial ETF', 'pe': 22.4, 'high': 430.10, 'low': 426.50, 'volume': 3900000},
     'IWM': {'price': 223.40, 'change': -0.65, 'changePercent': -0.29, 'name': 'iShares Russell 2000 ETF', 'pe': 24.1, 'high': 225.00, 'low': 221.80, 'volume': 22100000},
-    'NVDA': {'price': 181.60, 'change': 1.94, 'changePercent': 0.90, 'name': 'NVIDIA Corporation', 'pe': 48.5, 'high': 184.20, 'low': 180.50, 'volume': 84300000},
-    'AAPL': {'price': 344.17, 'change': 1.85, 'changePercent': 0.79, 'name': 'Apple Inc.', 'pe': 34.2, 'high': 346.10, 'low': 342.80, 'volume': 42100000},
-    'TSLA': {'price': 343.69, 'change': 4.20, 'changePercent': 1.72, 'name': 'Tesla, Inc.', 'pe': 64.2, 'high': 348.00, 'low': 340.50, 'volume': 68000000},
-    'MSFT': {'price': 535.93, 'change': 3.40, 'changePercent': 0.80, 'name': 'Microsoft Corporation', 'pe': 35.8, 'high': 538.00, 'low': 532.40, 'volume': 22000000},
+    'NVDA': {'price': 188.21, 'change': 6.61, 'changePercent': 3.64, 'name': 'NVIDIA Corporation', 'pe': 48.5, 'high': 194.89, 'low': 187.31, 'volume': 97800000},
+    'AAPL': {'price': 344.13, 'change': -0.04, 'changePercent': -0.01, 'name': 'Apple Inc.', 'pe': 34.2, 'high': 346.80, 'low': 343.10, 'volume': 46000000},
+    'TSLA': {'price': 359.72, 'change': 16.03, 'changePercent': 4.66, 'name': 'Tesla, Inc.', 'pe': 64.2, 'high': 364.50, 'low': 345.80, 'volume': 88000000},
+    'MSFT': {'price': 534.92, 'change': -1.01, 'changePercent': -0.19, 'name': 'Microsoft Corporation', 'pe': 35.8, 'high': 538.00, 'low': 532.40, 'volume': 22000000},
     'AMZN': {'price': 196.25, 'change': 2.10, 'changePercent': 1.08, 'name': 'Amazon.com, Inc.', 'pe': 43.6, 'high': 198.00, 'low': 194.20, 'volume': 34000000},
     'GOOGL': {'price': 178.40, 'change': 1.60, 'changePercent': 0.91, 'name': 'Alphabet Inc.', 'pe': 24.1, 'high': 180.50, 'low': 176.80, 'volume': 25000000},
     'META': {'price': 585.20, 'change': 7.40, 'changePercent': 1.28, 'name': 'Meta Platforms, Inc.', 'pe': 28.4, 'high': 589.00, 'low': 580.10, 'volume': 18000000},
@@ -86,7 +86,7 @@ BASELINE_MARKET_PRICES = {
     'COIN': {'price': 214.80, 'change': 7.20, 'changePercent': 3.47, 'name': 'Coinbase Global, Inc.', 'pe': 38.2, 'high': 218.00, 'low': 208.50, 'volume': 11000000},
 
     # Canadian Market (TSX) Listings
-    'SHOP.TO': {'price': 201.23, 'change': 3.80, 'changePercent': 1.66, 'name': 'Shopify Inc. (TSX)', 'pe': 78.4, 'high': 204.40, 'low': 199.10, 'volume': 4200000},
+    'SHOP.TO': {'price': 211.86, 'change': 10.63, 'changePercent': 5.28, 'name': 'Shopify Inc. (TSX)', 'pe': 78.4, 'high': 214.40, 'low': 204.10, 'volume': 5200000},
     'RY.TO': {'price': 285.46, 'change': 1.90, 'changePercent': 0.67, 'name': 'Royal Bank of Canada (TSX)', 'pe': 13.8, 'high': 287.50, 'low': 283.80, 'volume': 3100000},
     'TD.TO': {'price': 86.50, 'change': 0.75, 'changePercent': 0.88, 'name': 'Toronto-Dominion Bank (TSX)', 'pe': 10.9, 'high': 87.20, 'low': 85.80, 'volume': 5400000},
     'ENB.TO': {'price': 54.80, 'change': 0.45, 'changePercent': 0.83, 'name': 'Enbridge Inc. (TSX)', 'pe': 18.2, 'high': 55.20, 'low': 54.30, 'volume': 6800000},
@@ -108,8 +108,8 @@ BASELINE_MARKET_PRICES = {
     'BHP.AX': {'price': 58.18, 'change': 0.65, 'changePercent': 1.13, 'name': 'BHP Group Limited (ASX)', 'pe': 11.5, 'high': 58.70, 'low': 57.80, 'volume': 7500000},
 
     # Penny Stocks & Micro-Caps (< $5.00)
-    'PLUG': {'price': 1.35, 'change': 0.05, 'changePercent': 3.70, 'name': 'Plug Power Inc.', 'pe': 0, 'high': 1.40, 'low': 1.31, 'volume': 48000000},
-    'SNDL': {'price': 1.38, 'change': 0.04, 'changePercent': 3.17, 'name': 'SNDL Inc.', 'pe': 0, 'high': 1.42, 'low': 1.34, 'volume': 12000000},
+    'PLUG': {'price': 1.46, 'change': 0.11, 'changePercent': 8.15, 'name': 'Plug Power Inc.', 'pe': 0, 'high': 1.51, 'low': 1.37, 'volume': 58000000},
+    'SNDL': {'price': 1.42, 'change': 0.04, 'changePercent': 2.90, 'name': 'SNDL Inc.', 'pe': 0, 'high': 1.46, 'low': 1.38, 'volume': 14000000},
     'SOFI': {'price': 14.20, 'change': 0.28, 'changePercent': 2.01, 'name': 'SoFi Technologies Inc.', 'pe': 34.0, 'high': 14.60, 'low': 13.90, 'volume': 38000000},
     'MARA': {'price': 19.40, 'change': 0.85, 'changePercent': 4.58, 'name': 'MARA Holdings Inc.', 'pe': 0, 'high': 20.10, 'low': 18.90, 'volume': 29000000},
     'DNA': {'price': 0.34, 'change': 0.02, 'changePercent': 5.88, 'name': 'Ginkgo Bioworks Holdings', 'pe': 0, 'high': 0.38, 'low': 0.32, 'volume': 16000000},
@@ -117,7 +117,7 @@ BASELINE_MARKET_PRICES = {
     'RIOT': {'price': 12.95, 'change': 0.42, 'changePercent': 3.35, 'name': 'Riot Platforms Inc.', 'pe': 0, 'high': 13.40, 'low': 12.60, 'volume': 22000000},
     'CLOV': {'price': 3.15, 'change': 0.08, 'changePercent': 2.61, 'name': 'Clover Health Investments', 'pe': 0, 'high': 3.25, 'low': 3.05, 'volume': 9000000},
     'OPEN': {'price': 1.85, 'change': 0.06, 'changePercent': 3.35, 'name': 'Opendoor Technologies', 'pe': 0, 'high': 1.91, 'low': 1.80, 'volume': 14000000},
-    'PSEC': {'price': 1.385, 'change': 0.01, 'changePercent': 0.72, 'name': 'Prospect Capital Corp.', 'pe': 6.8, 'high': 1.42, 'low': 1.36, 'volume': 8400000},
+    'PSEC': {'price': 1.40, 'change': 0.015, 'changePercent': 1.08, 'name': 'Prospect Capital Corp.', 'pe': 6.8, 'high': 1.43, 'low': 1.37, 'volume': 9200000},
 
     # Futures & Derivatives Contracts (VolumeLens Institutional Universe)
     'ES=F': {'price': 5982.50, 'change': 28.50, 'changePercent': 0.48, 'name': 'E-mini S&P 500 Futures (CME)', 'pe': 0, 'high': 5998.00, 'low': 5965.25, 'volume': 1450000},

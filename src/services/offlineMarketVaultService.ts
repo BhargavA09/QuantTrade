@@ -40,12 +40,12 @@ type VaultListener = (state: NetworkHealthState) => void;
 // Institutional accurate baseline quotes for instant mobile launch & offline fallback
 const BASELINE_VAULT_QUOTES: Record<string, Partial<VaultQuote>> = {
   // US Mega-Cap & Indices
-  'NVDA': { name: 'NVIDIA Corporation', price: 217.94, change: 1.94, changePercent: 0.90, high: 219.19, low: 215.53, volume: 84000000 },
-  'AAPL': { name: 'Apple Inc.', price: 234.80, change: 1.85, changePercent: 0.79, high: 236.10, low: 232.80, volume: 46000000 },
-  'MSFT': { name: 'Microsoft Corporation', price: 428.20, change: 3.40, changePercent: 0.80, high: 431.00, low: 425.60, volume: 22000000 },
-  'TSLA': { name: 'Tesla, Inc.', price: 248.50, change: 4.20, changePercent: 1.72, high: 252.00, low: 244.50, volume: 68000000 },
-  'SPY': { name: 'SPDR S&P 500 ETF Trust', price: 769.66, change: 4.85, changePercent: 0.63, high: 772.10, low: 766.40, volume: 52000000 },
-  'QQQ': { name: 'Invesco QQQ Trust', price: 494.50, change: 4.10, changePercent: 0.84, high: 496.50, low: 491.10, volume: 38000000 },
+  'NVDA': { name: 'NVIDIA Corporation', price: 188.21, change: 6.61, changePercent: 3.64, high: 194.89, low: 187.31, volume: 97800000 },
+  'AAPL': { name: 'Apple Inc.', price: 344.13, change: -0.04, changePercent: -0.01, high: 346.80, low: 343.10, volume: 46000000 },
+  'MSFT': { name: 'Microsoft Corporation', price: 534.92, change: -1.01, changePercent: -0.19, high: 538.00, low: 532.40, volume: 22000000 },
+  'TSLA': { name: 'Tesla, Inc.', price: 359.72, change: 16.03, changePercent: 4.66, high: 364.50, low: 345.80, volume: 88000000 },
+  'SPY': { name: 'SPDR S&P 500 ETF Trust', price: 739.13, change: 6.13, changePercent: 0.84, high: 742.00, low: 735.60, volume: 62000000 },
+  'QQQ': { name: 'Invesco QQQ Trust', price: 647.05, change: 5.40, changePercent: 0.84, high: 651.20, low: 644.10, volume: 42000000 },
   'AMZN': { name: 'Amazon.com, Inc.', price: 196.25, change: 2.10, changePercent: 1.08, high: 198.00, low: 194.20, volume: 34000000 },
   'GOOGL': { name: 'Alphabet Inc.', price: 178.40, change: 1.60, changePercent: 0.91, high: 180.50, low: 176.80, volume: 25000000 },
   'META': { name: 'Meta Platforms, Inc.', price: 585.20, change: 7.40, changePercent: 1.28, high: 589.00, low: 580.40, volume: 18000000 },
@@ -54,7 +54,7 @@ const BASELINE_VAULT_QUOTES: Record<string, Partial<VaultQuote>> = {
   'COIN': { name: 'Coinbase Global, Inc.', price: 214.80, change: 7.20, changePercent: 3.47, high: 218.00, low: 208.50, volume: 11000000 },
 
   // CANADIAN MARKET (TSX) BASELINE QUOTES
-  'SHOP.TO': { name: 'Shopify Inc. (TSX)', price: 232.93, change: 3.80, changePercent: 1.66, high: 235.40, low: 230.10, volume: 4200000 },
+  'SHOP.TO': { name: 'Shopify Inc. (TSX)', price: 211.86, change: 10.63, changePercent: 5.28, high: 214.40, low: 204.10, volume: 5200000 },
   'RY.TO': { name: 'Royal Bank of Canada (TSX)', price: 285.46, change: 1.90, changePercent: 0.67, high: 287.50, low: 283.80, volume: 3100000 },
   'TD.TO': { name: 'Toronto-Dominion Bank (TSX)', price: 86.50, change: 0.75, changePercent: 0.88, high: 87.20, low: 85.80, volume: 5400000 },
   'ENB.TO': { name: 'Enbridge Inc. (TSX)', price: 54.80, change: 0.45, changePercent: 0.83, high: 55.20, low: 54.30, volume: 6800000 },
@@ -88,17 +88,18 @@ const BASELINE_VAULT_QUOTES: Record<string, Partial<VaultQuote>> = {
   'CBA.AX': { name: 'Commonwealth Bank (ASX)', price: 142.50, change: 1.20, changePercent: 0.85, high: 143.80, low: 141.60, volume: 2400000 },
 
   // PENNY STOCKS & MICRO-CAPS (< $5.00)
-  'PLUG': { name: 'Plug Power Inc.', price: 1.40, change: 0.05, changePercent: 3.70, high: 1.45, low: 1.36, volume: 48000000 },
-  'SNDL': { name: 'SNDL Inc.', price: 1.30, change: 0.04, changePercent: 3.17, high: 1.34, low: 1.27, volume: 12000000 },
-  'SOFI': { name: 'SoFi Technologies Inc.', price: 8.85, change: 0.28, changePercent: 3.27, high: 9.02, low: 8.65, volume: 38000000 },
-  'MARA': { name: 'MARA Holdings Inc.', price: 16.20, change: 0.85, changePercent: 5.54, high: 16.70, low: 15.60, volume: 29000000 },
-  'DNA': { name: 'Ginkgo Bioworks Holdings', price: 6.40, change: 0.18, changePercent: 2.89, high: 6.62, low: 6.25, volume: 16000000 },
-  'LCID': { name: 'Lucid Group Inc.', price: 3.42, change: 0.11, changePercent: 3.32, high: 3.52, low: 3.35, volume: 24000000 },
-  'RIOT': { name: 'Riot Platforms Inc.', price: 8.95, change: 0.42, changePercent: 4.92, high: 9.20, low: 8.65, volume: 22000000 },
-  'CLOV': { name: 'Clover Health Investments', price: 2.75, change: 0.08, changePercent: 3.00, high: 2.84, low: 2.68, volume: 9000000 },
-  'NKLA': { name: 'Nikola Corporation', price: 3.80, change: 0.12, changePercent: 3.26, high: 3.95, low: 3.70, volume: 8500000 },
+  'PLUG': { name: 'Plug Power Inc.', price: 1.46, change: 0.11, changePercent: 8.15, high: 1.51, low: 1.37, volume: 58000000 },
+  'SNDL': { name: 'SNDL Inc.', price: 1.42, change: 0.04, changePercent: 2.90, high: 1.46, low: 1.38, volume: 14000000 },
+  'PSEC': { name: 'Prospect Capital Corp.', price: 1.40, change: 0.015, changePercent: 1.08, high: 1.43, low: 1.37, volume: 9200000 },
+  'SOFI': { name: 'SoFi Technologies Inc.', price: 14.20, change: 0.28, changePercent: 2.01, high: 14.60, low: 13.90, volume: 38000000 },
+  'MARA': { name: 'MARA Holdings Inc.', price: 19.40, change: 0.85, changePercent: 4.58, high: 20.10, low: 18.90, volume: 29000000 },
+  'DNA': { name: 'Ginkgo Bioworks Holdings', price: 0.34, change: 0.02, changePercent: 5.88, high: 0.38, low: 0.32, volume: 16000000 },
+  'LCID': { name: 'Lucid Group Inc.', price: 2.42, change: 0.08, changePercent: 3.32, high: 2.52, low: 2.35, volume: 24000000 },
+  'RIOT': { name: 'Riot Platforms Inc.', price: 12.95, change: 0.42, changePercent: 3.35, high: 13.40, low: 12.60, volume: 22000000 },
+  'CLOV': { name: 'Clover Health Investments', price: 3.15, change: 0.08, changePercent: 2.61, high: 3.25, low: 3.05, volume: 9000000 },
+  'NKLA': { name: 'Nikola Corporation', price: 1.80, change: 0.05, changePercent: 2.86, high: 1.95, low: 1.70, volume: 8500000 },
   'OPEN': { name: 'Opendoor Technologies', price: 1.85, change: 0.06, changePercent: 3.35, high: 1.91, low: 1.80, volume: 14000000 },
-  'HUT': { name: 'Hut 8 Corp.', price: 12.80, change: 0.65, changePercent: 5.35, high: 13.10, low: 12.30, volume: 11000000 },
+  'HUT': { name: 'Hut 8 Corp.', price: 18.80, change: 0.65, changePercent: 3.58, high: 19.20, low: 18.30, volume: 11000000 },
   'BITF': { name: 'Bitfarms Ltd.', price: 2.15, change: 0.09, changePercent: 4.37, high: 2.22, low: 2.08, volume: 15000000 },
   'BB.TO': { name: 'BlackBerry Limited (TSX)', price: 3.25, change: 0.08, changePercent: 2.52, high: 3.32, low: 3.19, volume: 4500000 },
 
@@ -116,7 +117,7 @@ const BASELINE_VAULT_QUOTES: Record<string, Partial<VaultQuote>> = {
 class OfflineMarketVaultService {
   private networkHealth: NetworkHealthState;
   private listeners: VaultListener[] = [];
-  private STORAGE_PREFIX = 'quant_market_vault_v2_';
+  private STORAGE_PREFIX = 'quant_market_vault_v3_';
 
   constructor() {
     const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -136,7 +137,25 @@ class OfflineMarketVaultService {
     };
 
     this.bindNetworkListeners();
+    this.purgeStaleLegacyVaults();
     this.seedBaselineVault();
+  }
+
+  /**
+   * Automatically clears legacy v2 cached entries with outdated baseline prices
+   */
+  private purgeStaleLegacyVaults() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('quant_market_vault_v2_')) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch {}
   }
 
   private bindNetworkListeners() {

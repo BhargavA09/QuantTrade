@@ -38,6 +38,7 @@ import {
 } from '../../services/intradayStrategyEngine';
 import { quantTraderBrain } from '../../services/QuantTraderBrain';
 import { findNearestRelevantMatch, IntelligentSearchResponse } from '../../utils/intelligentSearch';
+import { livePriceStreamService } from '../../services/api/livePriceStreamService';
 
 interface StockSearchScenarioProjectionProps {
   initialTicker?: string;
@@ -175,6 +176,46 @@ export const StockSearchScenarioProjection: React.FC<StockSearchScenarioProjecti
       refreshMarketNoise(activeTicker);
     }
   }, [noiseScanTick, activeTicker]);
+
+  // Real-Time Live Streaming Price Ingestion & Dynamic Model Re-Projection
+  useEffect(() => {
+    if (!activeTicker) return;
+    livePriceStreamService.addTickers([activeTicker]);
+    const unsub = livePriceStreamService.subscribeTick((tick) => {
+      if (tick.ticker.toUpperCase() === activeTicker.toUpperCase() && tick.price > 0) {
+        setData(prev => {
+          if (!prev) return prev;
+          const oldPrice = prev.currentPrice || tick.price;
+          const priceRatio = tick.price / (oldPrice || 1);
+
+          // Dynamically scale scenario model projections based on live market price stream
+          const updateScenario = (sc: any) => {
+            if (!sc) return sc;
+            const newTarget = parseFloat((sc.projectedTargetPrice * priceRatio).toFixed(2));
+            const newGain = parseFloat((((newTarget - tick.price) / tick.price) * 100).toFixed(2));
+            return {
+              ...sc,
+              projectedTargetPrice: newTarget,
+              expectedGainPct: newGain
+            };
+          };
+
+          return {
+            ...prev,
+            currentPrice: tick.price,
+            scenarios: prev.scenarios ? {
+              baseCase: updateScenario(prev.scenarios.baseCase),
+              bullCase: updateScenario(prev.scenarios.bullCase),
+              bearCase: updateScenario(prev.scenarios.bearCase)
+            } : prev.scenarios
+          };
+        });
+        setLastRefreshedTime(`Live ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
+      }
+    });
+
+    return () => unsub();
+  }, [activeTicker]);
 
   const formatTxDate = (dStr: string): string => {
     if (!dStr) return '-';

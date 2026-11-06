@@ -84,7 +84,7 @@ async function fetchYahooChartQuote(symbol: string): Promise<{
     try {
       if (Date.now() < providerCooldowns.yahoo) continue;
 
-      const res = await fetch(`https://${host}/v8/finance/chart/${encoded}?interval=1d&range=1d`, {
+      const res = await fetch(`https://${host}/v8/finance/chart/${encoded}?interval=1m&range=1d`, {
         headers: { 
           'User-Agent': USER_AGENT, 
           'Accept': 'application/json',

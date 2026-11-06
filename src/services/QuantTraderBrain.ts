@@ -271,7 +271,7 @@ class QuantTraderBrainService {
       }
     ];
 
-    const saved = localStorage.getItem('quant_trader_brain_state_v2');
+    const saved = localStorage.getItem('quant_trader_brain_state_v3');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -479,14 +479,14 @@ class QuantTraderBrainService {
         id: 'ACT-01',
         ticker: 'NVDA',
         tradeType: 'LONG',
-        entryPrice: 138.20,
-        currentPrice: 138.80,
+        entryPrice: 182.40,
+        currentPrice: 188.21,
         quantity: 250,
-        stopLoss: 135.00,
-        takeProfit1: 142.50,
-        takeProfit2: 146.00,
-        unrealizedPnl: 150.00,
-        unrealizedPnlPct: 0.43,
+        stopLoss: 178.00,
+        takeProfit1: 194.50,
+        takeProfit2: 202.00,
+        unrealizedPnl: 1452.50,
+        unrealizedPnlPct: 3.19,
         entryTime: formatTime(0.5),
         setup: 'Ascending Triangle Breakout Target',
         kellyFraction: 0.08
@@ -540,11 +540,35 @@ class QuantTraderBrainService {
 
   private save() {
     try {
-      localStorage.setItem('quant_trader_brain_state_v2', JSON.stringify(this.state));
+      localStorage.setItem('quant_trader_brain_state_v3', JSON.stringify(this.state));
     } catch (e) {
       // ignore
     }
     this.notify();
+  }
+
+  public updateLiveTick(tick: { ticker: string; price: number; change?: number; changePercent?: number; volume?: number }) {
+    if (!tick || !tick.ticker || !tick.price || tick.price <= 0) return;
+    const sym = tick.ticker.toUpperCase();
+    let changed = false;
+
+    if (this.state.activeTrades && this.state.activeTrades.length > 0) {
+      this.state.activeTrades.forEach(trade => {
+        if (trade.ticker.toUpperCase() === sym) {
+          trade.currentPrice = tick.price;
+          const diff = trade.tradeType === 'LONG' ? (tick.price - trade.entryPrice) : (trade.entryPrice - tick.price);
+          trade.unrealizedPnl = parseFloat((diff * trade.quantity).toFixed(2));
+          trade.unrealizedPnlPct = parseFloat(((diff / trade.entryPrice) * 100).toFixed(2));
+          changed = true;
+        }
+      });
+    }
+
+    if (changed) {
+      const totalUnrealized = this.state.activeTrades.reduce((acc, t) => acc + (t.unrealizedPnl || 0), 0);
+      this.state.stats.capital = parseFloat((this.state.stats.initialCapital + this.state.stats.netPnl + totalUnrealized).toFixed(2));
+      this.save();
+    }
   }
 
   public subscribe(listener: BrainListener): () => void {
@@ -1248,12 +1272,7 @@ class QuantTraderBrainService {
       { ticker: 'URA', name: 'Global X Uranium ETF', category: 'commodity' as const, price: 31.40, change: 1.20, changePercent: 3.97, volatility: 36.2, assetType: 'Uranium / Clean Nuclear' },
 
       // CANADIAN MARKET (TSX / S&P/TSX 60)
-      { ticker: 'SHOP.TO', name: 'Shopify Inc. (TSX)', category: 'canadian_tsx' as const, price: 108.50, change: 2.40, changePercent: 2.26, volatility: 38.2, assetType: 'Canadian Tech & E-Commerce' },
-      { ticker: 'RY.TO', name: 'Royal Bank of Canada (TSX)', category: 'canadian_tsx' as const, price: 171.20, change: 1.10, changePercent: 0.65, volatility: 14.2, assetType: 'Canadian Financials & Wealth' },
-      { ticker: 'TD.TO', name: 'Toronto-Dominion Bank (TSX)', category: 'canadian_tsx' as const, price: 78.40, change: 0.65, changePercent: 0.84, volatility: 16.5, assetType: 'Canadian Banking' },
-      { ticker: 'ENB.TO', name: 'Enbridge Inc. (TSX)', category: 'canadian_tsx' as const, price: 54.80, change: 0.45, changePercent: 0.83, volatility: 15.8, assetType: 'Canadian Energy Midstream' },
-      // CANADIAN MARKET (TSX)
-      { ticker: 'SHOP.TO', name: 'Shopify Inc. (TSX)', category: 'canadian_tsx' as const, price: 232.93, change: 3.80, changePercent: 1.66, volatility: 32.4, assetType: 'E-Commerce Platform' },
+      { ticker: 'SHOP.TO', name: 'Shopify Inc. (TSX)', category: 'canadian_tsx' as const, price: 211.86, change: 10.63, changePercent: 5.28, volatility: 32.4, assetType: 'E-Commerce Platform' },
       { ticker: 'RY.TO', name: 'Royal Bank of Canada (TSX)', category: 'canadian_tsx' as const, price: 285.46, change: 1.90, changePercent: 0.67, volatility: 11.2, assetType: 'Canadian Major Bank' },
       { ticker: 'TD.TO', name: 'Toronto-Dominion Bank (TSX)', category: 'canadian_tsx' as const, price: 86.50, change: 0.75, changePercent: 0.88, volatility: 12.8, assetType: 'Retail & Commercial Banking' },
       { ticker: 'ENB.TO', name: 'Enbridge Inc. (TSX)', category: 'canadian_tsx' as const, price: 54.80, change: 0.45, changePercent: 0.83, volatility: 14.2, assetType: 'Energy Pipeline Infrastructure' },
@@ -1263,10 +1282,10 @@ class QuantTraderBrainService {
       { ticker: 'XIC.TO', name: 'iShares Core S&P/TSX Composite', category: 'canadian_tsx' as const, price: 39.20, change: 0.28, changePercent: 0.72, volatility: 12.6, assetType: 'Total Canadian Equity Composite' },
 
       // GLOBAL TECH & US EQUITIES
-      { ticker: 'NVDA', name: 'NVIDIA Corporation', category: 'global_stock' as const, price: 217.94, change: 1.94, changePercent: 0.90, volatility: 38.4, assetType: 'Semiconductors / AI' },
-      { ticker: 'AAPL', name: 'Apple Inc.', category: 'global_stock' as const, price: 234.80, change: 1.85, changePercent: 0.79, volatility: 18.2, assetType: 'Consumer Tech US' },
-      { ticker: 'TSLA', name: 'Tesla, Inc.', category: 'global_stock' as const, price: 248.50, change: 4.20, changePercent: 1.72, volatility: 46.5, assetType: 'EV / Autonomy US' },
-      { ticker: 'MSFT', name: 'Microsoft Corporation', category: 'global_stock' as const, price: 428.20, change: 3.40, changePercent: 0.80, volatility: 20.4, assetType: 'Cloud & AI US' },
+      { ticker: 'NVDA', name: 'NVIDIA Corporation', category: 'global_stock' as const, price: 188.21, change: 6.61, changePercent: 3.64, volatility: 38.4, assetType: 'Semiconductors / AI' },
+      { ticker: 'AAPL', name: 'Apple Inc.', category: 'global_stock' as const, price: 344.13, change: -0.04, changePercent: -0.01, volatility: 18.2, assetType: 'Consumer Tech US' },
+      { ticker: 'TSLA', name: 'Tesla, Inc.', category: 'global_stock' as const, price: 359.72, change: 16.03, changePercent: 4.66, volatility: 46.5, assetType: 'EV / Autonomy US' },
+      { ticker: 'MSFT', name: 'Microsoft Corporation', category: 'global_stock' as const, price: 534.92, change: -1.01, changePercent: -0.19, volatility: 20.4, assetType: 'Cloud & AI US' },
       { ticker: 'TSM', name: 'Taiwan Semiconductor Mfg.', category: 'global_stock' as const, price: 192.50, change: 3.80, changePercent: 2.01, volatility: 34.2, assetType: 'Global Foundry Taiwan' },
       { ticker: 'PLTR', name: 'Palantir Technologies', category: 'global_stock' as const, price: 44.60, change: 1.85, changePercent: 4.33, volatility: 49.5, assetType: 'Enterprise & Defense AI' },
       { ticker: 'AMZN', name: 'Amazon.com, Inc.', category: 'global_stock' as const, price: 196.25, change: 2.10, changePercent: 1.08, volatility: 26.5, assetType: 'Cloud & Commerce US' },
@@ -1283,16 +1302,16 @@ class QuantTraderBrainService {
       { ticker: 'BHP.AX', name: 'BHP Group Limited (ASX)', category: 'global_stock' as const, price: 58.18, change: 0.65, changePercent: 1.13, volatility: 22.0, assetType: 'Mining & Natural Resources Australia' },
 
       // PENNY STOCKS & MICRO-CAPS (< $5.00)
-      { ticker: 'PLUG', name: 'Plug Power Inc.', category: 'global_stock' as const, price: 1.40, change: 0.05, changePercent: 3.70, volatility: 68.0, assetType: 'Hydrogen Energy Micro-Cap' },
-      { ticker: 'SNDL', name: 'SNDL Inc.', category: 'global_stock' as const, price: 1.30, change: 0.04, changePercent: 3.17, volatility: 62.0, assetType: 'Consumer & Cannabis Micro-Cap' },
-      { ticker: 'MARA', name: 'MARA Holdings Inc.', category: 'global_stock' as const, price: 16.20, change: 0.85, changePercent: 5.54, volatility: 74.0, assetType: 'Compute & Mining Infrastructure' },
-      { ticker: 'DNA', name: 'Ginkgo Bioworks Holdings', category: 'global_stock' as const, price: 6.40, change: 0.18, changePercent: 2.89, volatility: 58.0, assetType: 'Synthetic Biology Small-Cap' },
-      { ticker: 'LCID', name: 'Lucid Group Inc.', category: 'global_stock' as const, price: 3.42, change: 0.11, changePercent: 3.32, volatility: 64.0, assetType: 'Electric Vehicles Penny Stock' },
-      { ticker: 'SOFI', name: 'SoFi Technologies Inc.', category: 'global_stock' as const, price: 8.85, change: 0.28, changePercent: 3.27, volatility: 48.0, assetType: 'Fintech & Digital Banking' },
+      { ticker: 'PLUG', name: 'Plug Power Inc.', category: 'global_stock' as const, price: 1.46, change: 0.11, changePercent: 8.15, volatility: 68.0, assetType: 'Hydrogen Energy Micro-Cap' },
+      { ticker: 'SNDL', name: 'SNDL Inc.', category: 'global_stock' as const, price: 1.42, change: 0.04, changePercent: 2.90, volatility: 62.0, assetType: 'Consumer & Cannabis Micro-Cap' },
+      { ticker: 'MARA', name: 'MARA Holdings Inc.', category: 'global_stock' as const, price: 19.40, change: 0.85, changePercent: 4.58, volatility: 74.0, assetType: 'Compute & Mining Infrastructure' },
+      { ticker: 'DNA', name: 'Ginkgo Bioworks Holdings', category: 'global_stock' as const, price: 0.34, change: 0.02, changePercent: 5.88, volatility: 58.0, assetType: 'Synthetic Biology Small-Cap' },
+      { ticker: 'LCID', name: 'Lucid Group Inc.', category: 'global_stock' as const, price: 2.42, change: 0.08, changePercent: 3.32, volatility: 64.0, assetType: 'Electric Vehicles Penny Stock' },
+      { ticker: 'SOFI', name: 'SoFi Technologies Inc.', category: 'global_stock' as const, price: 14.20, change: 0.28, changePercent: 2.01, volatility: 48.0, assetType: 'Fintech & Digital Banking' },
 
       // GLOBAL MARKET INDICES
-      { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', category: 'index' as const, price: 769.66, change: 4.85, changePercent: 0.63, volatility: 12.4, assetType: 'US Large Cap S&P 500' },
-      { ticker: 'QQQ', name: 'Invesco QQQ Trust', category: 'index' as const, price: 494.50, change: 4.10, changePercent: 0.84, volatility: 16.8, assetType: 'US Tech Nasdaq 100' },
+      { ticker: 'SPY', name: 'SPDR S&P 500 ETF Trust', category: 'index' as const, price: 739.13, change: 6.13, changePercent: 0.84, volatility: 12.4, assetType: 'US Large Cap S&P 500' },
+      { ticker: 'QQQ', name: 'Invesco QQQ Trust', category: 'index' as const, price: 647.05, change: 5.40, changePercent: 0.84, volatility: 16.8, assetType: 'US Tech Nasdaq 100' },
       { ticker: 'IWM', name: 'iShares Russell 2000 ETF', category: 'index' as const, price: 223.40, change: -0.65, changePercent: -0.29, volatility: 20.5, assetType: 'US Small Cap Russell' },
 
       // COMMODITIES, DIGITAL & FIXED INCOME

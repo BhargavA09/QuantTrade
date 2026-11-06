@@ -12,6 +12,7 @@
 
 import { offlineMarketVaultService } from '../offlineMarketVaultService';
 import { intradayStrategyEngine } from '../intradayStrategyEngine';
+import { quantTraderBrain } from '../QuantTraderBrain';
 
 export interface LivePriceTick {
   ticker: string;
@@ -292,9 +293,10 @@ class LivePriceStreamService {
       exchangeTimestamp: tick.timestamp
     });
 
-    // Real-time synchronization to Intraday Strategy Engine
+    // Real-time synchronization to Intraday Strategy Engine & Quant Trader Brain
     try {
       intradayStrategyEngine.updateLiveTick(fullTick);
+      quantTraderBrain.updateLiveTick(fullTick);
     } catch {}
 
     this.lastTickMs = Date.now();
